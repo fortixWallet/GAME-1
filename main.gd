@@ -512,26 +512,9 @@ func _aim_loupe(gc: Vector2) -> void:
 # Мета — побачити числами, чи збігаються вони, ПЕРЕД тим як щось міняти.
 const ZoneHit := preload("res://core/zones.gd")
 const Case01 := preload("res://data/case_01.gd")
-var shadow_same := 0
-var shadow_diff := 0
-var shadow_note := ""
-
-func _shadow_zone(gc: Vector2, old_over: bool) -> void:
-	if not goblet_pivot or not main_cam3: return
-	var z: Dictionary = Case01.ZONES[&"z.foot.underside"]
-	var new_over: bool = ZoneHit.inside_3d(gc, z, goblet_pivot, main_cam3)
-	if new_over == old_over: shadow_same += 1
-	else:
-		shadow_diff += 1
-		if shadow_note == "":
-			# скільки екранних пікселів дає радіус 1.0 у світі — щоб підібрати r ВИМІРОМ
-			var wp: Vector3 = hallmark_node.global_position
-			var c2: Vector2 = main_cam3.unproject_position(wp)
-			var s2: Vector2 = main_cam3.unproject_position(wp + main_cam3.global_transform.basis.x)
-			var px_per_unit: float = c2.distance_to(s2)
-			var old_thresh: float = loupe_lw*0.7
-			shadow_note = "вузол=%s px/од=%.1f поріг_старий=%.0fpx → потрібен r=%.3f" % [
-				hallmark_node.position, px_per_unit, old_thresh, old_thresh/maxf(px_per_unit, 0.001)]
+# Зона клейм на споді. Тримаємо посиланням на дані справи — щоб координата й радіус
+# жили в одному місці, а не двома копіями, які роз'їдуться.
+const UNDERSIDE_ZONE: Dictionary = Case01.ZONES[&"z.foot.underside"]
 
 func _underside_facing() -> bool:
 	if not hallmark_node or not main_cam3: return false
@@ -550,8 +533,10 @@ func _check_underside(gc: Vector2) -> void:
 	if not hallmark_node or not main_cam3: return
 	if found_marks and found_church: return
 	# лупа над дном (щедрий радіус — марки все одно на пластині перед очима)
-	var over: bool = _underside_facing() and main_cam3.unproject_position(hallmark_node.global_position).distance_to(gc) < loupe_lw*0.7
-	if dbg_mode: _shadow_zone(gc, over)
+	# КРОК 4: пікінг зони робить рушій (core/zones.gd), а не саморобна перевірка відстані.
+	# Радіус тепер СВІТОВИЙ і проєктується на екран, тому зона сама росте при наближенні
+	# й не залежить від ширини спрайта лупи, як залежав старий поріг loupe_lw*0.7.
+	var over: bool = ZoneHit.inside_3d(gc, UNDERSIDE_ZONE, goblet_pivot, main_cam3)
 	if over:
 		found_time += _dt()
 		if found_time > 0.5:
@@ -650,7 +635,16 @@ func _dbg_walk() -> void:
 			if found_church: break
 		await _shot(dir+"13b_loupe_church.png", 8)
 		print("WALK_B_OK found_marks=", found_marks, " found_church=", found_church)
-		print("SHADOW збіг=", shadow_same, " розбіжність=", shadow_diff, " ", shadow_note)
+		# НЕГАТИВНИЙ ТЕСТ: зона мусить БУТИ строгою. Старий поріг (323 px) спрацьовував
+		# на 200 px від центру пластини — тобто «десь біля чаші». Новий (0.45 світових,
+		# ≈108 px) там спрацювати не має. Без цієї перевірки не видно, чи заміна рушія
+		# щось змінила, чи просто переставила ту саму поблажливість.
+		drop_fact("found_marks"); drop_fact("found_church"); found_time = 0.0
+		var far: Vector2 = main_cam3.unproject_position(hallmark_node.global_position) + Vector2(200, 0)
+		for _i in 140:
+			_aim_loupe(far); _check_underside(far); await RenderingServer.frame_post_draw
+			if found_marks: break
+		print("WALK_B_STRICT far_rejected=", not found_marks)
 	elif "c" in args:
 		add_fact("found_marks"); add_fact("read_news"); add_fact("found_church"); add_fact("read_docs")   # здобуто в A і B
 		_show("CATALOG"); _cat_click(cat_screen, cat_m, cat_mr); await _shot(dir+"14_catalog_match.png")

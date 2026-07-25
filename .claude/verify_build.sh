@@ -43,7 +43,9 @@ for t in "walk b" "walk c" "chapters" "outcomes"; do
   case "$t" in
     # walk b перевіряє ВИТРИМКУ (dwell) під лупою — і саме він мовчки падав, поки
     # його тут не було: результат залежав від fps, а не від коду (див. _dt()).
-    "walk b")   echo "$OUT" | grep -q "WALK_B_OK found_marks=true found_church=true" || FAIL="$FAIL walk-b" ;;
+    "walk b")   echo "$OUT" | grep -q "WALK_B_OK found_marks=true found_church=true" || FAIL="$FAIL walk-b"
+                # зона мусить лишатися СТРОГОЮ: точка за 200 px від клейм не дає факту
+                echo "$OUT" | grep -q "WALK_B_STRICT far_rejected=true" || FAIL="$FAIL walk-b-strict" ;;
     "walk c")   echo "$OUT" | grep -q "WALK_C_OK sealed=true"        || FAIL="$FAIL walk-c" ;;
     "chapters") echo "$OUT" | grep -q "CHAPTERS_OK all_reachable=true" || FAIL="$FAIL chapters" ;;
     # чотири наслідки мусять давати чотири РІЗНИХ тексти: дві однакові гілки
