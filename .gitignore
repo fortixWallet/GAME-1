@@ -1,0 +1,34 @@
+# === Godot: генерується, ніколи не версіонувати ===
+.godot/
+*.translation
+export_presets.cfg
+
+# === Знімки автотестів: 238 МБ і ВІДТВОРЮВАНІ ===
+# Перезняти: G3_SHOTDIR=<шлях> godot --path . --rendering-driver opengl3 -- walk a|b|c
+#            (також: day1, chapters, clicktest, outcomes)
+_src/slice/baseline_25_07/
+_src/slice/shots*/
+
+# === Робочі й тимчасові ===
+layout.cfg
+.claude/last_verify.log
+/tmp/
+*.tmp
+
+# === macOS ===
+.DS_Store
+._*
+
+# === ЩО ВЕРСІОНУЄТЬСЯ СВІДОМО (не видаляти з репозиторію) ===
+# art/     — 142 МБ. НЕ відтворюється: згенеровано платним API, майстер-кадри незамінні.
+#            PNG погано дельта-стискається, тому нові версії арту робимо НОВИМ ІМЕНЕМ
+#            (hallmark_maker_v2 → v3), а не перезаписом — так історія лишається append-only.
+#            Якщо art/ переросте ~500 МБ — переводити на git-lfs.
+# models/   — 4.7 МБ, GLB. Теж не відтворюється дешево (Meshy, кредити).
+# _src/     — дизайн, 572 КБ. Найцінніше в проєкті на вагу.
+# main.gd, project.godot, main.tscn, .claude/ — код і налаштування.
+
+# === КЛЮЧІ: ніколи в git ===
+.keys.env
+*.env
+!*.env.example

@@ -1,0 +1,33 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash", "Read", "Write", "Edit", "Glob", "Grep",
+      "NotebookEdit", "WebFetch", "WebSearch", "Agent", "Skill", "Task", "TodoWrite"
+    ],
+    "defaultMode": "bypassPermissions",
+    "additionalDirectories": [
+      "/Users/skydrows/Documents/Game/Game3",
+      "/private/tmp/claude-501/-Users-skydrows-Documents-Game-Game3",
+      "/tmp/claude-501/-Users-skydrows-Documents-Game-Game3"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "if": "Edit(//Users/skydrows/Documents/Game/Game3/main.gd)",
+            "command": "/Users/skydrows/Documents/Game/Game3/.claude/verify_build.sh",
+            "timeout": 420,
+            "statusMessage": "Перевіряю збірку Godot…",
+            "asyncRewake": true,
+            "rewakeSummary": "Збірка зламана",
+            "rewakeMessage": "ЗБІРКА ЗЛАМАНА після твоєї правки main.gd. Полагодь негайно, перш ніж робити щось інше:"
+          }
+        ]
+      }
+    ]
+  }
+}
