@@ -164,6 +164,8 @@ func _ready() -> void:
 		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
 		DisplayServer.window_set_size(Vector2i(1920, 1080))
 
+	if "zonemap" in OS.get_cmdline_user_args():
+		_dbg_zonemap()
 	if "loupeshot" in OS.get_cmdline_user_args():
 		_dbg_loupe()
 	if "autosolve" in OS.get_cmdline_user_args():
@@ -669,6 +671,54 @@ func _dbg_walk() -> void:
 		_show("LEDGER"); await _shot(dir+"21_ledger.png", 4)
 		print("WALK_C_OK sealed=", sealed, " seals=", seals_set, " shown=", _shown())
 	get_tree().quit()
+
+# КАРТА ЗОН: малює кожну 3D-зону справи поверх келиха і знімає кадр.
+# Причина: координати в case_01.md — наближення, і одна з них уже виявилась хибною
+# на 77 пікселів. Решту п'ять ніхто не звіряв із побудованою моделлю. Дивитись очима.
+func _dbg_zonemap() -> void:
+	dbg_mode = true
+	var dir := _shotdir()
+	DirAccess.make_dir_recursive_absolute(dir)
+	await get_tree().process_frame
+	_show("HANDS")
+	for _i in 6: await RenderingServer.frame_post_draw
+	# два положення: вертикально і перевернуто — бо спід піддона у вертикальному
+	# положенні фізично не видно, і судити про його зону там неможливо
+	for pose in [{"rot": 0.0, "name": "zonemap_upright"}, {"rot": -1.6, "name": "zonemap_flipped"}]:
+		goblet_pivot.rotation.x = float(pose["rot"])
+		for _j in 3: await RenderingServer.frame_post_draw
+		await _zonemap_pass(dir + String(pose["name"]) + ".png")
+	print("ZONEMAP_OK")
+	get_tree().quit()
+
+func _zonemap_pass(path: String) -> void:
+	var layer := Control.new()
+	layer.size = Vector2(W, H); layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	screens["HANDS"].add_child(layer)
+	var cols := [Color(1,0.2,0.2), Color(0.2,1,0.3), Color(0.3,0.6,1),
+				 Color(1,0.9,0.2), Color(1,0.4,1), Color(0.2,1,1)]
+	var i := 0
+	for id in Case01.ZONES:
+		var z: Dictionary = Case01.ZONES[id]
+		if String(z.get("kind", &"")) != "mesh": continue
+		var wp: Vector3 = goblet_pivot.global_transform * (z["at"] as Vector3)
+		var c: Vector2 = main_cam3.unproject_position(wp)
+		var e: Vector2 = main_cam3.unproject_position(wp + main_cam3.global_transform.basis.x*float(z["r"]))
+		var rad: float = c.distance_to(e)
+		var behind := main_cam3.is_position_behind(wp)
+		# коло зони — мальоване ТІЛЬКИ в цьому режимі налагодження, у грі його нема
+		var ring := ColorRect.new()
+		ring.color = Color(cols[i % cols.size()], 0.22)
+		ring.size = Vector2(rad*2, rad*2); ring.position = c - Vector2(rad, rad)
+		ring.mouse_filter = Control.MOUSE_FILTER_IGNORE; layer.add_child(ring)
+		var lb := Label.new(); lb.text = String(id).replace("z.", "")
+		lb.label_settings = _ls(fr, int(H*0.020), cols[i % cols.size()])
+		lb.position = c + Vector2(rad*0.4, -rad*0.4); layer.add_child(lb)
+		print("ZONE %-20s екран=(%4.0f,%4.0f) радіус=%3.0fpx %s" % [id, c.x, c.y, rad,
+			  "НЕ ВИДНО (за камерою)" if behind else ""])
+		i += 1
+	await _shot(path, 4)
+	layer.queue_free()
 
 func _dbg_loupe() -> void:
 	dbg_mode = true
