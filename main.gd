@@ -145,7 +145,10 @@ func _ready() -> void:
 	hint_label = Label.new()
 	hint_label.label_settings = _ls(fr, int(H*0.028), Color(0.95,0.91,0.80))
 	hint_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	hint_label.size = Vector2(W, H*0.05); hint_label.position = Vector2(0, H*0.02)
+	hint_label.size = Vector2(W*0.86, H*0.05); hint_label.position = Vector2(W*0.07, H*0.02)
+	# запобіжник: задовгий рядок мусить переноситись, а не зрізатися по краях екрана.
+	# Спіймано на кроці 3 — репліка про крадіжку вилазила за обидва краї кадру.
+	hint_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	hint_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(hint_label)
 	_build_loupe()
@@ -153,6 +156,14 @@ func _ready() -> void:
 	move_child(hint_label, get_child_count()-1)   # підказки завжди поверх сцен
 	_show("MENU")
 	amb.play()
+	# ЗНІМКИ МУСЯТЬ БУТИ ОДНОГО РОЗМІРУ. Вікно стоїть у режимі 2 (розгорнуте), тому кадр
+	# має розмір вікна ОС — а він між сесіями плаває на два-три пікселі. Через це еталон
+	# кроку 0 вийшов неоднорідним (9 кадрів 2965×1668 і 39 кадрів 2968×1670), і будь-яке
+	# попіксельне порівняння давало 39 фальшивих «змін», у яких коду не було взагалі.
+	if OS.get_cmdline_user_args().size() > 0:
+		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
+		DisplayServer.window_set_size(Vector2i(1920, 1080))
+
 	if "loupeshot" in OS.get_cmdline_user_args():
 		_dbg_loupe()
 	if "autosolve" in OS.get_cmdline_user_args():
@@ -502,13 +513,20 @@ func _underside_facing() -> bool:
 	var wn: Vector3 = (-hallmark_node.global_transform.basis.y).normalized()   # спід дивиться в -Y
 	return wn.dot((main_cam3.global_position - wpos).normalized()) > 0.12
 
+# Крок часу для накопичення витримки (dwell). У тестах — ФІКСОВАНИЙ, бо інакше
+# результат залежить від fps: на вільній машині кадр коротший, і за ті самі 140 кадрів
+# набігає 0.14 с замість 0.5 — витримка не спрацьовує, і тест «падає» без жодної правки коду.
+# Саме так walk b мовчки поламався між двома прогонами того самого коміту (PLAYBOOK §4.1).
+func _dt() -> float:
+	return (1.0/60.0) if dbg_mode else get_process_delta_time()
+
 func _check_underside(gc: Vector2) -> void:
 	if not hallmark_node or not main_cam3: return
 	if found_marks and found_church: return
 	# лупа над дном (щедрий радіус — марки все одно на пластині перед очима)
 	var over: bool = _underside_facing() and main_cam3.unproject_position(hallmark_node.global_position).distance_to(gc) < loupe_lw*0.7
 	if over:
-		found_time += get_process_delta_time()
+		found_time += _dt()
 		if found_time > 0.5:
 			if not found_marks:
 				add_fact("found_marks"); found_time = 0.0; _play("page_turn")
@@ -517,7 +535,7 @@ func _check_underside(gc: Vector2) -> void:
 				add_fact("found_church"); _play("page_turn")
 				_set_hint("Where the silver was ground smooth, the raking light finds it: an engraved chalice — a church's mark.")
 	else:
-		found_time = maxf(0.0, found_time - get_process_delta_time())
+		found_time = maxf(0.0, found_time - _dt())
 
 func _process(_delta: float) -> void:
 	if loupe_held and loupe_ui and not dbg_mode:
@@ -551,6 +569,13 @@ func _walk_glass(gc: Vector2) -> void:
 	loupe_ui.position = gc - Vector2(GLASS_CX*loupe_lw, GLASS_CY*loupe_lh)
 	_glass_desk(gc)
 
+# Натиснути зону як гравець. Друкує скаргу, якщо зони нема, — мовчазний промах
+# у тесті виглядає точнісінько як успіх (правило 17 CLAUDE.md).
+func _click_zone(id: String) -> void:
+	if not zone_btns.has(id):
+		print("ZONE_MISSING ", id); return
+	(zone_btns[id] as Button).pressed.emit()
+
 func _dbg_walk() -> void:
 	dbg_mode = true
 	var args := OS.get_cmdline_user_args()
@@ -565,8 +590,10 @@ func _dbg_walk() -> void:
 		_walk_glass(Vector2(W*0.30, H*0.63)); await _shot(dir+"04_loupe_papers.png")
 		_walk_glass(Vector2(W*0.50, H*0.42)); await _shot(dir+"05_loupe_goblet.png")
 		_drop_loupe(); await _shot(dir+"06_loupe_down.png")
-		_show("DOCS"); await _shot(dir+"07_docs.png")
-		_show("NEWS"); await _shot(dir+"08_news.png")
+		# КРОК 3: тепер факт беруть ДІЄЮ. Тест мусить клікати те саме, що гравець,
+		# інакше він перевіряє не гру, а самого себе.
+		_show("DOCS"); _click_zone("z.papers.letter"); await _shot(dir+"07_docs.png")
+		_show("NEWS"); _click_zone("z.news.robbery"); await _shot(dir+"08_news.png")
 		_show("CATALOG"); _cat_miss(); await _shot(dir+"09_catalog_gated.png")
 		print("WALK_A_OK read_news=", read_news)
 	elif "b" in args:
@@ -606,6 +633,10 @@ func _dbg_walk() -> void:
 		_choose(2, "taken from a church"); await _shot(dir+"16_cert_provenance.png")
 		_choose(3, "the effaced church mark beneath"); await _shot(dir+"18_cert_full.png")
 		_do_verdict()
+		# 19_seal_mid — кадр ПОСЕРЕД анімації печатки, і він свідомо лишається
+		# невідтворюваним (ділянка 44×45 пкс). Спроба крокувати твін вручну коштувала
+		# години зависань: пауза, поставлена не тим режимом, вішала day1 назавжди
+		# на «await tw.finished». Ціна детермінізму тут вища за користь.
 		for _i in 12: await RenderingServer.frame_post_draw
 		await _shot(dir+"19_seal_mid.png", 2)
 		var guard := 0
@@ -764,22 +795,78 @@ func _show(name: String) -> void:
 	if name == "CERT":
 		if not sealed: active_slot = _next_open_slot()
 		_refresh_cert()
-	if name == "NEWS" and not read_news:
-		add_fact("read_news")
 	if name == "CLIENT":
 		_client_show()
-	if name == "DOCS" and not read_docs:
-		add_fact("read_docs")
 	if name == "LEDGER":
 		_show_ledger()
-	if name == "TESTIMONY" and not read_docs:
-		add_fact("read_docs")
-	if screens.has(name) and screens[name].has_meta("mark"):
-		var mk: Callable = screens[name].get_meta("mark")
-		mk.call(); _play("page_turn")
+	# КРОК 3: тут БУЛА роздача фактів за появу екрана — NEWS давав read_news,
+	# DOCS і TESTIMONY давали read_docs, а будь-який екран із meta("mark") давав
+	# свій факт просто тому, що відкрився. Гравець отримував знання за гортання.
+	# Тепер факт здобувається лише дією по місцю на аркуші — див. PAPER_ZONES.
 
 func _set_hint(t: String) -> void:
 	if hint_label: hint_label.text = t
+
+# ── ЗОНИ НА ПАПЕРАХ (крок 3) ─────────────────────────────────────────────────
+# Було: факт давався за те, що екран ПОКАЗАВСЯ. Гравець гортав сторінки й отримував
+# знання ні за що — це половина відчуття «гра сама веде до відповіді».
+# Стало: на аркуші є місця, і значення має лише те, яке гравець знайшов сам.
+#
+# Координати — у частках САМОГО АРКУША, не екрана: аркуш вписується по-різному
+# (COVER, CONTAIN, фіксована висота), а зона мусить лишатися на тому самому малюнку.
+# «half» — піврозміри, теж у частках аркуша.
+const PAPER_ZONES := {
+	"NEWS": [
+		{"id": "z.news.robbery", "u": Vector2(0.499, 0.185), "half": Vector2(0.392, 0.045),
+		 "fact": "read_news", "hint": "The lead of the paper",
+		 "say": "St. Onuphrius' sacristy, broken into. Among the missing: antique silver goblets."},
+		{"id": "z.news.later", "u": Vector2(0.201, 0.830), "half": Vector2(0.136, 0.104),
+		 "fact": "", "hint": "A later paragraph",
+		 "say": "The bell-rope of the sacristy had lately been renewed, and the old watchman dismissed a week before."},
+		{"id": "z.news.society", "u": Vector2(0.494, 0.541), "half": Vector2(0.136, 0.100),
+		 "fact": "", "hint": "About the town",
+		 "say": "The Antiquarian Society meets Thursday: a paper on the perils of the re-struck punch."},
+		{"id": "z.news.assayer", "u": Vector2(0.502, 0.872), "half": Vector2(0.132, 0.050),
+		 "fact": "", "hint": "Correspondence",
+		 "say": "A letter: 'a mark half-struck is not a mark honestly worn.' — An Old Assayer"},
+		{"id": "z.news.market", "u": Vector2(0.790, 0.897), "half": Vector2(0.137, 0.053),
+		 "fact": "", "hint": "The market column",
+		 "say": "Market: old silver plate high; church work in brisk demand, and few questions asked."},
+	],
+	"DOCS": [
+		{"id": "z.papers.letter", "u": Vector2(0.50, 0.42), "half": Vector2(0.34, 0.26),
+		 "fact": "read_docs", "hint": "The client's letter",
+		 "say": "She writes: from an aunt in the monastery, and she is told it is Viennese."},
+	],
+}
+var zone_btns := {}     # id зони → кнопка. Потрібне тестам, щоб клікати як гравець.
+
+# Невидима зона поверх аркуша. Жодного мальованого пікселя: підказка — текст шрифтом
+# на наявній поверхні, зворотний зв'язок — курсор-рука (те саме, що вже робить _mag_hotspot).
+func _paper_zone(parent: Control, paper: Control, z: Dictionary) -> Button:
+	var b := Button.new(); b.flat = true; b.modulate.a = 0.0
+	var u: Vector2 = z["u"]; var half: Vector2 = z["half"]
+	b.size = Vector2(paper.size.x*half.x*2.0, paper.size.y*half.y*2.0)
+	b.position = paper.position + Vector2(paper.size.x*u.x, paper.size.y*u.y) - b.size*0.5
+	b.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	b.mouse_entered.connect(_set_hint.bind(String(z["hint"])))
+	b.mouse_exited.connect(_set_hint.bind(""))
+	b.pressed.connect(_zone_press.bind(z))
+	zone_btns[String(z["id"])] = b
+	parent.add_child(b); return b
+
+# ЄДИНЕ місце, де клік по паперу перетворюється на знання.
+func _zone_press(z: Dictionary) -> void:
+	var f := String(z["fact"])
+	# add_fact сам гасить дублі; звук і рядок даємо щоразу — гравець має право перечитати
+	if f != "" and add_fact(f): _play("page_turn")
+	else: _play("ui_soft")
+	_set_hint(String(z["say"]))
+
+func _build_paper_zones(screen_name: String, parent: Control, paper: Control) -> void:
+	if not PAPER_ZONES.has(screen_name): return
+	for z in PAPER_ZONES[screen_name]:
+		_paper_zone(parent, paper, z)
 
 # інтерактивна РІЧ: мальований оверлей, що світиться на наведення і діє на клік
 func _object(parent: Control, key: String, ov: Texture2D, hint: String, action: Callable, lift := false, mask: Texture2D = null) -> TextureButton:
@@ -941,7 +1028,10 @@ func _sync_view(animate: bool = false) -> void:
 	var rot := Vector3(-4, -84, 0) if raking else Vector3(-9, -62, 0)
 	var energy := 1.15 if raking else 1.9
 	if key_light:
-		if animate:
+		# У тестах анімації нема: знімок, зроблений посеред твіна, не відтворюється
+		# між прогонами. Спіймано на 13b_loupe_church.png — кадр знімався через 8 кадрів,
+		# а світло переїжджає 0.5 с, тобто щоразу в іншій фазі.
+		if animate and not dbg_mode:
 			var lt := create_tween(); lt.set_parallel(true)
 			lt.tween_property(key_light, "rotation_degrees", rot, 0.5)
 			lt.tween_property(key_light, "light_energy", energy, 0.5)
@@ -1221,6 +1311,7 @@ func _build_docs() -> void:
 	var t := Label.new(); t.label_settings = _ls(fr, int(lh*0.033), Color(0.20,0.14,0.09))
 	t.text = "From the client:\n\n\"This goblet came to me\nfrom an aunt in the monastery.\nI am told it is Viennese.\nI should like to know its worth —\nand whether it is mine to sell.\"\n\nShe would not meet my eye\nas she said it."
 	t.position = paper.position + Vector2(lw*0.13, lh*0.15); t.mouse_filter = Control.MOUSE_FILTER_IGNORE; s.add_child(t)
+	_build_paper_zones("DOCS", s, paper)
 	# навігація — нижній ряд на притемненому столі (геть з паперу), тепла і читабельна
 	_txtbtn(s, "←  back to the desk", Vector2(W*0.04, H*0.92), func(): _show("DESK"))
 	_txtbtn(s, "Open the newspaper  →", Vector2(W*0.40, H*0.92), func(): _show("NEWS"))
@@ -1235,6 +1326,7 @@ func _build_news() -> void:
 	var np := TextureRect.new(); np.texture = nt; np.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	np.stretch_mode = TextureRect.STRETCH_SCALE; np.size = Vector2(nw, nh)
 	np.position = Vector2((W-nw)*0.5, (H-nh)*0.5); np.mouse_filter = Control.MOUSE_FILTER_IGNORE; s.add_child(np)
+	_build_paper_zones("NEWS", s, np)
 	_txtbtn(s, "←  back", Vector2(W*0.04, H*0.92), func(): _show("DOCS"))
 
 # ---------- CATALOG (клік по гербу) ----------

@@ -37,10 +37,13 @@ fi
 export G3_SHOTDIR="/tmp/g3_verify/"
 rm -rf "$G3_SHOTDIR"; mkdir -p "$G3_SHOTDIR"
 FAIL=""
-for t in "walk c" "chapters" "outcomes"; do
+for t in "walk b" "walk c" "chapters" "outcomes"; do
   OUT=$(godot --path . --rendering-driver opengl3 -- $t 2>&1 | grep -v specular)
   echo "--- $t ---" >>"$LOG"; echo "$OUT" >>"$LOG"
   case "$t" in
+    # walk b перевіряє ВИТРИМКУ (dwell) під лупою — і саме він мовчки падав, поки
+    # його тут не було: результат залежав від fps, а не від коду (див. _dt()).
+    "walk b")   echo "$OUT" | grep -q "WALK_B_OK found_marks=true found_church=true" || FAIL="$FAIL walk-b" ;;
     "walk c")   echo "$OUT" | grep -q "WALK_C_OK sealed=true"        || FAIL="$FAIL walk-c" ;;
     "chapters") echo "$OUT" | grep -q "CHAPTERS_OK all_reachable=true" || FAIL="$FAIL chapters" ;;
     # чотири наслідки мусять давати чотири РІЗНИХ тексти: дві однакові гілки
