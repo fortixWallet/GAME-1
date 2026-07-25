@@ -91,7 +91,7 @@
 | `z.sec.drawer_front` | `tool.hand` (click) | — | *(факту нема)* | "Rapped along the front, the drawer answers with a tone at the left and at the right, and flat in the middle third." | `flags.knock_heard = true`, `say.flat_middle` |
 | `z.sec.escutcheon` | `tool.loupe` | — | `f.escutcheon_bright` | "Four scratches run from the keyhole to the lower left. Their metal is bright; the metal around them is brown." | — |
 | `z.doc.daybook_intake` | `*` (click) | — | `f.daybook_locksmith` | "Intake, the 3rd: 'Secretaire, walnut, from the estate of Herr F. Opened on arrival by Krenn, our locksmith — lock seized. House keys surrendered with the piece.'" | — |
-| `z.drawer.underside` | `tool.rake` | — | `f.stamp_gruber` | "Burnt into the drawer bottom, low and to the left: M. GRUBER · WIEN. Beside it, in chalk, a number: 214." | — |
+| `z.drawer.underside` | `tool.rake` | — | `f.stamp_gruber` | "Burnt into the drawer bottom, low and to the left: M. GRUBER · WIEN. Beside it, in chalk, a number: 367." | — |
 | `z.doc.register_gruber` | `*` (click) | `f.stamp_gruber` | `f.reg_gruber_1822_1841` | "GRUBER, Michael. Möbeltischler, Wien, Gumpendorf. Workshop stamp in use 1822–1841. Numbered his carcasses in chalk." | — |
 | `z.sec.carcass_side` | `tool.caliper` (click) | `flags.knock_heard` | `f.outer_depth` | "Fixed jaw on the front edge of the side, sliding jaw on the outer face of the back board: 486.0 mm." | — |
 | `z.sec.back_edge` | `tool.caliper` (click) | `f.outer_depth` | `f.back_thickness` | "The back board, measured at its exposed edge: 12.0 mm." | — |
@@ -124,7 +124,7 @@ id (V4 §8, пастка 7.3).
 |---|---|---|---|
 | `f.escutcheon_bright` | "Four scratches by the keyhole; their metal is bright, the metal around them brown." | "bright scratches at the lock" | `lock` · вага 1 |
 | `f.daybook_locksmith` | "Day-book, the 3rd: opened on arrival by Krenn, the bureau's locksmith. House keys surrendered with the piece." | "our own locksmith opened it on the 3rd" | `papers` · вага 2 |
-| `f.stamp_gruber` | "Burnt into the drawer bottom: M. GRUBER · WIEN. Chalk number 214 beside it." | "the workshop stamp under the drawer" | `body` · вага 2 |
+| `f.stamp_gruber` | "Burnt into the drawer bottom: M. GRUBER · WIEN. Chalk number 367 beside it." | "the workshop stamp under the drawer" | `body` · вага 2 |
 | `f.reg_gruber_1822_1841` | "Register: Gruber, Michael, Möbeltischler, Wien-Gumpendorf. Stamp in use 1822–1841." | "the register dates the stamp to 1822–1841" | `books` · вага 2 |
 | `f.outer_depth` | "Front edge of the side to the outer face of the back board: 486.0 mm." | "486.0 mm outside" | `measure` · вага 1 |
 | `f.back_thickness` | "The back board at its edge: 12.0 mm." | "a back board of 12.0 mm" | `measure` · вага 1 |
@@ -209,60 +209,26 @@ id (V4 §8, пастка 7.3).
 ## 6. АТЕСТАТ
 
 Шість граф. Одна числова. Гейти діегетичні: закрита графа показує в дужках, **чого бракує**,
-а не що вписати (ENGINE_SPEC §5.1).
+а не що вписати (ENGINE_SPEC §5.1). `kind` за `core/slots.gd`: CHOICE / NUMBER / FACTS.
+`opts` тримають **id**, на папір лягає `tr("opt." + id)`.
 
-### Графа 1 — `s.piece`
-**Префікс:** *"The piece is —"*
-**Тип:** список
-**Гейт:** `f.stamp_gruber` **і** `f.reg_gruber_1822_1841`
-**Підказка при закритому гейті:** *"look under the drawer, then in the register"*
-**Варіанти:**
-- `o.vienna_1820s` — "a Viennese fall-front secretaire of the 1820s, walnut on softwood, by the workshop whose stamp it carries"
-- `o.later_copy` — "a later copy in the Viennese manner"
-- `o.marriage` — "two pieces married into one"
+| # | slot_id | префікс (EN) | тип | гейт | підказка при закритому гейті | варіанти / межі |
+|---|---|---|---|---|---|---|
+| 1 | `s.piece` | "The piece is ____" | CHOICE | `needs: [f.stamp_gruber, f.reg_gruber_1822_1841]` | "look under the drawer, then in the register" | `o.vienna_1820s` "a Viennese fall-front secretaire of the 1820s, walnut on softwood, by the workshop whose stamp it carries" · `o.later_copy` "a later copy in the Viennese manner" · `o.marriage` "two pieces married into one" |
+| 2 | `s.void_mm` | "Depth measured outside, less the boards and less the depth measured inside, in millimetres ____" | **NUMBER** `digits 2, min 10, max 99` | `needs: [f.outer_depth, f.back_thickness, f.inner_depth]` | "three readings, and the arithmetic is yours" | списку нема, валідації нема. *(істина: **19** = 486.0 − 12.0 − 455.0; у наслідках приймається 18–20, бо ноніус чесно має похибку)* |
+| 3 | `s.void_origin` | "The recess was cut ____" | CHOICE | `needs: [f.board_screwed, f.screw_points, f.ref_screw_points, f.lining_fleck]` | "whoever cut it left his screws and his timber" | `o.with_carcass` "with the carcass, by the workshop that made it" · `o.trade_later` "later, in a dealer's workshop, as a selling feature" · `o.private_later` "later, by a hand working alone, in the house" |
+| 4 | `s.last_opened` | "The recess was last opened ____" | CHOICE | `needs: [f.dust_rectangle, f.slot_burr]` | "dust keeps time better than people do" | `o.never` "not since it was fitted" · `o.long_ago` "years ago" · `o.within_fortnight` "within the fortnight" |
+| 5 | `s.lock_marks` | "The marks on the lock are ____" | CHOICE | `needs: [f.escutcheon_bright]` *(відкривається рано — і саме тому спокушає)* | — | `o.forced` "the work of someone who had no key" · `o.our_locksmith` "the work of this bureau, on the 3rd" · `o.old_wear` "the wear of forty years of use" |
+| 6 | `s.basis` | "On the strength of ____" | FACTS `min 2, max 4` | `needs_slot: [s.void_origin, s.last_opened]`, `clears_on: [s.void_origin, s.last_opened]` | — | джерело — `state.fact_order` |
 
-### Графа 2 — `s.void_mm`
-**Префікс:** *"Depth measured outside, less the boards and less the depth measured inside, in millimetres —"*
-**Тип:** **ЧИСЛО** · `digits: 2` · `min: 10` · `max: 99` · списку нема, валідації нема
-**Гейт:** `f.outer_depth` **і** `f.back_thickness` **і** `f.inner_depth`
-**Підказка:** *"three readings, and the arithmetic is yours"*
-**Правильно:** **19** (486.0 − 12.0 − 455.0 = 19.0)
-**Прийнятний допуск у наслідках:** 18–20 (ноніус чесно має похибку)
+**Істина** (рушій її не знає — знають тільки OUTCOMES):
+`s.piece = o.vienna_1820s` · `s.void_mm = 19` · `s.void_origin = o.private_later` ·
+`s.last_opened = o.within_fortnight` · `s.lock_marks = o.our_locksmith`.
 
-### Графа 3 — `s.void_origin`
-**Префікс:** *"The recess was cut —"*
-**Тип:** список
-**Гейт:** `f.board_screwed` **і** `f.screw_points` **і** `f.ref_screw_points` **і** `f.lining_fleck`
-**Підказка:** *"whoever cut it left his screws and his timber"*
-**Варіанти:**
-- `o.with_carcass` — "with the carcass, by the workshop that made it"
-- `o.trade_later` — "later, in a dealer's workshop, as a selling feature"
-- `o.private_later` — "later, by a hand working alone, in the house"
-
-### Графа 4 — `s.last_opened`
-**Префікс:** *"The recess was last opened —"*
-**Тип:** список
-**Гейт:** `f.dust_rectangle` **і** `f.slot_burr`
-**Підказка:** *"dust keeps time better than people do"*
-**Варіанти:**
-- `o.never` — "not since it was fitted"
-- `o.long_ago` — "years ago"
-- `o.within_fortnight` — "within the fortnight"
-
-### Графа 5 — `s.lock_marks`
-**Префікс:** *"The marks on the lock are —"*
-**Тип:** список
-**Гейт:** `f.escutcheon_bright` (відкривається рано — і саме тому спокушає)
-**Варіанти:**
-- `o.forced` — "the work of someone who had no key"
-- `o.our_locksmith` — "the work of this bureau, on the 3rd"
-- `o.old_wear` — "the wear of forty years of use"
-
-### Графа 6 — `s.basis`
-**Префікс:** *"On the strength of —"*
-**Тип:** **перетягування фактів** з нотатника · `min_count: 2` · `max_count: 4`
-**Гейт:** `needs_slot: [s.void_origin, s.last_opened]`
-**`clears_on`:** `[s.void_origin, s.last_opened]`
+> **Колонка «підказка» — розширення канону, і воно свідоме.** У `case_08` її нема, бо там
+> гейти прозорі з предмета. Тут закрита графа мусить діегетично сказати, **чого бракує**
+> (ENGINE_SPEC §5.1), і цей текст — дані, а не проза. Тому канон отримує сьому колонку:
+> порожня (`—`) там, де підказка не потрібна.
 
 ---
 

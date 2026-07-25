@@ -225,7 +225,7 @@
 | 2 | `s.photo_not_before` | "The photograph filed with entry 212 was made not earlier than ____." | **NUMBER**, digits 4, min 1700, max 1900 | `needs_any`: `f.mount_medals` | списку нема, валідації нема |
 | 3 | `s.days_out` | "Out of this office in 1890, ____ days." | **NUMBER**, digits 3, min 0, max 999 | `needs`: `f.daybook_restoration` | списку нема, валідації нема |
 | 4 | `s.identity` | "The canvas on the easel is ____." | CHOICE | `needs_any`: `f.plate_read`, `f.canvas_size` | `o.same_canvas` ("the canvas of entry 212") · `o.other_canvas` ("another canvas") · `o.copy_after_1890` ("a copy made after the relining") · `o.cannot_say` ("not to be told from this record") |
-| 5 | `s.record_verdict` | "The office record of 1889 is ____." | CHOICE | `needs_slot`: `s.subject_side`, `s.identity` | `o.words_right_picture_reversed` ("right in its words; its photograph printed in reverse") · `o.words_wrong` ("wrong in its words") · `o.wrong_throughout` ("wrong in words and picture both") · `o.made_to_mislead` ("made so as to mislead") |
+| 5 | `s.record_verdict` | "The office record of 1889 is ____." | CHOICE | `needs_slot`: `s.subject_side`, `s.identity` | `o.words_right_picture_reversed` ("right in its words; its photograph printed in reverse") · `o.words_wrong` ("wrong in its words") · `o.wrong_throughout` ("wrong in words and picture both") · `o.made_to_mislead` ("set down by a hand that was not this office's") |
 | 6 | `s.basis` | "On the basis of ____." | FACTS | `needs_slot`: `s.record_verdict`; `clears_on`: `s.record_verdict` | min 2, max 4; джерело — `state.fact_order` |
 
 **Правильні значення** (рушій їх не знає — знають тільки OUTCOMES):

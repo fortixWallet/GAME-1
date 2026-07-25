@@ -124,26 +124,26 @@
 | zone_id | tool | requires | fact_id | note (EN, спостереження) | sets_state |
 |---|---|---|---|---|---|
 | `z.book.inventory` | `*` (`on_click`) | — | — | say: "Register of pieces retained. Printed at the head: *numbers are given in the order of the date of receipt*. Six lines are written in. The last of them is in a browner ink than the five above it." — **факту не дає: це не спостереження, це відкрита книга** | `sets_flag: {fl.inv_read: true}` |
-| `z.book.inv_dates` | `loupe` \| `eye` (`dwell 0.8`) | `fl.inv_read` | `f.inv_inversion` | "Read straight down the dates, the numbers stand 1, 2, 3, 6, 4, 5. Two lines carry the same date: the 9th of November 1868." | — |
-| `z.book.inventory` | `loupe` (`dwell 1.0`) | `f.inv_inversion` | `f.inv_gun_weights` | "Line 3: a fowling piece, damascus barrel, Bräuer, J. — 5 Pfd 9 Lth. Line 6: a fowling piece, damascus, Bräuer, J. — 2 958 g." | — |
+| `z.book.inv_dates` | `tool.loupe` \| `tool.eye` (`dwell 0.8`) | `fl.inv_read` | `f.inv_inversion` | "Read straight down the dates, the numbers stand 1, 2, 3, 6, 4, 5. Two lines carry the same date: the 9th of November 1868." | — |
+| `z.book.inventory` | `tool.loupe` (`dwell 1.0`) | `f.inv_inversion` | `f.inv_gun_weights` | "Line 3: a fowling piece, damascus barrel, Bräuer, J. — 5 Pfd 9 Lth. Line 6: a fowling piece, damascus, Bräuer, J. — 2 958 g." | — |
 | `z.book.units` | `*` (`on_click`) | — | — | *(довідка; факту не дає — див. §5.1)* | `sets_flag: {fl.units_known: true}` |
-| `z.shelf.tag_gun` | `hand` (`on_click`) | — | — | *(бирку перевернуто; факту не дає)* | `z.shelf.tag_gun → turned` |
-| `z.shelf.tag_gun` (`turned`) | `loupe` (`dwell 0.5`) | — | `f.tag_two_numbers` | "One tag, on one bundle. Two numbers on it: a 3, and under the 3 a 6 in a browner ink. Nothing is struck out." | — |
-| `z.shelf.slot6` | `eye` \| `rake` (`dwell 0.7`) | — | `f.shelf_six_five` | "Six bundles stand on the shelf. Five are in flannel and carry a tag on a string. The sixth is bare, and the shelf paper under all six is as bright as the day it was cut." | — |
+| `z.shelf.tag_gun` | `tool.hand` (`on_click`) | — | — | *(бирку перевернуто; факту не дає)* | `z.shelf.tag_gun → turned` |
+| `z.shelf.tag_gun` (`turned`) | `tool.loupe` (`dwell 0.5`) | — | `f.tag_two_numbers` | "One tag, on one bundle. Two numbers on it: a 3, and under the 3 a 6 in a browner ink. Nothing is struck out." | — |
+| `z.shelf.slot6` | `tool.eye` \| `tool.rake` (`dwell 0.7`) | — | `f.shelf_six_five` | "Six bundles stand on the shelf. Five are in flannel and carry a tag on a string. The sixth is bare, and the shelf paper under all six is as bright as the day it was cut." | — |
 | `z.folder.blank` | `*` (`on_click`) | — | `f.folder_blank` | "A folder at the back of the drawer. The panel for the number on the spine is blank. Inside, one line: *I have not dared to describe it. It is still in the house.* The inner cover carries no receipt stub; the gum has never been wetted." | — |
-| `z.book.inventory` | `hand` (`on_click`) | `f.tag_two_numbers`, `f.inv_gun_weights` | — | say: "The pen is by the book." → **відкриває дію «викреслити рядок 6»** (§3.4) | — |
+| `z.book.inventory` | `tool.hand` (`on_click`) | `f.tag_two_numbers`, `f.inv_gun_weights` | — | say: "The pen is by the book." → **відкриває дію «викреслити рядок 6»** (§3.4) | — |
 
 ### 3.2. Річ у руках (~10 хв)
 
 | zone_id | tool | requires | fact_id | note (EN, спостереження) | sets_state |
 |---|---|---|---|---|---|
-| `z.shelf.slot6` | `hand` (`on_click`) | — | — | *(взяти з полиці → екран HANDS)* | `z.shelf.slot6 → taken`, `screen = HANDS` |
-| `z.relic.side` | `rake` (`dwell 1.2`) | — | `f.no_seam` | "Under raking light the light runs from the top over the edge and down the side without a stop. There is no seam, no hinge, no lock plate and no keyhole. The corners are one piece with the sides." | — |
-| `z.relic.under` | `loupe` (`dwell 0.9`) | — | `f.under_bare` | "The underside is bare. No punch, no scratched number, no owner's initials, and no bright patch where any of them had been taken off." | — |
-| `z.relic.top` | `loupe` (`dwell 0.6`) | — | `f.inscription` | "Cut into the top, in capitals a little worn at the shoulders: NON AD LVCEM. The cut is V-shaped and the same depth from end to end." | — |
+| `z.shelf.slot6` | `tool.hand` (`on_click`) | — | — | *(взяти з полиці → екран HANDS)* | `z.shelf.slot6 → taken`, `screen = HANDS` |
+| `z.relic.side` | `tool.rake` (`dwell 1.2`) | — | `f.no_seam` | "Under raking light the light runs from the top over the edge and down the side without a stop. There is no seam, no hinge, no lock plate and no keyhole. The corners are one piece with the sides." | — |
+| `z.relic.under` | `tool.loupe` (`dwell 0.9`) | — | `f.under_bare` | "The underside is bare. No punch, no scratched number, no owner's initials, and no bright patch where any of them had been taken off." | — |
+| `z.relic.top` | `tool.loupe` (`dwell 0.6`) | — | `f.inscription` | "Cut into the top, in capitals a little worn at the shoulders: NON AD LVCEM. The cut is V-shaped and the same depth from end to end." | — |
 | `z.book.inscriptions` | `*` (`on_click`) | `f.inscription` | `f.motto_page` | "List of inscriptions, Latin: *non ad lucem* — 'not toward the light'. The note beside it: the words are not a church formula and stand on no altar plate known to the compiler; they are met with on the lids of boxes for photographic plates, and on jars of drugs that spoil in daylight." | — |
-| `z.relic.top` \| `z.relic.side` | `caliper` (`on_click`) | — | `f.caliper_dims` | "Across, twice, and down: 154 mm by 108 mm by 72 mm. The jaws close on it square at every corner." | — |
-| `z.relic.top` | `hand` (`on_click`) | — | — | say: "It does not lift, and there is nothing to lift it by." — **діегетичний тупик, факту не дає** | — |
+| `z.relic.top` \| `z.relic.side` | `tool.caliper` (`on_click`) | — | `f.caliper_dims` | "Across, twice, and down: 154 mm by 108 mm by 72 mm. The jaws close on it square at every corner." | — |
+| `z.relic.top` | `tool.hand` (`on_click`) | — | — | say: "It does not lift, and there is nothing to lift it by." — **діегетичний тупик, факту не дає** | — |
 
 ### 3.3. Ваги (~12 хв; серце справи)
 
@@ -152,13 +152,13 @@
 
 | zone_id | tool | requires | fact_id | note (EN, спостереження) | sets_state |
 |---|---|---|---|---|---|
-| `z.rig.pan` | `scales` (`on_click`, `repeat`) | — | `f.weight_air` | "On the balance in air: 1 429 g. The beam comes to rest at once and does not creep." | — |
-| `z.rig.jar` | `hand` (`on_click`) | — | — | *(підвісити річ на волосині; вона висить вільно, дном на 40 мм вище дна слоїка)* | `z.rig.jar → piece_in` |
-| `z.rig.jar` (`piece_in`) | `scales` (`on_click`, `repeat`) | `f.weight_air` | `f.weight_water` | "Hanging clear on a horsehair, wholly under water, sides and bottom untouched: 1 429 g. The beam did not move when the water was reached." | — |
-| `z.rig.jar` (`piece_in`) | `caliper` (`on_click`) | — | `f.level_zero` | "The etched ring on the glass was set to the surface before the piece went in. Caliper from the ring down to the surface now: 0.0 mm. The inside of the jar measures 160 mm across." | — |
-| `z.rig.jar` | `hand` (`on_click`) | `f.weight_water` | — | *(зняти річ, підвісити еталон)* | `z.rig.jar → standard_in` |
-| `z.rig.standard` | `scales` (`on_click`, `repeat`) | — | — | say: "The brass standard on the same pan: 500 g. Stamped on its head: 500 g, and the assay office's crown." | `sets_flag: {fl.std_in_air: true}` |
-| `z.rig.jar` (`standard_in`) | `scales` (`on_click`, `repeat`) | `fl.std_in_air` | `f.control` | "The brass standard, 500 g in air, on the same beam, the same hair, the same water: 441 g. The ring on the glass now stands 2.9 mm above the surface." | — |
+| `z.rig.pan` | `tool.scales` (`on_click`, `repeat`) | — | `f.weight_air` | "On the balance in air: 1 429 g. The beam comes to rest at once and does not creep." | — |
+| `z.rig.jar` | `tool.hand` (`on_click`) | — | — | *(підвісити річ на волосині; вона висить вільно, дном на 40 мм вище дна слоїка)* | `z.rig.jar → piece_in` |
+| `z.rig.jar` (`piece_in`) | `tool.scales` (`on_click`, `repeat`) | `f.weight_air` | `f.weight_water` | "Hanging clear on a horsehair, wholly under water, sides and bottom untouched: 1 429 g. The beam did not move when the water was reached." | — |
+| `z.rig.jar` (`piece_in`) | `tool.caliper` (`on_click`) | — | `f.level_zero` | "The etched ring on the glass was set to the surface before the piece went in. Caliper from the ring down to the surface now: 0.0 mm. The inside of the jar measures 160 mm across." | — |
+| `z.rig.jar` | `tool.hand` (`on_click`) | `f.weight_water` | — | *(зняти річ, підвісити еталон)* | `z.rig.jar → standard_in` |
+| `z.rig.standard` | `tool.scales` (`on_click`, `repeat`) | — | — | say: "The brass standard on the same pan: 500 g. Stamped on its head: 500 g, and the assay office's crown." | `sets_flag: {fl.std_in_air: true}` |
+| `z.rig.jar` (`standard_in`) | `tool.scales` (`on_click`, `repeat`) | `fl.std_in_air` | `f.control` | "The brass standard, 500 g in air, on the same beam, the same hair, the same water: 441 g. The ring on the glass now stands 2.9 mm above the surface." | — |
 | `z.book.gravities` | `*` (`on_click`) | — | — | *(метод + таблиця; факту не дає — див. §5.3)* | `sets_flag: {fl.method_known: true}` |
 
 **Пастка порядку, навмисна.** Гравець майже завжди зважує річ **до** еталона. Отже перші
@@ -188,11 +188,11 @@
 
 | крок | зона / дія | tool | що відбувається |
 |---|---|---|---|
-| 1 | `z.room.lamp` | `hand` | Лампа гасне. З полиці — стук-шкрябання, три рази, і тишa. |
-| 2 | `z.room.lamp` (`out`) | `eye` | say: "It stops each time the street lamp outside comes up, and starts again when it drops." — **причина видима, підказки нема** |
-| 3 | `z.room.curtain` | `hand` | Штора засувається. Кімната стає чорна. Ambience `darkness`. |
+| 1 | `z.room.lamp` | `tool.hand` | Лампа гасне. З полиці — стук-шкрябання, три рази, і тишa. |
+| 2 | `z.room.lamp` (`out`) | `tool.eye` | say: "It stops each time the street lamp outside comes up, and starts again when it drops." — **причина видима, підказки нема** |
+| 3 | `z.room.curtain` | `tool.hand` | Штора засувається. Кімната стає чорна. Ambience `darkness`. |
 | 4 | `z.relic.top` | — | Кришка **стоїть відчинена**. Переходу нема, звуку відчинення нема: кадр просто інший. `z.relic.top → open` |
-| 5 | `z.relic.inside` | `eye` \| `hand` | `f.nest` (див. §4) |
+| 5 | `z.relic.inside` | `tool.eye` \| `tool.hand` | `f.nest` (див. §4) |
 
 **Загасити лампу мало, і це доводиться грою, а не текстом.** Якщо гравець засуває штору,
 не гасивши лампи — нічого не відбувається, і say: "The room is darker and the lamp is still lit."

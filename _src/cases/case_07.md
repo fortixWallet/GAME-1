@@ -117,60 +117,60 @@ const ZONES := {
 const RULES := [
  # ---- ПОРТСИГАР: чесна річ. Це важливо: гравець шукає ваду й не знаходить ----
  {"zone": &"z.case.lid", "tool": &"tool.loupe", "verb": &"observe", "dwell": 0.5,
-  "facts": [&"f.c7.lid_mono"],
+  "facts": [&"f.lid_mono"],
   "say": "A monogram engraved on the lid: R. H. The cuts are dark at the bottom, worn even at the top."},
  {"zone": &"z.case.lid", "tool": &"tool.hand", "verb": &"apply",
   "sets_state": {&"z.case.lid": &"open"}, "sfx": &"goblet_set",
   "say": "The lid springs open on its own weight."},
  {"zone": &"z.case.inner", "tool": &"tool.loupe", "verb": &"observe", "dwell": 0.5,
-  "requires": [], "facts": [&"f.c7.inner_marks"],
+  "requires": [], "facts": [&"f.inner_marks"],
   "say": "Inside the lid, four punches in a row: the maker's shield, the Diana head with a 2, the office letter inside the outline, and a zigzag scratch beside them."},
  {"zone": &"z.case.underside", "tool": &"tool.acid", "verb": &"apply",
-  "facts": [&"f.c7.acid_red"],
+  "facts": [&"f.acid_red"],
   "say": "A streak on the touchstone. Schwerter's solution runs blood-red on it, like the 900 needle."},
  {"zone": &"z.case.hinge", "tool": &"tool.caliper", "verb": &"apply",
-  "facts": [&"f.c7.hinge_ok"],
+  "facts": [&"f.hinge_ok"],
   "say": "The hinge barrel is of one piece with the body. No solder seam, no filler."},
  # ---- НАСКРІЗНА НИТКА: рука Продавця ----
  {"zone": &"z.case.thumbpiece", "tool": &"tool.rake", "verb": &"observe", "dwell": 0.8,
-  "facts": [&"f.c7.thumb_wear"],
+  "facts": [&"f.thumb_wear"],
   "say": "The thumbpiece is polished away on its left side only, and the polish runs deeper than the engraving."},
  # ---- КВИТАНЦІЯ КЛІЄНТА: вхід у картотеку ----
  {"zone": &"z.docs.receipt", "tool": &"tool.loupe", "verb": &"observe", "dwell": 0.4,
-  "facts": [&"f.c7.receipt_gnat"],
+  "facts": [&"f.receipt_hnat"],
   "say": "Receipt of deposit. The owner's hand at the foot: R. Hnat. The H is finished with a loop that comes back on itself."},
  # ---- СІМ ТЕК: кожна дає ПАРУ ДАТ, і більше нічого ----
- {"zone": &"z.cab.folder_1", "tool": &"tool.hand", "verb": &"apply", "facts": [&"f.c7.f1"],
+ {"zone": &"z.cab.folder_1", "tool": &"tool.hand", "verb": &"apply", "facts": [&"f.folder_1"],
   "say": "Folder 1. Seal set 14 April. Notice of death, 20 April. Six days."},
- {"zone": &"z.cab.folder_2", "tool": &"tool.hand", "verb": &"apply", "facts": [&"f.c7.f2"],
+ {"zone": &"z.cab.folder_2", "tool": &"tool.hand", "verb": &"apply", "facts": [&"f.folder_2"],
   "say": "Folder 2. Seal set 2 June. Notice of death, 6 June. Four days."},
- {"zone": &"z.cab.folder_3", "tool": &"tool.hand", "verb": &"apply", "facts": [&"f.c7.f3"],
+ {"zone": &"z.cab.folder_3", "tool": &"tool.hand", "verb": &"apply", "facts": [&"f.folder_3"],
   "say": "Folder 3. Seal set 19 September. Notice of death, 28 September. Nine days."},
- {"zone": &"z.cab.folder_4", "tool": &"tool.hand", "verb": &"apply", "facts": [&"f.c7.f4"],
+ {"zone": &"z.cab.folder_4", "tool": &"tool.hand", "verb": &"apply", "facts": [&"f.folder_4"],
   "say": "Folder 4. Seal set 11 January. Notice of death, 16 January. Five days."},
- {"zone": &"z.cab.folder_5", "tool": &"tool.hand", "verb": &"apply", "facts": [&"f.c7.f5"],
+ {"zone": &"z.cab.folder_5", "tool": &"tool.hand", "verb": &"apply", "facts": [&"f.folder_5"],
   "say": "Folder 5. Seal set 3 March. Notice of death, 9 March. Six days."},
- {"zone": &"z.cab.folder_6", "tool": &"tool.hand", "verb": &"apply", "facts": [&"f.c7.f6"],
+ {"zone": &"z.cab.folder_6", "tool": &"tool.hand", "verb": &"apply", "facts": [&"f.folder_6"],
   "say": "Folder 6. Seal set 27 July. Notice of death, 2 August. Six days."},
  # ТЕКА-ВИНЯТОК: печатки не було, і людина жива
- {"zone": &"z.cab.folder_7", "tool": &"tool.hand", "verb": &"apply", "facts": [&"f.c7.f7_alive"],
+ {"zone": &"z.cab.folder_7", "tool": &"tool.hand", "verb": &"apply", "facts": [&"f.folder_7_alive"],
   "say": "Folder 7. Returned without a certificate — the line for the seal is empty. The owner wrote again last winter, about a different matter."},
  # ---- УДАР: власні атестати ----
- {"zone": &"z.cab.own_1", "tool": &"tool.hand", "verb": &"apply", "facts": [&"f.c7.own_1"],
+ {"zone": &"z.cab.own_1", "tool": &"tool.hand", "verb": &"apply", "facts": [&"f.own_cert_1"],
   "say": "A card in your own hand. The client's name written by you. Seal set — and the notice of death is already pinned behind it.",
   "sfx": &"page_turn"},
- {"zone": &"z.cab.own_2", "tool": &"tool.hand", "verb": &"apply", "facts": [&"f.c7.own_2"],
+ {"zone": &"z.cab.own_2", "tool": &"tool.hand", "verb": &"apply", "facts": [&"f.own_cert_2"],
   "say": "The second card in your own hand. The same loop on the H at the foot of the deposit receipt.",
   "sfx": &"page_turn", "music": &"stop"},   # музика ОБРИВАЄТЬСЯ на середині такту (REZHYSURA §6Б)
  # ---- ГРОСБУХ: вивід РОКУ (не читання!) ----
- {"zone": &"z.ledger.numbers", "tool": &"tool.eye", "verb": &"apply", "facts": [&"f.c7.led_count"],
-  "say": "The seals are numbered without a break. The last is 1 429. Yours are the ones after it."},
- {"zone": &"z.ledger.dated_a", "tool": &"tool.eye", "verb": &"apply", "facts": [&"f.c7.led_a"],
-  "say": "A dated spread: seal 402 was set in the spring of 1871."},
- {"zone": &"z.ledger.dated_b", "tool": &"tool.eye", "verb": &"apply", "facts": [&"f.c7.led_b"],
-  "say": "Another dated spread: seal 1 106 was set in the autumn of 1889."},
+ {"zone": &"z.ledger.numbers", "tool": &"tool.eye", "verb": &"apply", "facts": [&"f.led_count"],
+  "say": "The seals are numbered without a break. The last is 1 486. Yours are the ones after it."},
+ {"zone": &"z.ledger.dated_a", "tool": &"tool.eye", "verb": &"apply", "facts": [&"f.led_500"],
+  "say": "A dated spread: seal 500 was set in the spring of 1872."},
+ {"zone": &"z.ledger.dated_b", "tool": &"tool.eye", "verb": &"apply", "facts": [&"f.led_1400"],
+  "say": "Another dated spread: seal 1 400 was set in the spring of 1890."},
  # ---- ХИБНИЙ СЛІД ----
- {"zone": &"z.news.cholera", "tool": &"tool.eye", "verb": &"apply", "facts": [&"f.c7.cholera"],
+ {"zone": &"z.news.cholera", "tool": &"tool.eye", "verb": &"apply", "facts": [&"f.cholera_notice"],
   "say": "The file for that spring carries a notice of cholera in the eastern quarters. Two of the seven dates fall inside that fortnight."},
  # ---- СЕЙФ: приймає ЧИСЛО, введене гравцем ----
  {"zone": &"z.safe.dial", "tool": &"tool.hand", "verb": &"apply",
@@ -181,10 +181,18 @@ const RULES := [
 ]
 ```
 
-**Арифметика року (це і є загадка, а не читання):**
-`(1889 − 1871) років / (1106 − 402) печаток` = 18 / 704 ≈ **0.0256 року на печатку**.
-Від печатки 402 назад до печатки 1: `402 × 0.0256 ≈ 10.3 року` → `1871 − 10 = ` **1861–1862**.
-Допуск ±1 рік. Запасна дорога (V6, драбина): на першій сторінці гросбуха рік вписаний
+**Арифметика року (це і є загадка, а не читання).** Числа підібрані так, щоб лічилося в голові
+й давало **рівно** одну відповідь, без «десь між»:
+`1 400 − 500 = 900` печаток за `1890 − 1872 = 18` років → **50 печаток на рік**.
+`500 печаток / 50 = 10 років` назад від весни 1872 → **весна 1862**.
+Допуск ±1 рік лишається — але потрібен він тепер лише на випадок описки, а не через
+розмитість самої задачі.
+
+> **Було й чому змінено.** Спершу тут стояли печатки 402 (весна 1871) і 1 106 (осінь 1889).
+> Вони давали 38.05 печатки на рік і початок **1860.7** — тобто відповідь 1862 із них
+> **не виводилася**, і я сам це в цьому файлі й записав («1861–1862»). Валідатор ловить це
+> як `C-*`; арифметику виправлено, а не допуск розширено. Заодно зник збіг числа
+> **1 429** зі справою 10 (там це вага в грамах). Запасна дорога (V6, драбина): на першій сторінці гросбуха рік вписаний
 рукою попередника, але **залитий чорнилом** — читається лише на просвіт **свічкою**.
 
 ---
@@ -193,33 +201,50 @@ const RULES := [
 
 | fact_id | text (нотатник, EN) | cite (графа «на підставі») | tag | weight |
 |---|---|---|---|---|
-| `f.c7.lid_mono` | "Monogram R. H. on the lid. Cuts dark at the bottom, worn even at the top." | "the monogram, worn evenly" | `body` | 1 |
-| `f.c7.inner_marks` | "Four punches inside the lid: maker's shield, Diana head with a 2, office letter inside the outline, a zigzag scratch beside them." | "four punches, complete" | `marks` | 2 |
-| `f.c7.acid_red` | "Schwerter's solution runs blood-red on the streak, like the 900 needle." | "the assay: blood-red, 900" | `metal` | 2 |
-| `f.c7.hinge_ok` | "The hinge barrel is of one piece with the body. No solder, no filler." | "the hinge, undisturbed" | `body` | 1 |
-| `f.c7.thumb_wear` | "The thumbpiece is polished away on its left side only, deeper than the engraving." | "the wear under a left thumb" | `hand` | **3** |
-| `f.c7.receipt_gnat` | "Deposit receipt signed R. Hnat. The H finished with a loop that comes back on itself." | "the signature R. Hnat" | `papers` | 2 |
-| `f.c7.f1` … `f.c7.f6` | "Folder N. Seal set DD. Notice of death, DD. N days." | "folder N: seal, then death" | `folders` | 2 each |
-| `f.c7.f7_alive` | "Folder 7. Returned without a certificate — the seal line is empty. The owner wrote again last winter." | "folder 7: no seal, and alive" | `folders` | **3** |
-| `f.c7.own_1` | "A card in your own hand. The name written by you. Seal set — the notice of death pinned behind it." | "my own certificate, and what followed it" | `self` | **3** |
-| `f.c7.own_2` | "The second card in your own hand. The same loop on the H." | "my own hand, twice" | `self` | **3** |
-| `f.c7.led_count` | "The seals are numbered without a break. The last is 1 429." | "the ledger runs to 1 429" | `books` | 1 |
-| `f.c7.led_a` | "Seal 402 was set in the spring of 1871." | "seal 402, spring 1871" | `books` | 2 |
-| `f.c7.led_b` | "Seal 1 106 was set in the autumn of 1889." | "seal 1 106, autumn 1889" | `books` | 2 |
-| `f.c7.cholera` | "A notice of cholera that spring. Two of the seven dates fall inside that fortnight." | "the cholera fortnight" | `papers` | 1 |
+| `f.lid_mono` | "Monogram R. H. on the lid. Cuts dark at the bottom, worn even at the top." | "the monogram, worn evenly" | `body` | 1 |
+| `f.inner_marks` | "Four punches inside the lid: maker's shield, Diana head with a 2, office letter inside the outline, a zigzag scratch beside them." | "four punches, complete" | `marks` | 2 |
+| `f.acid_red` | "Schwerter's solution runs blood-red on the streak, like the 900 needle." | "the assay: blood-red, 900" | `metal` | 2 |
+| `f.hinge_ok` | "The hinge barrel is of one piece with the body. No solder, no filler." | "the hinge, undisturbed" | `body` | 1 |
+| `f.thumb_wear` | "The thumbpiece is polished away on its left side only, deeper than the engraving." | "the wear under a left thumb" | `hand` | **3** |
+| `f.receipt_hnat` | "Deposit receipt signed R. Hnat. The H finished with a loop that comes back on itself." | "the signature R. Hnat" | `papers` | 2 |
+| `f.folder_1` | "Folder 1. Seal set 4 Feb 1889. Notice of death, 19 days after." | "folder 1: seal, then death" | `folders` | 2 |
+| `f.folder_2` | "Folder 2. Seal set 22 Mar 1889. Notice of death, 11 days after." | "folder 2: seal, then death" | `folders` | 2 |
+| `f.folder_3` | "Folder 3. Seal set 8 May 1889. Notice of death, 23 days after." | "folder 3: seal, then death" | `folders` | 2 |
+| `f.folder_4` | "Folder 4. Seal set 30 Jun 1889. Notice of death, 9 days after." | "folder 4: seal, then death" | `folders` | 2 |
+| `f.folder_5` | "Folder 5. Seal set 14 Sep 1889. Notice of death, 31 days after." | "folder 5: seal, then death" | `folders` | 2 |
+| `f.folder_6` | "Folder 6. Seal set 2 Nov 1889. Notice of death, 16 days after." | "folder 6: seal, then death" | `folders` | 2 |
+| `f.folder_7_alive` | "Folder 7. Returned without a certificate — the seal line is empty. The owner wrote again last winter." | "folder 7: no seal, and alive" | `folders` | **3** |
+| `f.own_cert_1` | "A card in your own hand. The name written by you. Seal set — the notice of death pinned behind it." | "my own certificate, and what followed it" | `self` | **3** |
+| `f.own_cert_2` | "The second card in your own hand. The same loop on the H." | "my own hand, twice" | `self` | **3** |
+| `f.led_count` | "The seals are numbered without a break. The last is 1 486." | "the ledger runs to 1 486" | `books` | 1 |
+| `f.led_500` | "Seal 500 was set in the spring of 1872." | "seal 500, spring 1872" | `books` | 2 |
+| `f.led_1400` | "Seal 1 400 was set in the spring of 1890." | "seal 1 400, spring 1890" | `books` | 2 |
+| `f.cholera_notice` | "A notice of cholera that spring. Two of the seven dates fall inside that fortnight." | "the cholera fortnight" | `papers` | 1 |
 
 ---
 
 ## 5. АТЕСТАТ (`ENGINE_SPEC` §1.5) — 6 граф, **дві числові**
 
-| # | Префікс (EN) | Тип | Гейт | Варіанти / відповідь |
-|---|---|---|---|---|
-| 1 | "The case was made in" | список | `f.c7.inner_marks` | Vienna 900 · Pest 800 · Warsaw 875 |
-| 2 | "The metal is" | перетягування факту | `f.c7.acid_red` | будь-який факт `metal` |
-| 3 | "The piece has passed through this bureau" | **ЧИСЛО** | ≥3 факти `folders` | **7** (і восьмий — твій) |
-| 4 | "The earliest seal in this ledger was set in the year" | **ЧИСЛО** | `f.c7.led_a` + `f.c7.led_b` | **1862** (±1) |
-| 5 | "The hand that brought them is" | список | `f.c7.thumb_wear` | one hand · many hands · cannot be told |
-| 6 | "On this I set my name — I rely upon" | перетягування ≥2 фактів | графа 5 заповнена | тільки зібрані факти |
+`kind` за `core/slots.gd`: CHOICE / NUMBER / FACTS. `opts` тримають **id**, на папір лягає
+`tr("opt." + id)`.
+
+| # | slot_id | префікс (EN) | тип | гейт | варіанти / межі |
+|---|---|---|---|---|---|
+| 1 | `s.made_in` | "The case was made in ____" | CHOICE | `needs: [f.inner_marks]` | `o.vienna_900` "Vienna, 900 in the thousand" · `o.vienna_800` "Vienna, 800 in the thousand" · `o.pest_800` "Pest, 800 in the thousand" · `o.warsaw_875` "Warsaw, 875 in the thousand" |
+| 2 | `s.metal` | "The metal is ____" | FACTS `min 1, max 1` | `needs: [f.acid_red]` | джерело — `state.fact_order`, тільки група `metal` |
+| 3 | `s.passed_through` | "Before this day the piece had passed through this bureau ____ times" | **NUMBER** `digits 1, min 0, max 9` | `needs_count: {folders: 3}` | списку нема, валідації нема. *(істина: **7**)* |
+| 4 | `s.first_seal_year` | "The earliest seal in this ledger was set in the year ____" | **NUMBER** `digits 4, min 1700, max 1900` | `needs: [f.led_500, f.led_1400]` | списку нема, валідації нема. *(істина: **1862**, допуск ±1)* |
+| 5 | `s.hand` | "The hand that brought them is ____" | CHOICE | `needs: [f.thumb_wear]` | `o.one_hand` "one hand, in all seven" · `o.many_hands` "as many hands as there are folders" · `o.cannot_be_told` "not to be told from these papers" |
+| 6 | `s.basis` | "On this I set my name — I rely upon ____" | FACTS `min 2, max 4` | `needs_slot: [s.hand]`, `clears_on: [s.hand, s.made_in]` | джерело — `state.fact_order`, без групи `self` |
+
+**Істина** (рушій її не знає — знають тільки OUTCOMES):
+`s.made_in = o.vienna_900` · `s.metal = f.acid_red` · `s.passed_through = 7` ·
+`s.first_seal_year = 1862` · `s.hand = o.one_hand`.
+
+**Графа 3 — восьмий раз не рахується.** Тек сім, і сьома повернулася **без** печатки. Восьмий
+раз — це той, що відбувається зараз, рукою гравця; бланк про нього не питає, і саме тому
+число «7» у графі стоїть як недоказ. Хто впише 8, той уже все зрозумів — і однаково не
+отримає жодного слова у відповідь.
 
 **Графа 4 і є код сейфа.** Гравець вписує рік в атестат — і **той самий рік** набирає на диску.
 Гра не каже, що це одне й те саме. Зв'язок робить гравець.
@@ -231,12 +256,12 @@ const RULES := [
 ```gdscript
 const OUTCOMES := [
  # правильно + власні атестати впізнані
- {"when": {"5": &"opt.hand.one", "cite_has": [&"f.c7.own_1", &"f.c7.own_2"]},
+ {"when": {&"s.hand": &"o.one_hand", "cite_has": [&"f.own_cert_1", &"f.own_cert_2"]},
   "text_key": "out.c7.recognised"},
  # правильно, але власних карток не торкнувся
- {"when": {"5": &"opt.hand.one"}, "text_key": "out.c7.pattern_only"},
+ {"when": {&"s.hand": &"o.one_hand"}, "text_key": "out.c7.pattern_only"},
  # повірив холері
- {"when": {"5": &"opt.hand.many"}, "text_key": "out.c7.cholera"},
+ {"when": {&"s.hand": &"o.many_hands"}, "text_key": "out.c7.cholera"},
  {"text_key": "out.c7.declined"},
 ]
 ```

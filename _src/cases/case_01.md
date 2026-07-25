@@ -94,18 +94,18 @@
 
 | zone_id | tool | requires | fact_id | note (EN, спостереження) | sets_state |
 |---|---|---|---|---|---|
-| `z.cup.whole` | `caliper` | — | `f.height_196` | "Height, lip to table: 196 mm. Foot: 104 mm across." | — |
-| `z.cup.whole` | `scales` | — | `f.weight_331` | "On the balance: 331 g. It sits still at once." | `repeat: true` |
-| `z.cup.whole` | `hand` | — | — | → перехід на екран HANDS | `screen = HANDS` |
-| `z.bowl.inner` | `eye` \| `loupe` | — | `f.bowl_gilt` | "The inside of the bowl is gilded. The gilding is thin in a crescent under one side of the lip." | — |
-| `z.stem.knop` | `eye` \| `rake` | — | `f.knop_form` | "The stem swells into a knop the size of a walnut, cast in two shells and soldered round the girdle." | — |
-| `z.foot.underside` | `loupe` (`dwell 0.5`) | — | `f.mark_maker`, `f.mark_diana` | "Two punches, side by side. A rectangle with clipped corners: L·HOFFMANN. Beside it a woman's head in profile — a numeral 3 stands before the chin, and the letter A stands **inside the same outline**, under the throat." | — |
-| `z.foot.underside` | `loupe` (`dwell 1.2`) | `f.hb_vienna_marks` | `f.marks_alone` | "The rest of the underside is bare. No third punch, no figures, and no bright patch where one had been taken off." | — |
-| `z.foot.top` | `hand` (`on_click`) | `f.mark_diana` | `f.domes` | "A finger run across the slope of the foot catches on two small domes in the metal — one behind each punch." | `z.foot.top → raised` |
-| `z.foot.top` | `loupe` \| `rake` | `f.domes` | `f.domes_alike` | "Both domes rise to the same height and break at the same sharp shoulder." | — |
-| `z.foot.edge` | `rake` (`dwell 0.8`) | — | `f.foot_edge_plain` | "The band round the edge of the foot is plain. Under raking light there is no lettering, and no shadow where lettering was taken off." | — |
-| `z.papers.receipt` | `loupe` \| `eye` (`on_click`) | — | `f.receipt_1807` | "Receipt, Vienna, 12 March 1807, duty paid on re-marking: *one becher, silver, 13 löthig, weight 14 loth, height 8 zoll 4 linien* — for Anna Reithofer." | видає caliper + scales |
-| `z.papers.receipt` | `caliper` (`on_click`) | `f.receipt_1807`, `f.height_196`, `f.weight_331` | `f.receipt_mismatch` | "By the table on the wall: the becher of the receipt stands 219 mm and weighs 246 g. The cup on the desk stands 196 mm and weighs 331 g." | — |
+| `z.cup.whole` | `tool.caliper` | — | `f.height_196` | "Height, lip to table: 196 mm. Foot: 104 mm across." | — |
+| `z.cup.whole` | `tool.scales` | — | `f.weight_331` | "On the balance: 331 g. It sits still at once." | `repeat: true` |
+| `z.cup.whole` | `tool.hand` | — | — | → перехід на екран HANDS | `screen = HANDS` |
+| `z.bowl.inner` | `tool.eye` \| `tool.loupe` | — | `f.bowl_gilt` | "The inside of the bowl is gilded. The gilding is thin in a crescent under one side of the lip." | — |
+| `z.stem.knop` | `tool.eye` \| `tool.rake` | — | `f.knop_form` | "The stem swells into a knop the size of a walnut, cast in two shells and soldered round the girdle." | — |
+| `z.foot.underside` | `tool.loupe` (`dwell 0.5`) | — | `f.mark_maker`, `f.mark_diana` | "Two punches, side by side. A rectangle with clipped corners: L·HOFFMANN. Beside it a woman's head in profile — a numeral 3 stands before the chin, and the letter A stands **inside the same outline**, under the throat." | — |
+| `z.foot.underside` | `tool.loupe` (`dwell 1.2`) | `f.hb_vienna_marks` | `f.marks_alone` | "The rest of the underside is bare. No third punch, no figures, and no bright patch where one had been taken off." | — |
+| `z.foot.top` | `tool.hand` (`on_click`) | `f.mark_diana` | `f.domes` | "A finger run across the slope of the foot catches on two small domes in the metal — one behind each punch." | `z.foot.top → raised` |
+| `z.foot.top` | `tool.loupe` \| `tool.rake` | `f.domes` | `f.domes_alike` | "Both domes rise to the same height and break at the same sharp shoulder." | — |
+| `z.foot.edge` | `tool.rake` (`dwell 0.8`) | — | `f.foot_edge_plain` | "The band round the edge of the foot is plain. Under raking light there is no lettering, and no shadow where lettering was taken off." | — |
+| `z.papers.receipt` | `tool.loupe` \| `tool.eye` (`on_click`) | — | `f.receipt_1807` | "Receipt, Vienna, 12 March 1807, duty paid on re-marking: *one becher, silver, 13 löthig, weight 14 loth, height 8 zoll 4 linien* — for Anna Reithofer." | видає caliper + scales |
+| `z.papers.receipt` | `tool.caliper` (`on_click`) | `f.receipt_1807`, `f.height_196`, `f.weight_331` | `f.receipt_mismatch` | "By the table on the wall: the becher of the receipt stands 219 mm and weighs 246 g. The cup on the desk stands 196 mm and weighs 331 g." | — |
 | `z.book.register` | `*` (`on_click`) | `f.mark_maker` | `f.reg_hoffmann` | "Register of Vienna workshops: HOFFMANN, Leopold — silversmith. Mark entered 1859. Mark struck out 1871." | — |
 | `z.book.marks` | `*` (`on_click`) | `f.mark_diana` | `f.hb_vienna_marks` | (повний текст сторінки — див. §6, таблиця Б) | — |
 
@@ -113,8 +113,8 @@
 
 | zone_id | tool | requires | ефект |
 |---|---|---|---|
-| `z.foot.top` | `eye` | — | say: "The lamp puts two small bright points on the slope of the foot." — **діегетичний вказівник на зону, без факту** |
-| `z.foot.top` | `hand` | немає `f.mark_diana` | say: "Smooth, and something under the finger. Nothing to say about it yet." — не дає факт до того, як гравець побачив клейма |
+| `z.foot.top` | `tool.eye` | — | say: "The lamp puts two small bright points on the slope of the foot." — **діегетичний вказівник на зону, без факту** |
+| `z.foot.top` | `tool.hand` | немає `f.mark_diana` | say: "Smooth, and something under the finger. Nothing to say about it yet." — не дає факт до того, як гравець побачив клейма |
 | `z.book.register` | `*` | немає `f.mark_maker` | say: "Four hundred names. Without a name to look for this is a wall." |
 
 **Дороги до того самого факту** (один факт = один id, `add_fact()` ловить дублі):
@@ -218,7 +218,7 @@
 | 2 | `s.fineness` | "Fineness **claimed by the mark**: ____ in 1000" | **NUMBER** `digits 3, min 100, max 999` | `needs: [f.mark_diana, f.hb_vienna_marks]` | нема списку. *(істина: **800**)* |
 | 3 | `s.not_before` | "The marks were struck not earlier than ____" | **NUMBER** `digits 4, min 1700, max 1900` | `needs: [f.mark_diana, f.hb_vienna_marks]` | нема списку. *(істина: **1872**)* |
 | 4 | `s.marks` | "The marks were struck ____" | CHOICE | `needs_any: [f.domes]` | `o.on_the_flat` "on the flat metal, before the vessel was raised" · `o.by_office_later` "on the finished vessel, at the assay office" · `o.after_the_fact` "on the finished vessel, by a hand that was not the office's" |
-| 5 | `s.provenance` | "The piece reached the bearer ____" | CHOICE | `needs_slot: [s.marks]` | `o.honest_inheritance` "by inheritance, as she states" · `o.legally_remarked` "as old plate, lawfully re-marked at a later sale" · `o.taken_from_church` "out of a church, and dressed to pass" · `o.made_to_look_stolen` "as new work, dressed to be taken for church plate" |
+| 5 | `s.provenance` | "The piece reached the bearer ____" | CHOICE | `needs_slot: [s.marks]` | `o.honest_inheritance` "by inheritance, as she states" · `o.legally_remarked` "as old plate, lawfully re-marked at a later sale" · `o.taken_from_church` "out of a church, and worked upon after it left" · `o.made_to_look_stolen` "as new work, carrying the marks of church plate" |
 | 6 | `s.basis` | "On the strength of:" | FACTS `min 2, max 4` | `needs_slot: [s.provenance]`, `clears_on: [s.provenance]` | джерело — `state.fact_order`, без групи `strat` |
 
 **Три залізні правила діють:** NUMBER без валідації й без фідбеку · CHOICE тримає id · FACTS
