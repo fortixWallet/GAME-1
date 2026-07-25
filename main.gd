@@ -140,7 +140,7 @@ func _ready() -> void:
 	_build_cert()
 	_build_ledger()
 	_build_case2()
-	CSLOTS = (CASES[1] as Dictionary)["slots"]
+	_load_case(1)          # один вхід у стан замість ручного присвоєння CSLOTS
 	# верхня підказка (діегетична — на мальованій стрічці нема, тож тонкий текст)
 	hint_label = Label.new()
 	hint_label.label_settings = _ls(fr, int(H*0.028), Color(0.95,0.91,0.80))
@@ -192,16 +192,32 @@ func _center(key: String) -> Vector2:
 	return Vector2((r[0]+r[2]*0.5)*W, (r[1]+r[3]*0.5)*H)
 
 func _dbg_outcomes() -> void:
+	# УВАГА: цей тест раніше БРЕХАВ. Четвертий рядок ставив провенанс
+	# «by a path I cannot vouch for», тобто НЕ церковний, і тому падав у ту саму
+	# гілку, що й третій. Дві однакові відповіді виглядали як два різні наслідки,
+	# а справжня четверта гілка (провенанс вгадано, майстерню — ні) не перевірялась
+	# ніколи. Тепер тест сам стежить, щоб гілок було чотири РІЗНИХ.
 	var cases := [
 		["Vienna — Hoffmann workshop","struck over an older, effaced mark","taken from a church","the effaced church mark beneath","ПРАВИЛЬНО+доказ"],
 		["Vienna — Hoffmann workshop","struck over an older, effaced mark","taken from a church","the client's own word","крадена БЕЗ доказу"],
 		["Vienna — Hoffmann workshop","struck but once, and clean","honestly, by inheritance","the client's own word","пропустив крадене"],
-		["Prague — court silver","struck but once, and clean","by a path I cannot vouch for","the client's own word","дрібні хиби"],
+		["Prague — court silver","struck over an older, effaced mark","taken from a church","the effaced church mark beneath","провенанс вгадано, майстерню ні"],
 	]
 	print("OUTCOMES")
+	# мітки самі містять «+» («ПРАВИЛЬНО+доказ»), тому склеювати їх у рядок і шукати
+	# в ньому плюс — не можна: перевірка спрацює на власній назві. Тримаємо СПИСОК.
+	var seen := {}
 	for c in cases:
 		cvals = [c[0],c[1],c[2],c[3]]
-		print("[", c[4], "] -> ", _outcome_text().substr(0, 60), "...")
+		var t := _outcome_text()
+		if not seen.has(t): seen[t] = []
+		(seen[t] as Array).append(c[4])
+		print("[", c[4], "] -> ", t.substr(0, 60), "...")
+	for t in seen:
+		var who := seen[t] as Array
+		if who.size() > 1:
+			print("OUTCOMES_FAIL: гілки ", who, " дають однаковий текст")
+	print("OUTCOMES_OK cases=", cases.size(), " unique=", seen.size())
 	get_tree().quit()
 
 # ПОВНИЙ ДЕНЬ 1 очима гравця: меню → кабінет → клієнтка → стіл → атестат → вечір
@@ -256,7 +272,7 @@ func _dbg_case2() -> void:
 	dbg_mode = true
 	var dir := _shotdir()
 	await get_tree().process_frame
-	_start_case(2)
+	_load_case(2)
 	_show("DESK2"); await _shot(dir+"c2_01_desk.png")
 	_show("TESTIMONY"); await _shot(dir+"c2_02_statements.png")
 	_show("WATCH_WEAR"); await _shot(dir+"c2_03_crown.png")
@@ -870,37 +886,77 @@ const CHAPTERS := [
 	["11 · The ledger",               "ledger"],
 ]
 
-func _reset_run() -> void:
-	# чистий стан + прибрати сліди попереднього проходу (віск, «CASE CLOSED», позначки каталогу)
-	sealed = false; cvals = ["","","",""]; active_slot = 0
-	drop_fact("found_marks"); drop_fact("matched_maker"); drop_fact("read_news")
-	drop_fact("found_church"); drop_fact("read_docs"); raking = false
-	drop_fact("found_wear"); drop_fact("found_chain"); found_time = 0.0
-	client_line = 0; client_seen = false; case_done = false; saw_figure = false
-	lamp_on = true; tod = "day"
+# ── СТАН → ВИГЛЯД: рівно три входи, і четвертого нема ────────────────────────
+# _load_case(n)     — ЄДИНЕ місце, де стан справи стає початковим.
+# _clear_run_nodes()— викидає вузли, що лишились від попереднього проходу.
+# _sync_view()      — ЄДИНЕ місце, де вигляд ВИВОДИТЬСЯ зі стану.
+#
+# Закон: обробник міняє СТАН і кличе _sync_view(). Обробник сам нічого не малює.
+# До кроку 2 скид жив у двох функціях із різними наборами полів (_reset_run і
+# _start_case), і саме через розбіжність між ними raking, кільце каталогу й діти
+# cert_layer переживали перехід між справами. Гірше: _reset_run не переставляв
+# CSLOTS, тож після справи 2 атестат справи 1 показував чужі графи.
+
+func _load_case(n: int) -> void:
+	case_id = n
+	CSLOTS = (CASES[n] as Dictionary)["slots"]
+	facts.clear()                       # одне речення замість чотирнадцяти drop_fact
+	cvals = ["", "", "", ""]
+	active_slot = 0
+	sealed = false
+	case_done = false
+	found_time = 0.0
+	client_line = 0
+	client_seen = false
+	saw_figure = false
+	raking = false
+	lamp_on = true
+	tod = "day"
+	_clear_run_nodes()
+	_sync_view()
+
+func _clear_run_nodes() -> void:
+	# сліди попереднього проходу: віск, «CASE CLOSED», позначки каталогу, лупа в руці
 	if loupe_held: _drop_loupe()
 	if goblet_pivot: goblet_pivot.rotation = Vector3.ZERO
-	if maker_mat:
-		maker_mat.albedo_texture = load("res://art/foot_plate_maker.png")
-		maker_mat.albedo_color = Color(1.30, 1.28, 1.22)
-	if key_light: key_light.rotation_degrees = Vector3(-9,-62,0); key_light.light_energy = 1.9
-	if rake_btn: rake_btn.text = "⟋  rake the light across the silver"
 	if cert_layer:
-		for n in ["stamp_hs","cert_msg"]:
+		for n in ["stamp_hs", "cert_msg"]:
 			if cert_layer.has_node(n): cert_layer.get_node(n).queue_free()
 		for ch in cert_layer.get_children():
 			if ch is TextureRect and ch != cert_layer.get_child(0): ch.queue_free()
 			elif ch is Label and (ch as Label).text == "CASE CLOSED": ch.queue_free()
 	if cat_screen:
-		for n2 in ["matchring","matchlbl"]:
+		for n2 in ["matchring", "matchlbl"]:
 			if cat_screen.has_node(n2): cat_screen.get_node(n2).queue_free()
+
+# Безпечна до повторного виклику: нічого не перемикає, лише приводить вигляд
+# у відповідність до стану. animate=true — коли зміну має бачити гравець.
+func _sync_view(animate: bool = false) -> void:
+	# косе світло міняє САМУ поверхню дна (пластину) — тож без лупи й під лупою знову однаково
+	# _load_case може викликатись до того, як заповнено кеш текстур (_ready)
+	if maker_mat and tex.has("foot_plate_maker"):
+		maker_mat.albedo_texture = tex["foot_plate_church"] if raking else tex["foot_plate_maker"]
+		# без пересвіту: гравюра має ЧИТАТИСЬ, а не тонути в білому
+		maker_mat.albedo_color = Color(1.38, 1.35, 1.30) if raking else Color(1.30, 1.28, 1.22)
+	var rot := Vector3(-4, -84, 0) if raking else Vector3(-9, -62, 0)
+	var energy := 1.15 if raking else 1.9
+	if key_light:
+		if animate:
+			var lt := create_tween(); lt.set_parallel(true)
+			lt.tween_property(key_light, "rotation_degrees", rot, 0.5)
+			lt.tween_property(key_light, "light_energy", energy, 0.5)
+		else:
+			key_light.rotation_degrees = rot
+			key_light.light_energy = energy
+	if rake_btn:
+		rake_btn.text = "⟋  raking light — on" if raking else "⟋  rake the light across the silver"
 
 func _found_all() -> void:
 	add_fact("found_marks"); add_fact("matched_maker"); add_fact("read_news")
 	add_fact("found_church"); add_fact("read_docs")
 
 func _goto(key: String) -> void:
-	_reset_run()
+	_load_case(1)
 	match key:
 		"door":
 			_enter_hub()
@@ -966,7 +1022,7 @@ func _build_menu() -> void:
 	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	sub.size = Vector2(W*0.46, H*0.05); sub.position = Vector2(W*0.065, H*0.50); sub.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	s0.add_child(sub)
-	_txtbtn(s0, "unlock the door  →", Vector2(W*0.065, H*0.60), func(): _play("door_bell"); _reset_run(); _enter_hub(), 0.034)
+	_txtbtn(s0, "unlock the door  →", Vector2(W*0.065, H*0.60), func(): _play("door_bell"); _load_case(1); _enter_hub(), 0.034)
 	_txtbtn(s0, "choose a scene  →", Vector2(W*0.065, H*0.68), func(): _show("CHAPTERS"), 0.028)
 
 # --- КАБІНЕТ ---
@@ -1147,25 +1203,10 @@ func _build_hands() -> void:
 	hands_glass_btn = _txtbtn(s, "◦  take up the glass", Vector2(W*0.29, H*0.9), func(): _pickup_loupe())
 
 func _toggle_raking() -> void:
-	raking = not raking
+	raking = not raking          # СТАН
 	_play("ui_soft")
-	if not key_light: return
-	# косе світло міняє САМУ поверхню дна (пластину) — тож без лупи й під лупою знову однаково
-	if maker_mat:
-		maker_mat.albedo_texture = load("res://art/foot_plate_church.png" if raking else "res://art/foot_plate_maker.png")
-		# без пересвіту: гравюра має ЧИТАТИСЬ, а не тонути в білому
-		maker_mat.albedo_color = Color(1.38, 1.35, 1.30) if raking else Color(1.30, 1.28, 1.22)
-	var lt := create_tween(); lt.set_parallel(true)
-	if raking:
-		lt.tween_property(key_light, "rotation_degrees", Vector3(-4, -84, 0), 0.5)
-		lt.tween_property(key_light, "light_energy", 1.15, 0.5)
-		rake_btn.text = "⟋  raking light — on"
-		_set_hint("The light lies almost flat across the silver now. Bring the glass close.")
-	else:
-		lt.tween_property(key_light, "rotation_degrees", Vector3(-9, -62, 0), 0.5)
-		lt.tween_property(key_light, "light_energy", 1.9, 0.5)
-		rake_btn.text = "⟋  rake the light across the silver"
-		_set_hint("")
+	_sync_view(true)             # вигляд виводиться зі стану, тут — з анімацією
+	_set_hint("The light lies almost flat across the silver now. Bring the glass close." if raking else "")
 
 # ---------- DOCS (тека: лист) ----------
 func _build_docs() -> void:
@@ -1438,16 +1479,6 @@ func _choose(i: int, opt: String) -> void:
 	_play("pen_write")
 	active_slot = _next_open_slot()   # авто-перехід до наступного незаповненого відкритого слота
 	_refresh_cert()
-
-func _start_case(n: int) -> void:
-	case_id = n
-	CSLOTS = (CASES[n] as Dictionary)["slots"]
-	cvals = ["","","",""]
-	sealed = false
-	drop_fact("read_docs"); drop_fact("read_news")
-	drop_fact("found_marks"); drop_fact("matched_maker"); drop_fact("found_church"); raking = false
-	drop_fact("found_wear"); drop_fact("found_chain")
-	active_slot = 0
 
 func _next_open_slot() -> int:
 	for j in CSLOTS.size():

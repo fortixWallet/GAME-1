@@ -37,13 +37,17 @@ fi
 export G3_SHOTDIR="/tmp/g3_verify/"
 rm -rf "$G3_SHOTDIR"; mkdir -p "$G3_SHOTDIR"
 FAIL=""
-for t in "walk c" "chapters"; do
+for t in "walk c" "chapters" "outcomes"; do
   OUT=$(godot --path . --rendering-driver opengl3 -- $t 2>&1 | grep -v specular)
   echo "--- $t ---" >>"$LOG"; echo "$OUT" >>"$LOG"
   case "$t" in
     "walk c")   echo "$OUT" | grep -q "WALK_C_OK sealed=true"        || FAIL="$FAIL walk-c" ;;
     "chapters") echo "$OUT" | grep -q "CHAPTERS_OK all_reachable=true" || FAIL="$FAIL chapters" ;;
+    # чотири наслідки мусять давати чотири РІЗНИХ тексти: дві однакові гілки
+    # виглядають як покриття, а насправді одна з них не перевіряється ніколи
+    "outcomes") echo "$OUT" | grep -q "OUTCOMES_OK cases=4 unique=4" || FAIL="$FAIL outcomes" ;;
   esac
+  echo "$OUT" | grep -q "OUTCOMES_FAIL" && FAIL="$FAIL outcomes-dup"
   echo "$OUT" | grep -qi "SCRIPT ERROR" && FAIL="$FAIL script-error($t)"
 done
 
