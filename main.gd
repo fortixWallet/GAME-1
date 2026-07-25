@@ -36,14 +36,34 @@ var edit_key := ""
 var edit_off := Vector2.ZERO
 
 # --- стан розслідування ---
-var found_marks := false     # роздивився клеймо майстра під лупою
-var matched_maker := false   # знайшов збіг у довіднику (Відень)
-var read_news := false       # прочитав газету (пограбування ризниці)
-var read_docs := false       # прочитав справу (лист клієнтки / свідчення)
-var found_wear := false      # справа 2: знос заводної голівки (ліва рука)
-var found_chain := false     # справа 2: свіжі подряпини на вушку (ланцюжок перечіпляли)
+# ---- ФАКТИ: єдине сховище. Порядок вставки Dictionary = хронологія нотатника ----
+# Старі буліни лишились іменами, але тепер це ГЕТТЕРИ над facts.
+# Присвоєння геттеру = помилка компіляції → компілятор сам ловить забуті місця.
+var facts := {}
+
+func add_fact(id: String) -> bool:
+	if facts.has(id): return false      # ЄДИНЕ місце в грі, де гинуть дублі
+	facts[id] = true
+	return true
+
+func drop_fact(id: String) -> void:
+	facts.erase(id)
+
+var found_marks: bool:
+	get: return facts.has("found_marks")     # клеймо майстра під лупою
+var matched_maker: bool:
+	get: return facts.has("matched_maker")   # збіг у довіднику (Відень)
+var read_news: bool:
+	get: return facts.has("read_news")       # газета: пограбування ризниці
+var read_docs: bool:
+	get: return facts.has("read_docs")       # справа: лист клієнтки / свідчення
+var found_wear: bool:
+	get: return facts.has("found_wear")      # справа 2: знос дужки
+var found_chain: bool:
+	get: return facts.has("found_chain")     # справа 2: свіжі подряпини на вушку
 var raking := false          # косе світло увімкнене (в руках)
-var found_church := false    # під косим світлом побачив стерту церковну монограму
+var found_church: bool:
+	get: return facts.has("found_church")    # стерта церковна монограма під косим світлом
 var sealed := false
 var tod := "day"             # день / вечір / ніч
 var lamp_on := true          # лампа на столі
@@ -217,7 +237,7 @@ func _dbg_day1() -> void:
 	await _shot(dir+"d1_07_hub_case.png")
 	_hub_desk(); await _shot(dir+"d1_08_desk.png")
 	# справа вже перевірена окремо — беремо зачіпки й пишемо вирок
-	found_marks = true; matched_maker = true; read_news = true; found_church = true; read_docs = true
+	add_fact("found_marks"); add_fact("matched_maker"); add_fact("read_news"); add_fact("found_church"); add_fact("read_docs")
 	_show("CERT"); await _shot(dir+"d1_09_cert.png")
 	_choose(0, "Vienna — Hoffmann workshop"); _choose(1, "struck over an older, effaced mark")
 	_choose(2, "taken from a church"); _choose(3, "the effaced church mark beneath")
@@ -282,7 +302,7 @@ func _dbg_clicktest() -> void:
 			opened = _shown()
 	log += "newspaper link -> " + opened + " (треба NEWS)\n"
 	# 5. каталог: клік по правильній комірці
-	_show("CATALOG"); found_marks = true; await get_tree().process_frame
+	_show("CATALOG"); add_fact("found_marks"); await get_tree().process_frame
 	await _click_at(cat_m)
 	log += "catalog cell -> matched_maker=" + str(matched_maker) + " (треба true)\n"
 	print(log)
@@ -475,10 +495,10 @@ func _check_underside(gc: Vector2) -> void:
 		found_time += get_process_delta_time()
 		if found_time > 0.5:
 			if not found_marks:
-				found_marks = true; found_time = 0.0; _play("page_turn")
+				add_fact("found_marks"); found_time = 0.0; _play("page_turn")
 				_set_hint("A struck maker's mark — a Vienna shield. But the silver beside it is scored, as if an older mark were ground away.")
 			elif raking and not found_church:
-				found_church = true; _play("page_turn")
+				add_fact("found_church"); _play("page_turn")
 				_set_hint("Where the silver was ground smooth, the raking light finds it: an engraved chalice — a church's mark.")
 	else:
 		found_time = maxf(0.0, found_time - get_process_delta_time())
@@ -492,7 +512,7 @@ func _dbg_autosolve() -> void:
 	await get_tree().process_frame
 	for _i in 4: await RenderingServer.frame_post_draw
 	# зібрані зачіпки (кожну ставить своя дія: лупа/довідник/газета/косе світло — перевірено окремо)
-	found_marks = true; read_news = true; matched_maker = true; found_church = true
+	add_fact("found_marks"); add_fact("read_news"); add_fact("matched_maker"); add_fact("found_church")
 	_show("CERT")
 	for _i in 6: await RenderingServer.frame_post_draw
 	_choose(0, "Vienna — Hoffmann workshop")
@@ -561,7 +581,7 @@ func _dbg_walk() -> void:
 		await _shot(dir+"13b_loupe_church.png", 8)
 		print("WALK_B_OK found_marks=", found_marks, " found_church=", found_church)
 	elif "c" in args:
-		found_marks = true; read_news = true; found_church = true; read_docs = true   # здобуто в A і B
+		add_fact("found_marks"); add_fact("read_news"); add_fact("found_church"); add_fact("read_docs")   # здобуто в A і B
 		_show("CATALOG"); _cat_click(cat_screen, cat_m, cat_mr); await _shot(dir+"14_catalog_match.png")
 		_show("CERT"); await _shot(dir+"15_cert_open.png")
 		# бланк-речення: заповнюємо всі 4 слоти, останній — доказ проти невинної версії
@@ -729,15 +749,15 @@ func _show(name: String) -> void:
 		if not sealed: active_slot = _next_open_slot()
 		_refresh_cert()
 	if name == "NEWS" and not read_news:
-		read_news = true
+		add_fact("read_news")
 	if name == "CLIENT":
 		_client_show()
 	if name == "DOCS" and not read_docs:
-		read_docs = true
+		add_fact("read_docs")
 	if name == "LEDGER":
 		_show_ledger()
 	if name == "TESTIMONY" and not read_docs:
-		read_docs = true
+		add_fact("read_docs")
 	if screens.has(name) and screens[name].has_meta("mark"):
 		var mk: Callable = screens[name].get_meta("mark")
 		mk.call(); _play("page_turn")
@@ -853,9 +873,9 @@ const CHAPTERS := [
 func _reset_run() -> void:
 	# чистий стан + прибрати сліди попереднього проходу (віск, «CASE CLOSED», позначки каталогу)
 	sealed = false; cvals = ["","","",""]; active_slot = 0
-	found_marks = false; matched_maker = false; read_news = false
-	found_church = false; read_docs = false; raking = false
-	found_wear = false; found_chain = false; found_time = 0.0
+	drop_fact("found_marks"); drop_fact("matched_maker"); drop_fact("read_news")
+	drop_fact("found_church"); drop_fact("read_docs"); raking = false
+	drop_fact("found_wear"); drop_fact("found_chain"); found_time = 0.0
 	client_line = 0; client_seen = false; case_done = false; saw_figure = false
 	lamp_on = true; tod = "day"
 	if loupe_held: _drop_loupe()
@@ -876,8 +896,8 @@ func _reset_run() -> void:
 			if cat_screen.has_node(n2): cat_screen.get_node(n2).queue_free()
 
 func _found_all() -> void:
-	found_marks = true; matched_maker = true; read_news = true
-	found_church = true; read_docs = true
+	add_fact("found_marks"); add_fact("matched_maker"); add_fact("read_news")
+	add_fact("found_church"); add_fact("read_docs")
 
 func _goto(key: String) -> void:
 	_reset_run()
@@ -893,7 +913,7 @@ func _goto(key: String) -> void:
 		"docs":
 			client_seen = true; _show("DOCS")
 		"catalog":
-			client_seen = true; found_marks = true; _show("CATALOG")
+			client_seen = true; add_fact("found_marks"); _show("CATALOG")
 		"cert":
 			client_seen = true; _found_all()
 			cvals = ["Vienna — Hoffmann workshop","struck over an older, effaced mark",
@@ -1224,7 +1244,7 @@ func _cat_miss() -> void:
 func _cat_click(s: Control, m: Vector2, mr: float) -> void:
 	if not found_marks:
 		_set_hint("You have not examined the goblet yet."); return
-	matched_maker = true; _play("page_turn")
+	add_fact("matched_maker"); _play("page_turn")
 	_set_hint("")
 	if not s.has_node("matchlbl"):
 		# кільце-обвід навколо знайденої комірки (мальованого немає — тонка діегетична позначка на сторінці)
@@ -1424,9 +1444,9 @@ func _start_case(n: int) -> void:
 	CSLOTS = (CASES[n] as Dictionary)["slots"]
 	cvals = ["","","",""]
 	sealed = false
-	read_docs = false; read_news = false
-	found_marks = false; matched_maker = false; found_church = false; raking = false
-	found_wear = false; found_chain = false
+	drop_fact("read_docs"); drop_fact("read_news")
+	drop_fact("found_marks"); drop_fact("matched_maker"); drop_fact("found_church"); raking = false
+	drop_fact("found_wear"); drop_fact("found_chain")
 	active_slot = 0
 
 func _next_open_slot() -> int:
@@ -1533,10 +1553,10 @@ func _build_case2() -> void:
 	# --- дві деталі під лупою: голівка (знос) і вушко (подряпини) ---
 	_build_detail("WATCH_WEAR", "watch_wear",
 		"The crown is worn flat on its LEFT side — wound for years by a left hand.",
-		func(): found_wear = true, "WATCH_CHAIN", "the bow and chain  →")
+		func(): add_fact("found_wear"), "WATCH_CHAIN", "the bow and chain  →")
 	_build_detail("WATCH_CHAIN", "watch_chain",
 		"The bow is scratched bright and raw — this chain was put on lately, not worn for thirty years.",
-		func(): found_chain = true, "WATCH_WEAR", "←  the winding crown")
+		func(): add_fact("found_chain"), "WATCH_WEAR", "←  the winding crown")
 
 # екран-деталь: велике фото + напис, що саме видно (знахідка ставиться при відкритті)
 func _build_detail(scr: String, texname: String, note: String, mark: Callable, other: String, other_lbl: String) -> void:
