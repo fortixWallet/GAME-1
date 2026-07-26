@@ -164,6 +164,8 @@ func _ready() -> void:
 		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
 		DisplayServer.window_set_size(Vector2i(1920, 1080))
 
+	if "layoutcheck" in OS.get_cmdline_user_args():
+		_dbg_layoutcheck()
 	if "zonemap" in OS.get_cmdline_user_args():
 		_dbg_zonemap()
 	if "loupeshot" in OS.get_cmdline_user_args():
@@ -671,6 +673,64 @@ func _dbg_walk() -> void:
 		_show("LEDGER"); await _shot(dir+"21_ledger.png", 4)
 		print("WALK_C_OK sealed=", sealed, " seals=", seals_set, " shown=", _shown())
 	get_tree().quit()
+
+# ПЕРЕВІРКА ВЕРСТКИ: обходить УСІ екрани й шукає тексти, що налазять один на одного.
+# Причина: підпис клієнтки й кнопка «go on» стояли в одній смузі, і кнопка друкувалась
+# просто поверх репліки. Такі речі не видно в коді — лише в кадрі, і лише якщо дивитись.
+# Друкує СКІЛЬКИ перевірено (правило 17), а тоді що знайдено.
+func _dbg_layoutcheck() -> void:
+	dbg_mode = true
+	await get_tree().process_frame
+	# Динамічні тексти на момент перевірки порожні — і саме серед них було справжнє
+	# накладання (репліка клієнтки × кнопка «go on»). Заповнюємо перед обходом.
+	client_line = 1; _client_show()
+	_set_hint("A maker's shield. Beside it a woman's head in profile — a numeral 3 before the chin, a letter A inside the same outline. The silver to the right is scored smooth.")
+	await get_tree().process_frame
+	var screens_seen := 0
+	var nodes_seen := 0
+	var hits := 0
+	for key in screens:
+		var sc: Control = screens[key]
+		screens_seen += 1
+		var items: Array = []
+		_collect_text_rects(sc, items)
+		nodes_seen += items.size()
+		for i in items.size():
+			for j in range(i + 1, items.size()):
+				var a: Dictionary = items[i]
+				var b: Dictionary = items[j]
+				var r: Rect2 = (a["rect"] as Rect2).intersection(b["rect"] as Rect2)
+				if r.size.x <= 1.0 or r.size.y <= 1.0: continue
+				# перетин вважаємо накладанням, лише якщо він з'їдає помітну частину
+				var frac: float = r.get_area() / minf((a["rect"] as Rect2).get_area(),
+													  (b["rect"] as Rect2).get_area())
+				if frac < 0.12: continue
+				hits += 1
+				print("OVERLAP %-10s %.0f%%  «%s» × «%s»" % [key, frac*100.0,
+					  String(a["text"]).substr(0, 34), String(b["text"]).substr(0, 34)])
+	print("LAYOUT перевірено екранів=", screens_seen, " текстів=", nodes_seen, " накладань=", hits)
+	get_tree().quit()
+
+func _collect_text_rects(n: Node, out: Array) -> void:
+	for ch in n.get_children():
+		var t := ""
+		if ch is Label: t = (ch as Label).text
+		elif ch is Button: t = (ch as Button).text
+		if t.strip_edges() != "" and ch is Control:
+			var c := ch as Control
+			var r := Rect2(c.global_position, c.size)
+			if ch is Label:
+				var lb := ch as Label
+				var ink: float = float(lb.get_line_count()) * float(lb.get_line_height())
+				if ink > 0.0 and ink < r.size.y:
+					# текст може стояти зверху, по центру або знизу коробки
+					var va := lb.vertical_alignment
+					var dy: float = 0.0
+					if va == VERTICAL_ALIGNMENT_CENTER: dy = (r.size.y - ink) * 0.5
+					elif va == VERTICAL_ALIGNMENT_BOTTOM: dy = r.size.y - ink
+					r = Rect2(r.position + Vector2(0, dy), Vector2(r.size.x, ink))
+			out.append({"text": t.replace("\n", " "), "rect": r})
+		_collect_text_rects(ch, out)
 
 # КАРТА ЗОН: малює кожну 3D-зону справи поверх келиха і знімає кадр.
 # Причина: координати в case_01.md — наближення, і одна з них уже виявилась хибною
@@ -1295,7 +1355,7 @@ func _build_client() -> void:
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART; l.size = Vector2(W*0.62, H*0.13); l.position = Vector2(W*0.19, H*0.815)
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE; s2.add_child(l)
-	_txtbtn(s2, "go on  →", Vector2(W*0.46, H*0.915), func(): _client_next(), 0.030)
+	_txtbtn(s2, "go on  →", Vector2(W*0.845, H*0.905), func(): _client_next(), 0.030)
 
 var client_line := 0
 const CLIENT_LINES := [
@@ -1355,7 +1415,7 @@ func _build_hands() -> void:
 	# діегетична вказівка (не відповідь): перевернути чашу
 	var tip := Label.new(); tip.label_settings = _ls(fr, int(H*0.026), Color(0.82,0.78,0.68))
 	tip.text = "Drag to turn it — silver is marked underneath.  Rake the light to read a worn mark."
-	tip.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; tip.size = Vector2(W, H*0.05); tip.position = Vector2(0, H*0.88)
+	tip.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; tip.size = Vector2(W, H*0.05); tip.position = Vector2(0, H*0.835)
 	tip.mouse_filter = Control.MOUSE_FILTER_IGNORE; s.add_child(tip)
 	var tw := create_tween(); tw.tween_interval(6.0); tw.tween_property(tip, "modulate:a", 0.0, 1.5)
 	_txtbtn(s, "←  set it down", Vector2(W*0.04, H*0.9), func(): _show("DESK"))
@@ -1475,7 +1535,17 @@ func _build_cert() -> void:
 	var chh: float = H*0.88
 	var cwd: float = chh*float(at.get_width())/float(at.get_height())
 	# папір ЛІВОРУЧ; праворуч — панель вибору на притемненому столі
-	var root := Control.new(); root.size = Vector2(cwd, chh); root.position = Vector2(W*0.055, (H-chh)/2)
+	var cpos := Vector2(W*0.055, (H-chh)/2)
+	# ТІНЬ ПІД АРКУШЕМ ПРОБУВАЛИ — НЕ ПРАЦЮЄ, і це не помилка виконання.
+	# Стіл на цьому екрані майже чорний (яскравість ≈6 із 255), і тінь на ньому
+	# не читається взагалі: заміряно до і після — 5.7 проти 5.8.
+	# Аркуш виглядає наклейкою НЕ через брак тіні, а через різкий світлий
+	# прямокутний край на майже чорному тлі. Справжнє лікування — рваний край
+	# самого аркуша (як у листа клієнтки), а це правка текстури, що зсуває
+	# верстку рядків. Робити разом із кроком 7, коли атестат перейде на таблиці.
+	# Спрайт art/cert_shadow.png лишається в репозиторії — знадобиться, щойно
+	# під аркушем з'явиться світліша поверхня.
+	var root := Control.new(); root.size = Vector2(cwd, chh); root.position = cpos
 	s.add_child(root); cert_layer = root
 	var paper := TextureRect.new(); paper.texture = at; paper.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	paper.stretch_mode = TextureRect.STRETCH_SCALE; paper.set_anchors_preset(Control.PRESET_FULL_RECT)

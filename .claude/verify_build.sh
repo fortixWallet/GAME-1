@@ -37,7 +37,7 @@ fi
 export G3_SHOTDIR="/tmp/g3_verify/"
 rm -rf "$G3_SHOTDIR"; mkdir -p "$G3_SHOTDIR"
 FAIL=""
-for t in "walk b" "walk c" "chapters" "outcomes"; do
+for t in "walk b" "walk c" "chapters" "outcomes" "layoutcheck"; do
   OUT=$(godot --path . --rendering-driver opengl3 -- $t 2>&1 | grep -v specular)
   echo "--- $t ---" >>"$LOG"; echo "$OUT" >>"$LOG"
   case "$t" in
@@ -51,6 +51,8 @@ for t in "walk b" "walk c" "chapters" "outcomes"; do
     # чотири наслідки мусять давати чотири РІЗНИХ тексти: дві однакові гілки
     # виглядають як покриття, а насправді одна з них не перевіряється ніколи
     "outcomes") echo "$OUT" | grep -q "OUTCOMES_OK cases=4 unique=4" || FAIL="$FAIL outcomes" ;;
+    # жоден текст не має налазити на інший (вимога Віктора, 26.07)
+    "layoutcheck") echo "$OUT" | grep -q "накладань= 0" || echo "$OUT" | grep -q "накладань=0" || FAIL="$FAIL layout" ;;
   esac
   echo "$OUT" | grep -q "OUTCOMES_FAIL" && FAIL="$FAIL outcomes-dup"
   echo "$OUT" | grep -qi "SCRIPT ERROR" && FAIL="$FAIL script-error($t)"
