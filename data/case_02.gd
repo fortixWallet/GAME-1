@@ -8,32 +8,37 @@
 # Meshy, високодеталізовані. Зони 3D — локальні координати відповідного вузла.
 extends RefCounted
 
+# Інструменти справи 2 доступні З ПОЧАТКУ (специфікація: викрутка — нове в поясі,
+# решта успадкована зі справи 1). Ряд на екранах FURN/WELL/DRAWER.
+const START_TOOLS := [&"tool.eye", &"tool.hand", &"tool.loupe", &"tool.rake",
+					  &"tool.caliper", &"tool.screwdriver"]
+
 const ZONES := {
 	# --- корпус: екран FURN ---
 	&"z.sec.escutcheon": {
 		"kind": &"mesh", "screen": &"FURN", "node": &"sec_body",
-		"at": Vector3(0.0, 0.32, 0.30), "facing": Vector3(0, 0, 1),
+		"at": Vector3(0.0, -0.02, 0.40), "facing": Vector3(0, 0.55, 1),
 		"r": 0.06, "facing_min": 0.10,
 		"hint": "The keyhole escutcheon",
 		"tools": [&"tool.loupe", &"tool.eye"],
 	},
 	&"z.sec.drawer_front": {
 		"kind": &"mesh", "screen": &"FURN", "node": &"sec_body",
-		"at": Vector3(0.0, -0.18, 0.30), "facing": Vector3(0, 0, 1),
-		"r": 0.30, "facing_min": 0.10,
+		"at": Vector3(0.0, -0.25, 0.32), "facing": Vector3(0, 0, 1),
+		"r": 0.26, "facing_min": 0.10,
 		"hint": "The long drawer",
 		"tools": [&"tool.hand", &"tool.caliper"],
 	},
 	&"z.sec.carcass_side": {
 		"kind": &"mesh", "screen": &"FURN", "node": &"sec_body",
-		"at": Vector3(-0.52, 0.05, 0.28), "facing": Vector3(-1, 0, 0.3),
-		"r": 0.10, "facing_min": 0.08,
+		"at": Vector3(-0.43, 0.02, 0.30), "facing": Vector3(-1, 0, 0.35),
+		"r": 0.09, "facing_min": 0.08,
 		"hint": "The front edge of the side",
 		"tools": [&"tool.caliper", &"tool.eye"],
 	},
 	&"z.sec.back_edge": {
 		"kind": &"mesh", "screen": &"FURN", "node": &"sec_body",
-		"at": Vector3(0.50, 0.42, -0.28), "facing": Vector3(1, 0.2, -0.4),
+		"at": Vector3(0.44, 0.55, -0.30), "facing": Vector3(1, 0.2, -0.4),
 		"r": 0.08, "facing_min": 0.06,
 		"hint": "The exposed edge of the back board",
 		"tools": [&"tool.caliper", &"tool.eye"],
@@ -41,23 +46,23 @@ const ZONES := {
 	# --- писальний відділ (дошка відкинута): екран WELL ---
 	&"z.well.back_board": {
 		"kind": &"mesh", "screen": &"WELL", "node": &"sec_body",
-		"at": Vector3(0.0, 0.30, -0.05), "facing": Vector3(0, 0.2, 1),
-		"r": 0.24, "facing_min": 0.08,
+		"at": Vector3(0.0, 0.185, -0.05), "facing": Vector3(0, 0.2, 1),
+		"r": 0.105, "facing_min": 0.08,
 		"hint": "The back board of the writing well",
 		"tools": [&"tool.eye", &"tool.loupe", &"tool.caliper", &"tool.screwdriver"],
 	},
 	&"z.void.lining": {
 		"kind": &"mesh", "screen": &"WELL", "node": &"sec_body",
-		"at": Vector3(0.0, 0.32, -0.10), "facing": Vector3(0, 0.2, 1),
-		"r": 0.20, "facing_min": 0.06,
+		"at": Vector3(0.0, 0.185, -0.12), "facing": Vector3(0, 0.2, 1),
+		"r": 0.10, "facing_min": 0.06,
 		"hint": "The lining of the recess",
 		"tools": [&"tool.loupe"],
 		"requires_state": {&"z.well.back_board": &"open"},
 	},
 	&"z.void.floor": {
 		"kind": &"mesh", "screen": &"WELL", "node": &"sec_body",
-		"at": Vector3(0.0, 0.24, -0.10), "facing": Vector3(0, 0.5, 1),
-		"r": 0.18, "facing_min": 0.06,
+		"at": Vector3(0.0, 0.095, -0.10), "facing": Vector3(0, 0.5, 1),
+		"r": 0.08, "facing_min": 0.06,
 		"hint": "The floor of the recess",
 		"tools": [&"tool.rake", &"tool.loupe"],
 		"requires_state": {&"z.well.back_board": &"open"},
@@ -88,7 +93,7 @@ const ZONES := {
 	},
 	&"z.doc.label_pigeonhole": {
 		"kind": &"mesh", "screen": &"WELL", "node": &"sec_body",
-		"at": Vector3(0.38, 0.36, 0.02), "facing": Vector3(0, 0.2, 1),
+		"at": Vector3(0.34, 0.30, 0.02), "facing": Vector3(0, 0.2, 1),
 		"r": 0.07, "facing_min": 0.06,
 		"hint": "A paper label in the pigeonhole",
 		"tools": [&"tool.loupe", &"tool.eye"],

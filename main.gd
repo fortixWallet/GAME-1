@@ -975,11 +975,45 @@ func _dbg_furnprobe() -> void:
 	goblet_pivot.visible = false
 	await _shot(dir + "probe_no_goblet.png", 3)
 	goblet_pivot.visible = true
+	# карта зон: підсвітити mesh-зони активного екрана (звірка координат оком)
+	for scr2 in ["FURN", "WELL"]:
+		_show(scr2)
+		for _j in 6: await RenderingServer.frame_post_draw
+		var lay := Control.new(); lay.size = Vector2(W, H)
+		lay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		screens[scr2].add_child(lay)
+		var cam2: Camera3D = screen_cams.get(scr2, null)
+		var cols2 := [Color(1,0.2,0.2), Color(0.2,1,0.3), Color(0.3,0.6,1), Color(1,0.9,0.2), Color(1,0.4,1)]
+		var i2 := 0
+		for id2 in _case_zones():
+			var z2: Dictionary = _case_zones()[id2]
+			if String(z2.get("kind", &"")) != "mesh": continue
+			if String(z2.get("screen", &"")) != scr2: continue
+			var node2: Node3D = mesh_nodes.get(StringName(z2.get("node", &"")), null)
+			if node2 == null or cam2 == null: continue
+			var wp2: Vector3 = node2.global_transform * (z2["at"] as Vector3)
+			var c2s: Vector2 = cam2.unproject_position(wp2)
+			var e2: Vector2 = cam2.unproject_position(wp2 + cam2.global_transform.basis.x*float(z2.get("r", 0.1)))
+			var rad2: float = c2s.distance_to(e2)
+			var ring2 := ColorRect.new(); ring2.color = Color(cols2[i2 % cols2.size()], 0.30)
+			ring2.size = Vector2(rad2*2, rad2*2); ring2.position = c2s - Vector2(rad2, rad2)
+			ring2.mouse_filter = Control.MOUSE_FILTER_IGNORE; lay.add_child(ring2)
+			var lb2 := Label.new(); lb2.text = String(id2).replace("z.", "")
+			lb2.label_settings = _ls(fr, int(H*0.018), cols2[i2 % cols2.size()])
+			lb2.position = c2s + Vector2(6, -rad2 - 14); lay.add_child(lb2)
+			print("C2ZONE ", scr2, " ", id2, " екран=", c2s.round(), " r=", int(rad2))
+			i2 += 1
+		await _shot(dir + "zones_" + scr2 + ".png", 3)
+		lay.queue_free()
 	# повний огляд екранів справи 2
 	_show("WELL"); await _shot(dir + "c2_well.png", 4)
 	_apply_zone("z.sec.drawer_front", &"tool.hand")   # прапорець
 	_apply_zone("z.sec.drawer_front", &"tool.hand")   # вийняти шухляду
 	await _shot(dir + "c2_drawer.png", 6)
+	sec_drawer.rotation.x = PI
+	for _j2 in 6: await RenderingServer.frame_post_draw
+	await _shot(dir + "c2_drawer_под.png", 3)
+	sec_drawer.rotation.x = 0.0
 	_show("C2DOCS"); await _shot(dir + "c2_docs.png", 3)
 	_show("BOOK_SCREWS"); await _shot(dir + "c2_screws.png", 3)
 	# порожнина після викрутки
@@ -1414,10 +1448,16 @@ var tool_row: Control
 func _refresh_tool_row() -> void:
 	if tool_row == null: return
 	for c in tool_row.get_children(): c.queue_free()
-	if not unlocked_tools.has(&"tool.caliper"): return
-	var names := {&"tool.caliper": "⊂  the caliper", &"tool.scales": "⚖  the scales"}
+	if unlocked_tools.is_empty(): return
+	var names := {
+		&"tool.eye": "◉  the eye", &"tool.hand": "✋  the hand",
+		&"tool.loupe": "◌  the loupe", &"tool.rake": "⟋  raking light",
+		&"tool.caliper": "⊂  the caliper", &"tool.scales": "⚖  the scales",
+		&"tool.screwdriver": "⌁  the screwdriver",
+	}
 	var x := 0.0
-	for tl in [&"tool.caliper", &"tool.scales"]:
+	for tl in [&"tool.eye", &"tool.hand", &"tool.loupe", &"tool.rake",
+			   &"tool.caliper", &"tool.scales", &"tool.screwdriver"]:
 		if not unlocked_tools.has(tl): continue
 		var b := Button.new(); b.flat = true
 		b.text = ("● " if active_tool == tl else "") + String(names[tl])
@@ -1537,6 +1577,10 @@ func _load_case(n: int) -> void:
 	pending_confirm = ""
 	active_tool = &"*"
 	unlocked_tools.clear()
+	if CASE_DATA.has(n):
+		var st0 = (CASE_DATA[n] as Object).get("START_TOOLS")
+		if st0 is Array:
+			for tl0 in st0: unlocked_tools[tl0] = true
 	num_buf = ""
 	cvals = []
 	for sl in CSLOTS:
@@ -2596,6 +2640,31 @@ func _build_case2() -> void:
 	bb.position = Vector3(oa.get_center().x, oa.get_center().y + oa.size.y*0.075, oa.get_center().z - oa.size.z*0.16)
 	sv.add_child(bb); mesh_nodes[&"sec_backboard"] = bb
 	sec_backboard = bb; sec_drawer = drawer
+	# тавро столярні на споді шухляди: випалений штамп текстом (шрифт — виняток
+	# правила 1) + крейдяний номер. ЛОКАЛЬНИЙ AABB меша: глобальний тут брехав би
+	# (batьків scale/зсув), і перша посадка полетіла геть із геометрії.
+	var dmesh: MeshInstance3D = null
+	for dm in drawer.find_children("*", "MeshInstance3D", true, false):
+		dmesh = dm as MeshInstance3D; break
+	var dla: AABB = dmesh.get_aabb() if dmesh else AABB(Vector3(-1,-0.3,-0.5), Vector3(2,0.6,1))
+	var brand := Label3D.new()
+	brand.text = "M·GRUBER · WIEN"
+	brand.font = fb; brand.font_size = 48; brand.pixel_size = 0.0011
+	brand.modulate = Color(0.23, 0.13, 0.07, 0.95)
+	brand.position = Vector3(dla.get_center().x - dla.size.x*0.22,
+							 dla.position.y + 0.003,
+							 dla.get_center().z + dla.size.z*0.18)
+	brand.rotation_degrees = Vector3(90, 0, 0)
+	brand.outline_size = 0
+	drawer.add_child(brand)
+	var chalk := Label3D.new()
+	chalk.text = "367"
+	chalk.font = fh; chalk.font_size = 66; chalk.pixel_size = 0.0011
+	chalk.modulate = Color(0.92, 0.90, 0.84, 0.85)
+	chalk.position = brand.position + Vector3(dla.size.x*0.30, 0, -dla.size.z*0.04)
+	chalk.rotation_degrees = Vector3(90, 0, 0)
+	chalk.outline_size = 0
+	drawer.add_child(chalk)
 	# три камери — ВІД ФАКТИЧНОГО ГАБАРИТУ моделі, не з голови (низ різало)
 	var bb3 := _aabb(body)
 	var c3 := bb3.get_center()
@@ -2604,7 +2673,7 @@ func _build_case2() -> void:
 	cf.position = c3 + Vector3(0.62, 0.18, 1.0).normalized()*rr3*1.38
 	cf.look_at(c3, Vector3.UP)
 	var cw := Camera3D.new(); sv.add_child(cw); cw.fov = 30
-	var well_c := c3 + Vector3(0, bb3.size.y*0.12, 0)
+	var well_c := c3 + Vector3(0, bb3.size.y*0.155, 0)
 	cw.position = well_c + Vector3(0.0, 0.35, 1.0).normalized()*rr3*0.52
 	cw.look_at(well_c, Vector3.UP)
 	var cd := Camera3D.new(); sv.add_child(cd); cd.fov = 30
@@ -2624,6 +2693,8 @@ func _build_case2() -> void:
 		screen_cams[scr] = sec_cams[scr]
 	sec_vp = sv
 	# навігація: план → деталь і назад (режисура: без стрибків повз середній план)
+	# ряд інструментів — на всіх трьох планах предмета; ОДИН вузол tool_row
+	# переїжджає між екранами при _sync_case2_view (як контейнер вьюпорта)
 	_txtbtn(screens["FURN"], "the writing well  →", Vector2(W*0.40, H*0.92), func(): _show("WELL"))
 	_txtbtn(screens["FURN"], "take the drawer out  →", Vector2(W*0.64, H*0.92), func(): _apply_zone("z.sec.drawer_front", &"tool.hand"))
 	_txtbtn(screens["FURN"], "the papers  →", Vector2(W*0.05, H*0.92), func(): _show("C2DOCS"))
@@ -2631,6 +2702,12 @@ func _build_case2() -> void:
 	_txtbtn(screens["WELL"], "←  step back", Vector2(W*0.04, H*0.92), func(): _show("FURN"))
 	_txtbtn(screens["WELL"], "✎", Vector2(W*0.945, H*0.055), func(): _show_notebook(), 0.030)
 	_txtbtn(screens["DRAWER"], "←  slide it back", Vector2(W*0.04, H*0.92), func(): _show("FURN"))
+	_txtbtn(screens["DRAWER"], "⟲  turn it over", Vector2(W*0.42, H*0.92), func():
+		# перевернути шухляду: спід (тавро столярні) — догори
+		var tw2 := create_tween()
+		var target: float = 0.0 if absf(sec_drawer.rotation.x) > 1.5 else PI
+		tw2.tween_property(sec_drawer, "rotation:x", target, 0.55).set_trans(Tween.TRANS_QUAD)
+		_play("goblet_set"))
 	# папери справи 2 (гросбух + реєстр на одному аркуші) і довідник шурупів
 	var d2 := _screen("C2DOCS")
 	_paper_backdrop(d2)
@@ -2688,6 +2765,15 @@ func _sync_case2_view() -> void:
 			(have as SubViewportContainer).remove_child(sec_vp)
 			add_child(sec_vp)
 			have.queue_free()
+	# ряд інструментів слідує за активним екраном справи 2
+	if tool_row and on_c2 and tool_row.get_parent() != screens[scr]:
+		if tool_row.get_parent(): tool_row.get_parent().remove_child(tool_row)
+		screens[scr].add_child(tool_row)
+		_refresh_tool_row()
+	elif tool_row and not on_c2 and scr == "DESK" and tool_row.get_parent() != screens["DESK"]:
+		if tool_row.get_parent(): tool_row.get_parent().remove_child(tool_row)
+		screens["DESK"].add_child(tool_row)
+		_refresh_tool_row()
 	# два стани корпуса: WELL бачить відкинуту дошку з нутром
 	var in_well: bool = scr == "WELL"
 	if sec_body_closed: sec_body_closed.visible = on_c2 and not in_well
