@@ -109,6 +109,7 @@ var hallmark_node: Node3D
 var loupe_ui: Control
 var loupe_glass: ColorRect       # екранне збільшення (стіл)
 var loupe_vp: SubViewport        # 3D-в'юпорт зі спільним світом чаші
+var goblet_sv: SubViewport       # головний вьюпорт чаші (для звірки світів)
 var loupe_cam: Camera3D          # зум-камера на реальне клеймо
 var loupe_vp_tex: TextureRect    # показує 3D-в'юпорт у склі
 var key_light: DirectionalLight3D    # основне тепле світло (косе світло змінює його кут)
@@ -547,9 +548,10 @@ func _drop_loupe() -> void:
 
 func _loupe_frame() -> void:
 	var mp: Vector2 = get_viewport().get_mouse_position()
-	if not cup_dragging:
+	if not cup_dragging and not pilot_loupe_lock:
 		loupe_ui.position = mp - Vector2(GLASS_CX*loupe_lw, GLASS_CY*loupe_lh)
 	var gc: Vector2 = loupe_ui.position + Vector2(GLASS_CX*loupe_lw, GLASS_CY*loupe_lh)
+	if pilot_loupe_lock: _aim_loupe(gc)
 	var in_hands: bool = screens.has("HANDS") and screens["HANDS"].visible and loupe_vp != null and main_cam3 != null
 	if in_hands:
 		# ПРОСТА ЛУПА: живий зум того, що під нею; куди навести — справа гравця, без прив'язок
@@ -791,6 +793,16 @@ func _dbg_walk() -> void:
 			_aim_loupe(gc2); _hover_zone_3d(gc2); await RenderingServer.frame_post_draw
 			if found_church: break
 		await _shot(dir+"13b_loupe_church.png", 8)
+		# СКЛО НЕ ПОРОЖНЄ: центр кадру лупи мусить містити чашу (непрозорі пікселі).
+		# Регресія 27.07: після own_world_3d лупа впала в порожній root-світ і
+		# показувала прозоре скло — «не зближує зовсім». Маркери фактів це НЕ ловили.
+		await RenderingServer.frame_post_draw
+		var limg := loupe_vp.get_texture().get_image()
+		var opaque := 0
+		for py2 in range(330, 430, 10):
+			for px2 in range(330, 430, 10):
+				if limg.get_pixel(px2, py2).a > 0.5: opaque += 1
+		print("LOUPE_ALIVE opaque=", opaque, " ok=", opaque >= 60)
 		print("WALK_B_OK found_marks=", found_marks, " found_church=", found_church)
 		# НЕГАТИВНИЙ ТЕСТ: зона мусить БУТИ строгою. Старий поріг (323 px) спрацьовував
 		# на 200 px від центру пластини — тобто «десь біля чаші». Новий (0.45 світових,
@@ -929,6 +941,19 @@ func _dbg_pilot() -> void:
 			ev2.button_index = MOUSE_BUTTON_LEFT; ev2.pressed = false
 			ev2.position = b; ev2.global_position = b
 			get_viewport().push_input(ev2, true); await get_tree().process_frame
+		elif op == "loupe" and parts.size() >= 3:
+			# поставити центр скла лупи в точку (діагностика живого зуму:
+			# скло слідує за СИСТЕМНОЮ мишею, якої у пілота нема)
+			var lp := Vector2(float(parts[1]), float(parts[2]))
+			pilot_loupe_lock = true
+			loupe_ui.position = lp - Vector2(GLASS_CX*loupe_lw, GLASS_CY*loupe_lh)
+			_aim_loupe(lp)
+		elif op == "move" and parts.size() >= 3:
+			# чистий рух миші без кнопки: скло лупи слідує за позицією вьюпорта
+			var mm2 := InputEventMouseMotion.new()
+			var p2 := Vector2(float(parts[1]), float(parts[2]))
+			mm2.position = p2; mm2.global_position = p2
+			get_viewport().push_input(mm2, true); await get_tree().process_frame
 		elif op == "key" and parts.size() >= 2:
 			var ke := InputEventKey.new(); ke.pressed = true
 			ke.keycode = OS.find_keycode_from_string(String(parts[1]))
@@ -1885,9 +1910,13 @@ func _build_hands() -> void:
 	# чесно бачила чашу в нулі координат — «ваза в шафі» (Віктор, 27.07).
 	sv.own_world_3d = true
 	svc.add_child(sv); _build_goblet_world(sv)
+	goblet_sv = sv
 	# 3D-в'юпорт лупи: СПІЛЬНИЙ світ чаші → зум-камера показує РЕАЛЬНЕ клеймо (не картинку)
 	loupe_vp = SubViewport.new(); loupe_vp.size = Vector2i(760,760)
-	loupe_vp.world_3d = sv.world_3d; loupe_vp.transparent_bg = true; loupe_vp.msaa_3d = Viewport.MSAA_4X
+	# ФАКТИЧНИЙ світ чаші, не властивість: при own_world_3d=true властивість
+	# world_3d == null, і копіювання її в лупу кидало лупу в порожній root-світ —
+	# «скло прозоре, не зближує зовсім» (Віктор, 27.07; регресія фіксу «вази в шафі»)
+	loupe_vp.world_3d = sv.find_world_3d(); loupe_vp.transparent_bg = true; loupe_vp.msaa_3d = Viewport.MSAA_4X
 	loupe_vp.render_target_update_mode = SubViewport.UPDATE_DISABLED
 	add_child(loupe_vp)
 	loupe_cam = Camera3D.new(); loupe_vp.add_child(loupe_cam); loupe_cam.fov = 30.0
@@ -1972,6 +2001,7 @@ func _ptext(sc: Dictionary, txt: String, ux: float, uy: float, size_f: float,
 # (AtlasTexture з region у пікселях текстури). Відкривається з будь-якого екрана
 # розслідування кнопкою або клавішею N; повертає туди, звідки відкрили.
 var notebook_prev := "DESK"
+var pilot_loupe_lock := false   # пілот зафіксував скло: не слідувати за мишею ОС
 var notebook_rows := 0
 
 # ── СЕЙВ (крок 9). Формат із version З ПЕРШОГО ДНЯ (пастка §8: id фактів ще
