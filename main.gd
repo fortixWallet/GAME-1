@@ -974,6 +974,19 @@ func _dbg_furnprobe() -> void:
 		nn = nn.get_parent()
 	goblet_pivot.visible = false
 	await _shot(dir + "probe_no_goblet.png", 3)
+	goblet_pivot.visible = true
+	# повний огляд екранів справи 2
+	_show("WELL"); await _shot(dir + "c2_well.png", 4)
+	_apply_zone("z.sec.drawer_front", &"tool.hand")   # прапорець
+	_apply_zone("z.sec.drawer_front", &"tool.hand")   # вийняти шухляду
+	await _shot(dir + "c2_drawer.png", 6)
+	_show("C2DOCS"); await _shot(dir + "c2_docs.png", 3)
+	_show("BOOK_SCREWS"); await _shot(dir + "c2_screws.png", 3)
+	# порожнина після викрутки
+	_apply_zone("z.well.back_board", &"tool.eye")
+	_apply_zone("z.well.back_board", &"tool.screwdriver")
+	_apply_zone("z.well.back_board", &"tool.screwdriver")
+	_show("WELL"); await _shot(dir + "c2_well_open.png", 4)
 	get_tree().quit()
 
 # ПЕРЕВІРКА СЕЙВА: зберегти → зіпсувати стан → відновити → звірити ДО ПОЛЯ.
@@ -2561,6 +2574,13 @@ func _build_case2() -> void:
 	var body_s: PackedScene = load("res://models/secretaire_body.glb")
 	var body := body_s.instantiate() as Node3D
 	sv.add_child(body); mesh_nodes[&"sec_body"] = body
+	# ДВА СТАНИ КОРПУСА (як день/ніч кабінету, лише в 3D): FURN — дошка зачинена,
+	# WELL — відкинута, з нутром і задньою стінкою відділу. Своп у _sync_case2_view.
+	var open_s: PackedScene = load("res://models/secretaire_open.glb")
+	var body_open := open_s.instantiate() as Node3D
+	body_open.visible = false
+	sv.add_child(body_open); mesh_nodes[&"sec_open"] = body_open
+	sec_body_closed = body; sec_body_open = body_open
 	# нормування: корпус ~1.9 h у метрах моделі — ставимо в нуль, камери від нього
 	var drawer_s: PackedScene = load("res://models/secretaire_drawer.glb")
 	var drawer := drawer_s.instantiate() as Node3D
@@ -2570,9 +2590,10 @@ func _build_case2() -> void:
 	sv.add_child(drawer); mesh_nodes[&"sec_drawer"] = drawer
 	var bb_s: PackedScene = load("res://models/secretaire_backboard.glb")
 	var bb := bb_s.instantiate() as Node3D
-	bb.scale = Vector3(0.42, 0.42, 0.42)
-	bb.position = Vector3(0.0, 0.62, -0.10)       # у ніші писального відділу
-	bb.rotation_degrees = Vector3(6, 0, 0)
+	var oa := _aabb(body_open)
+	bb.scale = Vector3(0.30, 0.30, 0.30)
+	# перед задньою стінкою писального відділу open-моделі, з малим зазором
+	bb.position = Vector3(oa.get_center().x, oa.get_center().y + oa.size.y*0.075, oa.get_center().z - oa.size.z*0.16)
 	sv.add_child(bb); mesh_nodes[&"sec_backboard"] = bb
 	sec_backboard = bb; sec_drawer = drawer
 	# три камери — ВІД ФАКТИЧНОГО ГАБАРИТУ моделі, не з голови (низ різало)
@@ -2640,6 +2661,8 @@ var sec_vp: SubViewport
 var sec_cams := {}
 var sec_backboard: Node3D
 var sec_drawer: Node3D
+var sec_body_closed: Node3D
+var sec_body_open: Node3D
 
 # вигляд сцени секретера ВИВОДИТЬСЯ зі стану (закон кроку 2)
 func _sync_case2_view() -> void:
@@ -2665,9 +2688,13 @@ func _sync_case2_view() -> void:
 			(have as SubViewportContainer).remove_child(sec_vp)
 			add_child(sec_vp)
 			have.queue_free()
-	# стан дошки: відкручена — з'їжджає вниз і зникає, ніша відкрита
+	# два стани корпуса: WELL бачить відкинуту дошку з нутром
+	var in_well: bool = scr == "WELL"
+	if sec_body_closed: sec_body_closed.visible = on_c2 and not in_well
+	if sec_body_open: sec_body_open.visible = in_well
+	# знімна дощечка живе в нутрі open-стану; відкручена — зникає, ніша відкрита
 	if sec_backboard:
-		sec_backboard.visible = zone_states.get(&"z.well.back_board", &"default") != &"open"
+		sec_backboard.visible = in_well and zone_states.get(&"z.well.back_board", &"default") != &"open"
 	if sec_drawer:
 		sec_drawer.visible = zone_states.get(&"z.sec.drawer_front", &"default") == &"out"
 
