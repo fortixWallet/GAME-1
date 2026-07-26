@@ -121,6 +121,7 @@ var loupe_lw := 0.0
 var loupe_lh := 0.0
 var tex_comp: Texture2D    # композит стола З предметами — джерело скла лупи
 var cup_dragging := false
+var drag_travel := 0.0       # накопичений рух миші: <8 px = клік, не оберт
 var tex_loupe: Texture2D
 var found_time := 0.0
 var mag_btn: Button           # хотспот лупи на столі — ховаємо, коли взяли в руки
@@ -502,7 +503,7 @@ func _loupe_frame() -> void:
 		loupe_glass.visible = false; loupe_vp_tex.visible = true
 		loupe_vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS
 		_aim_loupe(gc)
-		_check_underside(gc)
+		_hover_zone_3d(gc)
 	else:
 		# НА СТОЛІ: різке збільшення з ОРИГІНАЛУ картини (не з екрана)
 		loupe_vp_tex.visible = false; loupe_glass.visible = true
@@ -558,32 +559,51 @@ func _flags() -> Dictionary:
 func _dt() -> float:
 	return (1.0/60.0) if dbg_mode else get_process_delta_time()
 
-func _check_underside(gc: Vector2) -> void:
-	if not hallmark_node or not main_cam3: return
-	# лупа над дном (щедрий радіус — марки все одно на пластині перед очима)
-	# КРОК 4: пікінг зони робить рушій (core/zones.gd), а не саморобна перевірка відстані.
-	# Радіус тепер СВІТОВИЙ і проєктується на екран, тому зона сама росте при наближенні
-	# й не залежить від ширини спрайта лупи, як залежав старий поріг loupe_lw*0.7.
-	var over: bool = ZoneHit.inside_3d(gc, UNDERSIDE_ZONE, goblet_pivot, main_cam3)
-	if over:
+# ── 3D-ЗОНИ ЧЕРЕЗ РУШІЙ (крок 5c) ────────────────────────────────────────────
+# Було: _check_underside — зашита обробка ОДНІЄЇ зони з дубльованими say.
+# Стало: пік серед усіх mesh-зон екрана + правило з ДАНИХ. dwell — із правила
+# (0.5 у клейм, 1.2 у «пустого споду»), say — єдина копія в data/case_01.gd.
+func _pick_3d_at(gc: Vector2, tool: StringName) -> String:
+	for id in _case_zones():
+		var z: Dictionary = _case_zones()[id]
+		if String(z.get("kind", &"")) != "mesh": continue
+		if not ZoneHit.reachable(z, zone_states, _flags()): continue
+		var tools: Array = z.get("tools", [])
+		if not tools.is_empty() and not (tool in tools): continue
+		if ZoneHit.inside_3d(gc, z, goblet_pivot, main_cam3): return String(id)
+	return ""
+
+# наведення лупи: акумулює витримку правила під прицілом
+func _hover_zone_3d(gc: Vector2) -> void:
+	if not goblet_pivot or not main_cam3: return
+	var zid := _pick_3d_at(gc, &"tool.loupe")
+	if zid == "":
+		found_time = maxf(0.0, found_time - _dt()); return
+	var rule := RuleEngine.find(_case_rules(), StringName(zid), &"tool.loupe", facts, _flags())
+	if rule.is_empty():
+		# 2.5: усе віддано — повторити say придатного правила (перечитати можна)
 		found_time += _dt()
 		if found_time > 0.5:
-			# 2.5 (ENGINE_SPEC_ADDENDUM §2): витримка скидається після КОЖНОЇ видачі,
-			# а вже здобута зона на повторне наведення дає ТОЙ САМИЙ рядок без факту —
-			# гравець може перечитати. Раніше зона замовкала назавжди (ранній return).
 			found_time = 0.0
-			if not found_marks:
-				add_fact("f.mark_maker"); add_fact("f.mark_diana"); _play("page_turn")
-				_set_hint("A maker's shield. Beside it a woman's head in profile — a numeral 3 before the chin, a letter A inside the same outline. The silver to the right is scored smooth.")
-			elif raking and not found_church:
-				add_fact("f.church_mark"); _play("page_turn")
-				_set_hint("Where the silver was ground smooth, the raking light finds it: an engraved chalice — a church's mark.")
-			elif raking and found_church:
-				_set_hint("Where the silver was ground smooth, the raking light finds it: an engraved chalice — a church's mark.")
-			else:
-				_set_hint("A maker's shield. Beside it a woman's head in profile — a numeral 3 before the chin, a letter A inside the same outline. The silver to the right is scored smooth.")
-	else:
-		found_time = maxf(0.0, found_time - _dt())
+			for r in _case_rules():
+				var rr: Dictionary = r
+				if StringName(rr.get("zone", &"")) == StringName(zid) \
+						and StringName(rr.get("tool", &"*")) == &"tool.loupe" \
+						and RuleEngine.applicable(rr, facts, _flags()):
+					_set_hint(String(rr.get("say", ""))); return
+		return
+	found_time += _dt()
+	if found_time >= maxf(RuleEngine.dwell_of(rule), 0.05):
+		found_time = 0.0
+		_apply_rule(rule)
+
+# короткий клік рукою по 3D-зоні (горбики на піддоні — розводжувальний факт)
+func _click_zone_3d(gc: Vector2) -> void:
+	if not goblet_pivot or not main_cam3: return
+	var zid := _pick_3d_at(gc, &"tool.hand")
+	if zid == "": return
+	var rule := RuleEngine.find(_case_rules(), StringName(zid), &"tool.hand", facts, _flags())
+	if not rule.is_empty(): _apply_rule(rule)
 
 func _process(_delta: float) -> void:
 	if loupe_held and loupe_ui and not dbg_mode:
@@ -652,7 +672,7 @@ func _dbg_walk() -> void:
 		var gc: Vector2 = main_cam3.unproject_position(maker_p)
 		loupe_ui.position = gc - Vector2(GLASS_CX*loupe_lw, GLASS_CY*loupe_lh)
 		for _i in 100:
-			_aim_loupe(gc); _check_underside(gc); await RenderingServer.frame_post_draw
+			_aim_loupe(gc); _hover_zone_3d(gc); await RenderingServer.frame_post_draw
 			if found_marks: break
 		await _shot(dir+"13_loupe_marks.png", 5)
 		# КОСЕ СВІТЛО: лупа на ЗІШЛІФОВАНУ ділянку — там проступає затерта церковна мітка
@@ -660,7 +680,7 @@ func _dbg_walk() -> void:
 		var gc2: Vector2 = main_cam3.unproject_position(church_p)
 		loupe_ui.position = gc2 - Vector2(GLASS_CX*loupe_lw, GLASS_CY*loupe_lh)
 		for _i in 140:
-			_aim_loupe(gc2); _check_underside(gc2); await RenderingServer.frame_post_draw
+			_aim_loupe(gc2); _hover_zone_3d(gc2); await RenderingServer.frame_post_draw
 			if found_church: break
 		await _shot(dir+"13b_loupe_church.png", 8)
 		print("WALK_B_OK found_marks=", found_marks, " found_church=", found_church)
@@ -671,9 +691,31 @@ func _dbg_walk() -> void:
 		drop_fact("f.mark_maker"); drop_fact("f.mark_diana"); drop_fact("f.church_mark"); found_time = 0.0
 		var far: Vector2 = main_cam3.unproject_position(hallmark_node.global_position) + Vector2(200, 0)
 		for _i in 140:
-			_aim_loupe(far); _check_underside(far); await RenderingServer.frame_post_draw
+			_aim_loupe(far); _hover_zone_3d(far); await RenderingServer.frame_post_draw
 			if found_marks: break
 		print("WALK_B_STRICT far_rejected=", not found_marks)
+		# ГОРБИКИ (5c): розводжувальний факт іде через рушій. Повертаємо факти клейм
+		# (їх вимагає requires), ставимо чашу так, щоб верх піддона дивився на камеру,
+		# і клікаємо рукою по z.foot.top, тоді лупою — domes_alike.
+		add_fact("f.mark_maker"); add_fact("f.mark_diana")
+		goblet_pivot.rotation = Vector3.ZERO
+		# +0.9: чаша нахиляється вершиною ВІД камери, і ВЕРХ піддона повертається до
+		# глядача (нормаль (0,.8,.6) → z'≈+1). При −0.9 нормаль дивиться від камери,
+		# і facing-тест чесно валить зону — перша версія цього тесту на цьому й впала.
+		goblet_pivot.rotation.x = 0.9
+		for _i in 3: await RenderingServer.frame_post_draw
+		var top_w: Vector3 = goblet_pivot.global_transform * (Case01.ZONES[&"z.foot.top"]["at"] as Vector3)
+		var top_gc: Vector2 = main_cam3.unproject_position(top_w)
+		_click_zone_3d(top_gc)
+		var domes_ok: bool = facts.has("f.domes")
+		# лупа на ту саму точку → f.domes_alike (dwell з правила)
+		if loupe_held: pass
+		else: _pickup_loupe()
+		for _i in 80:
+			_aim_loupe(top_gc); _hover_zone_3d(top_gc); await RenderingServer.frame_post_draw
+			if facts.has("f.domes_alike"): break
+		print("WALK_B_DOMES hand=", domes_ok, " alike=", facts.has("f.domes_alike"),
+			  " state=", zone_states.get(&"z.foot.top", &"default"))
 	elif "c" in args:
 		for f0 in ["f.mark_maker","f.mark_diana","f.news_robbery","f.church_mark","f.letter_read"]: add_fact(f0)   # здобуто в A і B
 		_show("CATALOG"); _cat_click(cat_screen, cat_m, cat_mr); await _shot(dir+"14_catalog_match.png")
@@ -971,6 +1013,7 @@ func _set_hint(t: String) -> void:
 # pick_2d рушія, факт і say — через RuleEngine.find по ДАНИХ справи. Рядки say
 # більше не дублюються в main.gd.
 var paper_frames := {}   # screen_name → {"frame": Rect2, "aspect": float}
+var zone_states := {}    # id зони → StringName стану (sets_state правил; скидається _load_case)
 
 func _paper_catcher(screen_name: String, parent: Control, paper: Control) -> void:
 	paper_frames[screen_name] = {
@@ -997,7 +1040,7 @@ func _pick_2d_at(screen_name: String, p: Vector2) -> String:
 	var pf: Dictionary = paper_frames.get(screen_name, {})
 	if pf.is_empty(): return ""
 	return ZoneHit.pick_2d(p, _case_zones(), screen_name,
-		pf["frame"] as Rect2, float(pf["aspect"]), {}, _flags())
+		pf["frame"] as Rect2, float(pf["aspect"]), zone_states, _flags())
 
 # ЄДИНЕ місце, де клік по 2D-зоні стає знанням. Правило шукається в ДАНИХ.
 func _apply_zone(zone_id: String) -> void:
@@ -1010,9 +1053,15 @@ func _apply_zone(zone_id: String) -> void:
 					and RuleEngine.applicable(rr, facts, _flags()):
 				_play("ui_soft"); _set_hint(String(rr.get("say", ""))); return
 		return
+	_apply_rule(rule)
+
+# ЄДИНЕ місце, де правило віддає результат: факти, стани зон, звук, рядок.
+func _apply_rule(rule: Dictionary) -> void:
 	var got_new := false
 	for f in RuleEngine.facts_of(rule):
 		if add_fact(String(f)): got_new = true
+	var st: Dictionary = rule.get("sets_state", {})
+	for zid in st: zone_states[zid] = st[zid]
 	_play("page_turn" if got_new else "ui_soft")
 	_set_hint(String(rule.get("say", "")))
 
@@ -1140,6 +1189,7 @@ func _load_case(n: int) -> void:
 	case_id = n
 	CSLOTS = (CASES[n] as Dictionary)["slots"]
 	facts.clear()                       # одне речення замість чотирнадцяти drop_fact
+	zone_states.clear()
 	cvals = ["", "", "", ""]
 	active_slot = 0
 	sealed = false
@@ -2068,7 +2118,15 @@ func _unhandled_input(event: InputEvent) -> void:
 	# у HANDS: тягнеш — ОБЕРТАЄШ чашу (можна перевернути й глянути спід). Лупа кладеться кнопкою.
 	if not (screens.has("HANDS") and screens["HANDS"].visible and goblet_pivot): return
 	if event is InputEventMouseButton and (event as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT:
-		cup_dragging = (event as InputEventMouseButton).pressed
+		var mb := event as InputEventMouseButton
+		if mb.pressed:
+			cup_dragging = true; drag_travel = 0.0
+		else:
+			cup_dragging = false
+			# КОРОТКИЙ КЛІК ≠ ОБЕРТ (крок 5c): якщо миша майже не рухалась — це дія
+			# рукою по зоні (горбики z.foot.top). Драг лишається обертом чаші.
+			if drag_travel < 8.0 and not loupe_held:
+				_click_zone_3d(mb.position)
 	elif event is InputEventMouseMotion and cup_dragging:
 		var mm := event as InputEventMouseMotion
 		# БУЛО: rotation.y — оберт навколо СВІТОВОЇ вертикалі. Коли чашу перевернуто
@@ -2077,5 +2135,6 @@ func _unhandled_input(event: InputEvent) -> void:
 		# міг поставити клейма рівно (скарга Віктора, 26.07).
 		# СТАЛО: горизонталь крутить навколо ВЛАСНОЇ осі предмета (як чашку в руці),
 		# вертикаль нахиляє навколо горизонталі ЕКРАНА. Це звичний «turntable».
+		drag_travel += mm.relative.length()
 		goblet_pivot.rotate_object_local(Vector3.UP, -mm.relative.x * 0.012)
 		goblet_pivot.rotate(Vector3.RIGHT, -mm.relative.y * 0.012)

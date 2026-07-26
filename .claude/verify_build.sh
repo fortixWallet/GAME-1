@@ -58,6 +58,8 @@ for t in "walk a" "walk b" "walk c" "chapters" "outcomes" "layoutcheck" "case2";
     # жили на видаленому механізмі meta("mark"), і жоден тест цього не бачив
     "case2")    echo "$OUT" | grep -q "CASE2_OK wear=true chain=true docs=true" || FAIL="$FAIL case2" ;;
     "walk b")   echo "$OUT" | grep -q "WALK_B_OK found_marks=true found_church=true" || FAIL="$FAIL walk-b"
+                # горбики (5c): рука → f.domes, лупа → f.domes_alike, стан зони raised
+                echo "$OUT" | grep -q "WALK_B_DOMES hand=true alike=true state=raised" || FAIL="$FAIL domes"
                 # зона мусить лишатися СТРОГОЮ: точка за 200 px від клейм не дає факту
                 echo "$OUT" | grep -q "WALK_B_STRICT far_rejected=true" || FAIL="$FAIL walk-b-strict" ;;
     "walk c")   echo "$OUT" | grep -q "WALK_C_OK sealed=true"        || FAIL="$FAIL walk-c" ;;
