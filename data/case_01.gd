@@ -37,7 +37,9 @@ extends RefCounted
 const ZONES := {
 	&"z.cup.whole": {
 		"kind": &"img", "screen": &"DESK", "surface": &"case_desk",
-		"u": Vector2(0.508, 0.470), "shape": &"rect", "half": Vector2(0.088, 0.262),
+		# u.y виміряно з фактичного хотспота келиха в грі (аудит 26.07, знахідка 48):
+		# специфікаційні 0.470 стояли на ~40 px нижче за намальований келих
+		"u": Vector2(0.508, 0.414), "shape": &"rect", "half": Vector2(0.088, 0.262),
 		"tools": [&"tool.caliper", &"tool.scales", &"tool.hand"],
 	},
 	&"z.bowl.inner": {
@@ -166,6 +168,17 @@ const RULES := [
 	 "facts": [&"f.hb_vienna_marks"],
 	 "say": "Handbook, Vienna assay office. From 1867: Diana's head with a numeral (1 = 950, 2 = 900, 3 = 800, 4 = 750) and no year. From 1872 the office letter is cut inside the head's outline; before 1872 it stood as a separate punch beside it."},
 ]
+
+# ── МАПА СТАРИХ id → КАНОН (для кроку 5, підключення core/rules.gd) ──────────
+# Словники фактів у main.gd і тут РІЗНІ, і мапа НЕ 1:1 (аудит 26.07, знахідка 14):
+#   found_marks    ≈ f.mark_maker + f.mark_diana   (одна дія гравця видає ДВА факти)
+#   found_church   = f.church_mark
+#   matched_maker  = f.reg_hoffmann                (каталог = атрибуція майстра)
+#   read_docs      → відповідника НЕМА: у грі на DOCS лист клієнтки, у специфікації
+#                    там квитанція 1807 (f.receipt_1807) — це РІЗНІ папери, і лист
+#                    у специфікацію ще не внесений
+#   read_news      → відповідника НЕМА: газети в специфікації справи 1 не існує
+# Підключати rules.gd МОЖНА тільки після рішення по цих двох останніх рядках.
 
 # ── ФАКТИ ────────────────────────────────────────────────────────────────────
 # `cite` — коротка форма для графи «на підставі». `weight` — вага в OUTCOMES.

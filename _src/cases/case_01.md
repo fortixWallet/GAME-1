@@ -83,7 +83,7 @@
 | `z.bowl.inner` | внутрішня поверхня чаші | 3d | `p = (0, 0.55, 0)`, `n = (0, 1, 0)` | `r = 0.34`, `facing_min = 0.20` | HANDS · eye, loupe, rake |
 | `z.stem.knop` | нодус на стояку | 3d | `p = (0, −0.36, 0.10)`, `n = (0, 0.15, 0.99).normalized()` | `r = 0.13`, `facing_min = 0.05` | HANDS · eye, loupe, rake |
 | `z.foot.top` | похила ВЕРХНЯ площина піддона | 3d | `p = (0, −0.86, 0.28)`, `n = (0, 0.80, 0.60).normalized()` | `r = 0.20`, `facing_min = 0.10` | HANDS · hand, rake, loupe |
-| `z.foot.underside` | спід піддона, місце клейм | 3d | `p = (0, −0.96, 0.28)`, `n = (0, −1, 0)` | `r = 0.22`, `facing_min = 0.12` | HANDS · loupe, rake |
+| `z.foot.underside` | спід піддона, місце клейм | 3d | `p = (0, −0.69, 0)`, `n = (0, −1, 0)` *(виміряно з моделі 26.07: вгнуте дно піднімається до −0.69; специфікаційні −0.96 хибили на 77 px)* | `r = 0.45` *(порахований: клейма на 0.289 і 0.227 від осі; 0.22 не накривав би майстрове)* | HANDS · loupe, rake |
 | `z.foot.edge` | вузький вертикальний рант по краю піддона | 3d | `p = (0, −0.93, 0.52)`, `n = (0, −0.30, 0.95).normalized()` | `r = 0.075`, `facing_min = 0.05` | HANDS · rake, loupe |
 
 > **Залізна вимога до 3D-макета:** `z.foot.underside` і `z.foot.top` мусять стояти на **однаковій
@@ -123,10 +123,11 @@
 | `z.cup.whole` | `tool.hand` | — | — | → перехід на екран HANDS | `screen = HANDS` |
 | `z.bowl.inner` | `tool.eye` \| `tool.loupe` | — | `f.bowl_gilt` | "The inside of the bowl is gilded. The gilding is thin in a crescent under one side of the lip." | — |
 | `z.stem.knop` | `tool.eye` \| `tool.rake` | — | `f.knop_form` | "The stem swells into a knop the size of a walnut, cast in two shells and soldered round the girdle." | — |
-| `z.foot.underside` | `tool.loupe` (`dwell 0.5`) | — | `f.mark_maker`, `f.mark_diana` | "Two punches, side by side. A rectangle with clipped corners: L·HOFFMANN. Beside it a woman's head in profile — a numeral 3 stands before the chin, and the letter A stands **inside the same outline**, under the throat." | — |
+| `z.foot.underside` | `tool.loupe` (`dwell 0.5`) | — | `f.mark_maker`, `f.mark_diana` | "Two punches, one under the other. A shield, and within it a winged monogram set between two letters. Beside it a woman's head in profile — a numeral 3 stands before the chin, and the letter A stands **inside the same outline**, under the throat." *(приведено до арту 26.07)* | — |
 | `z.foot.underside` | `tool.loupe` (`dwell 1.2`) | `f.hb_vienna_marks` | `f.marks_alone` | "The rest of the underside is bare. No third punch, no figures, and no bright patch where one had been taken off." | — |
 | `z.foot.top` | `tool.hand` (`on_click`) | `f.mark_diana` | `f.domes` | "A finger run across the slope of the foot catches on two small domes in the metal — one behind each punch." | `z.foot.top → raised` |
 | `z.foot.top` | `tool.loupe` \| `tool.rake` | `f.domes` | `f.domes_alike` | "Both domes rise to the same height and break at the same sharp shoulder." | — |
+| `z.foot.underside` | `tool.loupe` (`dwell 0.5`) під **косим світлом**, потребує `f.mark_maker` | — | `f.church_mark` | "Where the silver was ground smooth, the raking light finds it: an engraved chalice — a church's mark." *(додано 26.07: правило було в грі й в арті, але не в цій таблиці)* | — |
 | `z.foot.edge` | `tool.rake` (`dwell 0.8`) | — | `f.foot_edge_plain` | "The band round the edge of the foot is plain. Under raking light there is no lettering, and no shadow where lettering was taken off." | — |
 | `z.papers.receipt` | `tool.loupe` \| `tool.eye` (`on_click`) | — | `f.receipt_1807` | "Receipt, Vienna, 12 March 1807, duty paid on re-marking: *one becher, silver, 13 löthig, weight 14 loth, height 8 zoll 4 linien* — for Anna Reithofer." | видає caliper + scales |
 | `z.papers.receipt` | `tool.caliper` (`on_click`) | `f.receipt_1807`, `f.height_196`, `f.weight_331` | `f.receipt_mismatch` | "By the table on the wall: the becher of the receipt stands 219 mm and weighs 246 g. The cup on the desk stands 196 mm and weighs 331 g." | — |
@@ -168,8 +169,9 @@
 | `f.weight_331` | "On the balance: 331 g." | "331 g on the balance" | `measure` | 1 |
 | `f.receipt_1807` | "Receipt, Vienna, 12 March 1807, duty paid on re-marking: *one becher, silver, 13 löthig, weight 14 loth, height 8 zoll 4 linien* — for Anna Reithofer." | "the re-marking receipt of 1807" | `papers` | 1 |
 | `f.receipt_mismatch` | "The becher of the receipt stands 219 mm and weighs 246 g. The cup on the desk stands 196 mm and weighs 331 g." | "the receipt is 219 mm, the cup is 196" | `papers` | 2 |
+| `f.church_mark` | "Where the silver was ground smooth, the raking light finds it: an engraved chalice — a church's mark." | "the effaced church mark beneath" | `marks` | 3 |
 
-**14 фактів.** Жоден рядок не містить слів *plated, false, forged, stolen, later, therefore*.
+**15 фактів** *(з 26.07: + `f.church_mark`)*. Жоден рядок не містить слів *plated, false, forged, stolen, later, therefore*.
 
 ---
 

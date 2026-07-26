@@ -33,16 +33,30 @@ if [ -n "$ERRS" ]; then
   exit 2
 fi
 
+# 1б) юніт-тести рушія зон: headless, швидкі; ловлять регресію core/zones.gd,
+#     яку жоден візуальний прогін не бачить (аудит 26.07, знахідка 45)
+ZOUT=$(godot --headless --path . --script res://tools/test_zones.gd 2>&1)
+echo "--- test_zones ---" >>"$LOG"; echo "$ZOUT" >>"$LOG"
+if ! echo "$ZOUT" | grep -q "ZONES_TEST_OK"; then
+  echo "ТЕСТИ РУШІЯ ЗОН УПАЛИ:"; echo "$ZOUT" | grep -E "✗|падінь" | head -5
+  exit 2
+fi
+
 # 2) автотести: справа 1 і точки входу сцен
 export G3_SHOTDIR="/tmp/g3_verify/"
 rm -rf "$G3_SHOTDIR"; mkdir -p "$G3_SHOTDIR"
 FAIL=""
-for t in "walk b" "walk c" "chapters" "outcomes" "layoutcheck"; do
+for t in "walk a" "walk b" "walk c" "chapters" "outcomes" "layoutcheck" "case2"; do
   OUT=$(godot --path . --rendering-driver opengl3 -- $t 2>&1 | grep -v specular)
   echo "--- $t ---" >>"$LOG"; echo "$OUT" >>"$LOG"
   case "$t" in
     # walk b перевіряє ВИТРИМКУ (dwell) під лупою — і саме він мовчки падав, поки
     # його тут не було: результат залежав від fps, а не від коду (див. _dt()).
+    # walk a — єдиний тест, що клікає зони паперів ЯК ГРАВЕЦЬ (walk c сідає факти напряму)
+    "walk a")   echo "$OUT" | grep -q "WALK_A_OK read_news=true" || FAIL="$FAIL walk-a" ;;
+    # case2: аудит 26.07 знайшов її повністю зламаною при зеленому гейті — факти
+    # жили на видаленому механізмі meta("mark"), і жоден тест цього не бачив
+    "case2")    echo "$OUT" | grep -q "CASE2_OK wear=true chain=true docs=true" || FAIL="$FAIL case2" ;;
     "walk b")   echo "$OUT" | grep -q "WALK_B_OK found_marks=true found_church=true" || FAIL="$FAIL walk-b"
                 # зона мусить лишатися СТРОГОЮ: точка за 200 px від клейм не дає факту
                 echo "$OUT" | grep -q "WALK_B_STRICT far_rejected=true" || FAIL="$FAIL walk-b-strict" ;;

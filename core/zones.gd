@@ -5,8 +5,10 @@
 #   2.1 needs_flag        — гейт по стану світу («настав вечір»), а не по факту
 #   2.2 requires_state    — зона під кришкою недосяжна, поки кришка закрита (справа 3!)
 #   2.3 instances         — сім оголошень у газеті як сім екземплярів однієї зони
-#   2.4 (пошук у теці — віджет, живе не тут)
-#   2.5 семантика dwell   — після видачі факту витримка скидається, зона стає `read`
+#   2.4 (пошук у теці — віджет, НЕ реалізовано, живе не тут)
+#   2.5 семантика dwell   — РЕАЛІЗОВАНО ЧАСТКОВО і не тут: скидання витримки після
+#       видачі факту і повтор say живуть у main.gd:_check_underside; стану `read`
+#       як такого ще нема (аудит 26.07, знахідка 11)
 #
 # Клас нічого не малює і нічого не знає про справу. Він відповідає рівно на одне
 # питання: яка зона під цією точкою екрана, і чи вона зараз узагалі досяжна.
@@ -128,9 +130,17 @@ static func pick_2d(p: Vector2, zones: Dictionary, screen_name: String,
 			continue
 		if not inside_2d(uv, z, aspect):
 			continue
-		var area: float = (float(z.get("half", Vector2(0.1, 0.1)).x)*float(z.get("half", Vector2(0.1, 0.1)).y)
-						   if String(z.get("shape", &"circle")) == "rect"
-						   else float(z.get("r", 0.05))*float(z.get("r", 0.05)))
+		# ПЛОЩІ В ОДНИХ ОДИНИЦЯХ (аудит 26.07, знахідка 62): радіус кола — частка
+		# ШИРИНИ, тож по вертикалі він r/aspect. Порівнювати r·r із half.x·half.y
+		# без цієї поправки — значить при aspect≠1 «найменша зона» між колом і
+		# прямокутником обирається неправильно.
+		var area: float
+		if String(z.get("shape", &"circle")) == "rect":
+			var hf: Vector2 = z.get("half", Vector2(0.1, 0.1))
+			area = hf.x*hf.y
+		else:
+			var rr: float = float(z.get("r", 0.05))
+			area = rr*(rr/maxf(aspect, EPS))
 		if area < best_area:
 			best_area = area; best = String(id)
 	return best

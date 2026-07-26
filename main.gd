@@ -284,14 +284,18 @@ func _dbg_day1() -> void:
 	get_tree().quit()
 
 func _dbg_case2() -> void:
+	# АУДИТ 26.07: старий тест друкував CASE2_OK безумовно — з wear=false він
+	# виглядав зеленим. Тепер: кліки ЯК ГРАВЕЦЬ (через zone_btns) і вердикт
+	# рахується по фактах; гейт greп-ає саме "wear=true chain=true docs=true".
 	dbg_mode = true
 	var dir := _shotdir()
 	await get_tree().process_frame
 	_load_case(2)
 	_show("DESK2"); await _shot(dir+"c2_01_desk.png")
-	_show("TESTIMONY"); await _shot(dir+"c2_02_statements.png")
-	_show("WATCH_WEAR"); await _shot(dir+"c2_03_crown.png")
-	_show("WATCH_CHAIN"); await _shot(dir+"c2_04_bow.png")
+	_show("TESTIMONY"); _click_zone("z.testimony.widow"); _click_zone("z.testimony.nephew")
+	await _shot(dir+"c2_02_statements.png")
+	_show("WATCH_WEAR"); _click_zone("z.watch.wear"); await _shot(dir+"c2_03_crown.png")
+	_show("WATCH_CHAIN"); _click_zone("z.watch.chain"); await _shot(dir+"c2_04_bow.png")
 	_show("CERT"); await _shot(dir+"c2_05_cert.png")
 	_choose(0, "a left-handed man"); _choose(1, "lately taken off and put back")
 	_choose(2, "the widow"); _choose(3, "the crown worn on its left side")
@@ -312,15 +316,18 @@ func _dbg_clicktest() -> void:
 	# 1. стіл: клік по теці → DOCS
 	_show("DESK"); await get_tree().process_frame
 	await _click_at(_center("folder"))
+	var docs_seen: bool = _shown() == "DOCS"
 	log += "folder -> " + _shown() + " (треба DOCS)\n"
 	# 2. стіл: клік по келиху → HANDS
 	_show("DESK"); await get_tree().process_frame
 	await _click_at(_center("goblet"))
 	for _i in 30: await get_tree().process_frame   # чекаємо lift-твін
+	var hands_seen: bool = _shown() == "HANDS"
 	log += "goblet -> " + _shown() + " (треба HANDS)\n"
 	# 3. стіл: клік по лупі → взяти в руки (loupe_held)
 	_show("DESK"); await get_tree().process_frame
 	await _click_at(_center("mag"))
+	var loupe_was_held: bool = loupe_held
 	log += "mag -> loupe_held=" + str(loupe_held) + " (треба true)\n"
 	if loupe_held: _drop_loupe()
 	# 4. з DOCS → газета
@@ -331,12 +338,19 @@ func _dbg_clicktest() -> void:
 		if c is Button and (c as Button).text.contains("newspaper"):
 			await _click_at((c as Button).position + (c as Button).size*0.5)
 			opened = _shown()
+	var news_seen: bool = opened == "NEWS"
 	log += "newspaper link -> " + opened + " (треба NEWS)\n"
 	# 5. каталог: клік по правильній комірці
 	_show("CATALOG"); add_fact("found_marks"); await get_tree().process_frame
 	await _click_at(cat_m)
 	log += "catalog cell -> matched_maker=" + str(matched_maker) + " (треба true)\n"
 	print(log)
+	# машинний вердикт (аудит 26.07, знахідка 46): раніше тест друкував значення
+	# поруч зі словом «треба», але НІЧОГО не порівнював — зелене/червоне вирішувала
+	# людина очима. Тепер критерії зашиті, і рядок CLICKTEST_OK можна grep-ати.
+	var okc: bool = matched_maker and loupe_was_held and docs_seen and hands_seen and news_seen
+	print("CLICKTEST_OK all=", okc, " (docs=", docs_seen, " hands=", hands_seen,
+		  " loupe=", loupe_was_held, " news=", news_seen, " match=", matched_maker, ")")
 	get_tree().quit()
 # каталог знімків для верифікації: env G3_SHOTDIR (абсолютний шлях) або user://
 func _shotdir() -> String:
@@ -520,12 +534,6 @@ const Case01 := preload("res://data/case_01.gd")
 # жили в одному місці, а не двома копіями, які роз'їдуться.
 const UNDERSIDE_ZONE: Dictionary = Case01.ZONES[&"z.foot.underside"]
 
-func _underside_facing() -> bool:
-	if not hallmark_node or not main_cam3: return false
-	var wpos: Vector3 = hallmark_node.global_position
-	var wn: Vector3 = (-hallmark_node.global_transform.basis.y).normalized()   # спід дивиться в -Y
-	return wn.dot((main_cam3.global_position - wpos).normalized()) > 0.12
-
 # Крок часу для накопичення витримки (dwell). У тестах — ФІКСОВАНИЙ, бо інакше
 # результат залежить від fps: на вільній машині кадр коротший, і за ті самі 140 кадрів
 # набігає 0.14 с замість 0.5 — витримка не спрацьовує, і тест «падає» без жодної правки коду.
@@ -535,7 +543,6 @@ func _dt() -> float:
 
 func _check_underside(gc: Vector2) -> void:
 	if not hallmark_node or not main_cam3: return
-	if found_marks and found_church: return
 	# лупа над дном (щедрий радіус — марки все одно на пластині перед очима)
 	# КРОК 4: пікінг зони робить рушій (core/zones.gd), а не саморобна перевірка відстані.
 	# Радіус тепер СВІТОВИЙ і проєктується на екран, тому зона сама росте при наближенні
@@ -544,12 +551,20 @@ func _check_underside(gc: Vector2) -> void:
 	if over:
 		found_time += _dt()
 		if found_time > 0.5:
+			# 2.5 (ENGINE_SPEC_ADDENDUM §2): витримка скидається після КОЖНОЇ видачі,
+			# а вже здобута зона на повторне наведення дає ТОЙ САМИЙ рядок без факту —
+			# гравець може перечитати. Раніше зона замовкала назавжди (ранній return).
+			found_time = 0.0
 			if not found_marks:
-				add_fact("found_marks"); found_time = 0.0; _play("page_turn")
+				add_fact("found_marks"); _play("page_turn")
 				_set_hint("A maker's shield. Beside it a woman's head in profile — a numeral 3 before the chin, a letter A inside the same outline. The silver to the right is scored smooth.")
 			elif raking and not found_church:
 				add_fact("found_church"); _play("page_turn")
 				_set_hint("Where the silver was ground smooth, the raking light finds it: an engraved chalice — a church's mark.")
+			elif raking and found_church:
+				_set_hint("Where the silver was ground smooth, the raking light finds it: an engraved chalice — a church's mark.")
+			else:
+				_set_hint("A maker's shield. Beside it a woman's head in profile — a numeral 3 before the chin, a letter A inside the same outline. The silver to the right is scored smooth.")
 	else:
 		found_time = maxf(0.0, found_time - _dt())
 
@@ -965,6 +980,14 @@ const PAPER_ZONES := {
 		 "fact": "", "hint": "The market column",
 		 "say": "Market: old silver plate high; church work in brisk demand, and few questions asked."},
 	],
+	"TESTIMONY": [
+		{"id": "z.testimony.widow", "u": Vector2(0.50, 0.28), "half": Vector2(0.36, 0.16),
+		 "fact": "read_docs", "hint": "The widow's statement",
+		 "say": "The widow: wound every night before the lamp, thirty years; the chain was his father's and never off the watch."},
+		{"id": "z.testimony.nephew", "u": Vector2(0.50, 0.63), "half": Vector2(0.36, 0.16),
+		 "fact": "read_docs", "hint": "The nephew's statement",
+		 "say": "The nephew: given in the last week; the chain put on fresh, by his own hand. Right-handed, as the uncle was."},
+	],
 	"DOCS": [
 		{"id": "z.papers.letter", "u": Vector2(0.50, 0.42), "half": Vector2(0.34, 0.26),
 		 "fact": "read_docs", "hint": "The client's letter",
@@ -1103,6 +1126,7 @@ const CHAPTERS := [
 	["9 · Evening — the room",        "evening"],
 	["10 · Darkness",                 "dark"],
 	["11 · The ledger",               "ledger"],
+	["12 · Case 2 — the watch (draft)",  "case2"],
 ]
 
 # ── СТАН → ВИГЛЯД: рівно три входи, і четвертого нема ────────────────────────
@@ -1210,6 +1234,10 @@ func _goto(key: String) -> void:
 		"ledger":
 			client_seen = true; case_done = true; tod = "evening"
 			seals_set = maxi(seals_set, 1); _show("LEDGER")
+		"case2":
+			# чернетка справи 2: жива точка входу (аудит 26.07 — контент був
+			# недосяжний: _load_case(2) кликався лише з debug-режиму)
+			_load_case(2); client_seen = true; _show("DESK2")
 		_:
 			_show("MENU")
 
@@ -1817,34 +1845,49 @@ func _build_case2() -> void:
 	var tx := Label.new(); tx.label_settings = _ls(fr, int(lh*0.028), Color(0.20,0.14,0.09))
 	tx.text = "THE WIDOW:\n\"He wound it every night before\nthe lamp. Thirty years. The chain\nwas his father's — it was never\noff the watch.\"\n\nTHE NEPHEW:\n\"My uncle gave it me in his last\nweek. I put the chain on myself,\nfresh, to carry it properly.\nHe was right-handed, as I am.\""
 	tx.position = paper.position + Vector2(lw*0.11, lh*0.11); tx.mouse_filter = Control.MOUSE_FILTER_IGNORE; t.add_child(tx)
+	_build_paper_zones("TESTIMONY", t, paper)
 	_txtbtn(t, "←  back to the desk", Vector2(W*0.04, H*0.92), func(): _show("DESK2"))
 	_txtbtn(t, "Write the certificate  →", Vector2(W*0.72, H*0.92), func(): _show("CERT"))
 	# --- дві деталі під лупою: голівка (знос) і вушко (подряпини) ---
-	_build_detail("WATCH_WEAR", "watch_wear",
+	_build_detail("WATCH_WEAR", "watch_wear", "z.watch.wear",
 		"The crown is worn flat on its LEFT side — wound for years by a left hand.",
-		func(): add_fact("found_wear"), "WATCH_CHAIN", "the bow and chain  →")
-	_build_detail("WATCH_CHAIN", "watch_chain",
+		"found_wear", "WATCH_CHAIN", "the bow and chain  →")
+	_build_detail("WATCH_CHAIN", "watch_chain", "z.watch.chain",
 		"The bow is scratched bright and raw — this chain was put on lately, not worn for thirty years.",
-		func(): add_fact("found_chain"), "WATCH_WEAR", "←  the winding crown")
+		"found_chain", "WATCH_WEAR", "←  the winding crown")
 
-# екран-деталь: велике фото + напис, що саме видно (знахідка ставиться при відкритті)
-func _build_detail(scr: String, texname: String, note: String, mark: Callable, other: String, other_lbl: String) -> void:
+# екран-деталь: велике фото; знахідка ставиться КЛІКОМ по самій деталі, не показом.
+# ІСТОРІЯ РЕГРЕСІЇ (аудит 26.07): раніше факт клали через set_meta("mark", ...) і його
+# викликав _show(). Крок 3 прибрав читача мети, але ці два екрани лишилися з мертвим
+# записом — found_wear і found_chain не ставилися НІДЕ, атестат справи 2 став
+# непрохідним, і гейт мовчав, бо case2 у ньому не було. Тепер факт = дія по зоні
+# (той самий закон, що PAPER_ZONES), зона зареєстрована в zone_btns для тестів.
+func _build_detail(scr: String, texname: String, zone_id: String, note: String, fact_id: String, other: String, other_lbl: String) -> void:
 	var d := _screen(scr)
 	_paper_backdrop(d, 0.12)
+	var im_pos := Vector2(W*0.3, H*0.10); var im_size := Vector2(W*0.4, H*0.74)
 	if tex.has(texname):
 		var t2: Texture2D = tex[texname]
 		var dh := H*0.74; var dw := dh*float(t2.get_width())/float(t2.get_height())
 		var im := TextureRect.new(); im.texture = t2; im.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		im.stretch_mode = TextureRect.STRETCH_SCALE; im.size = Vector2(dw, dh)
 		im.position = Vector2((W-dw)*0.5, H*0.10); im.mouse_filter = Control.MOUSE_FILTER_IGNORE; d.add_child(im)
-	var l := Label.new(); l.label_settings = _ls(fr, int(H*0.026), Color(0.92,0.88,0.78))
-	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	l.size = Vector2(W*0.7, H*0.08); l.position = Vector2(W*0.15, H*0.855)
-	l.text = note; l.mouse_filter = Control.MOUSE_FILTER_IGNORE; d.add_child(l)
+		im_pos = im.position; im_size = im.size
+	# зона огляду — центральні 62% фото; напис-відповідь з'являється ПІСЛЯ дії
+	var hb := Button.new(); hb.flat = true; hb.modulate.a = 0
+	hb.size = im_size*0.62; hb.position = im_pos + (im_size - hb.size)*0.5
+	hb.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	hb.mouse_entered.connect(_set_hint.bind("Bring the eye close."))
+	hb.mouse_exited.connect(_set_hint.bind(""))
+	hb.pressed.connect(func():
+		if add_fact(fact_id): _play("page_turn")
+		else: _play("ui_soft")
+		_set_hint(note))
+	d.add_child(hb)
+	zone_btns[zone_id] = hb
 	_txtbtn(d, "←  set it down", Vector2(W*0.04, H*0.92), func(): _show("DESK2"))
 	_txtbtn(d, other_lbl, Vector2(W*0.42, H*0.92), func(): _show(other))
 	_txtbtn(d, "Write the certificate  →", Vector2(W*0.74, H*0.92), func(): _show("CERT"))
-	d.set_meta("mark", mark)
 
 func _evening() -> void:
 	case_done = true
