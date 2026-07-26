@@ -237,7 +237,7 @@ const FACTS := {
 	&"f.church_mark":     {"cite": "the effaced church mark beneath", "tag": &"marks", "weight": 3},
 	# факти з гри, ще не внесені в case_01.md §4 (вносити при кроці 6):
 	&"f.letter_read":     {"cite": "the client's own letter", "tag": &"papers", "weight": 1},
-	&"f.news_robbery":    {"cite": "the notice of the sacristy theft", "tag": &"papers", "weight": 1},
+	&"f.news_robbery":    {"cite": "the Herald of 14 March on the sacristy", "tag": &"papers", "weight": 1},
 	&"f.reg_hoffmann":    {"cite": "the register: Hoffmann, 1859 to 1871", "tag": &"books", "weight": 2},
 	&"f.hb_vienna_marks": {"cite": "the handbook of Vienna marks", "tag": &"books", "weight": 2},
 	&"f.domes":           {"cite": "two domes on the top of the foot", "tag": &"body", "weight": 2},

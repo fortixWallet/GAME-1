@@ -144,6 +144,8 @@ func _ready() -> void:
 	_build_docs()
 	_build_news()
 	_build_catalog()
+	_build_receipt()
+	_build_books()
 	_build_cert()
 	_build_ledger()
 	_build_case2()
@@ -657,6 +659,35 @@ func _dbg_walk() -> void:
 		_show("NEWS"); _click_zone("z.news.robbery"); await _shot(dir+"08_news.png")
 		_show("CATALOG"); _cat_miss(); await _shot(dir+"09_catalog_gated.png")
 		print("WALK_A_OK read_news=", read_news)
+	elif "e" in args:
+		# КРОК 6: інформаційний ланцюг. Спершу НЕГАТИВ: довідники до клейм мовчать.
+		_apply_zone("z.book.register")
+		var neg_ok: bool = not facts.has("f.reg_hoffmann")
+		_apply_zone("z.papers.receipt")
+		var unlocked: bool = unlocked_tools.has(&"tool.caliper") and unlocked_tools.has(&"tool.scales")
+		_apply_zone("z.cup.whole", &"tool.caliper")
+		_apply_zone("z.cup.whole", &"tool.scales")
+		_apply_zone("z.papers.receipt", &"tool.caliper")
+		var measured: bool = facts.has("f.height_196") and facts.has("f.weight_331") and facts.has("f.receipt_mismatch")
+		add_fact("f.mark_maker"); add_fact("f.mark_diana")   # клейма — walk b покриває
+		_apply_zone("z.book.register")
+		_apply_zone("z.book.marks")
+		var books: bool = facts.has("f.reg_hoffmann") and facts.has("f.hb_vienna_marks")
+		# marks_alone: лупа 1.2 с по споду ПІСЛЯ довідника
+		_show("HANDS"); goblet_pivot.rotation = Vector3.ZERO; goblet_pivot.rotation.x = -1.6
+		for _i in 3: await RenderingServer.frame_post_draw
+		_pickup_loupe()
+		var uw: Vector3 = goblet_pivot.global_transform * (Case01.ZONES[&"z.foot.underside"]["at"] as Vector3)
+		var ug: Vector2 = main_cam3.unproject_position(uw)
+		for _i in 140:
+			_aim_loupe(ug); _hover_zone_3d(ug); await RenderingServer.frame_post_draw
+			if facts.has("f.marks_alone"): break
+		_show("DOCS_RECEIPT"); await _shot(dir+"e1_receipt.png")
+		_show("BOOK_REG"); await _shot(dir+"e2_register.png")
+		_show("BOOK_MARKS"); await _shot(dir+"e3_handbook.png")
+		_show("DESK"); _refresh_tool_row(); await _shot(dir+"e4_desk_tools.png")
+		print("WALK_E_OK neg=", neg_ok, " unlocked=", unlocked, " measured=", measured,
+			  " books=", books, " alone=", facts.has("f.marks_alone"))
 	elif "b" in args:
 		_show("HANDS"); await _shot(dir+"10_hands_upright.png", 5)
 		goblet_pivot.rotation.x = -0.9; await _shot(dir+"11_hands_midturn.png", 5)
@@ -943,7 +974,7 @@ func _load() -> void:
 	# справа 2 «Спадок удови»
 	for n3 in ["hub_day","hub_day_case","hub_lamp_off","hub_evening","hub_evening_figure","hub_night","hub_darkness","menu_door","client_woman","client_in_room","subtitle_band"]:
 		if ResourceLoader.exists(ART + n3 + ".png"): tex[n3] = load(ART + n3 + ".png")
-	for n2 in ["case2_desk","watch_wear","watch_chain"]:
+	for n2 in ["case2_desk","watch_wear","watch_chain","paper_receipt_1807","reg_page_h","marks_page_vienna"]:
 		if ResourceLoader.exists(ART + n2 + ".png"): tex[n2] = load(ART + n2 + ".png")
 	# опційний арт (додано 24.07): чистий лист клієнтки
 	if ResourceLoader.exists(ART + "letter_client.png"):
@@ -1014,6 +1045,8 @@ func _set_hint(t: String) -> void:
 # більше не дублюються в main.gd.
 var paper_frames := {}   # screen_name → {"frame": Rect2, "aspect": float}
 var zone_states := {}    # id зони → StringName стану (sets_state правил; скидається _load_case)
+var active_tool: StringName = &"*"     # обраний вимірювальний інструмент (крок 6)
+var unlocked_tools := {}               # tool id → true (unlocks правил; скидається _load_case)
 
 func _paper_catcher(screen_name: String, parent: Control, paper: Control) -> void:
 	paper_frames[screen_name] = {
@@ -1029,7 +1062,7 @@ func _paper_catcher(screen_name: String, parent: Control, paper: Control) -> voi
 		if ev is InputEventMouseButton and (ev as InputEventMouseButton).pressed \
 				and (ev as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT:
 			var id := _pick_2d_at(screen_name, c.position + (ev as InputEventMouseButton).position)
-			if id != "": _apply_zone(id)
+			if id != "": _apply_zone(id, active_tool)
 		elif ev is InputEventMouseMotion:
 			var id2 := _pick_2d_at(screen_name, c.position + (ev as InputEventMouseMotion).position)
 			var z: Dictionary = _case_zones().get(StringName(id2), {})
@@ -1043,8 +1076,8 @@ func _pick_2d_at(screen_name: String, p: Vector2) -> String:
 		pf["frame"] as Rect2, float(pf["aspect"]), zone_states, _flags())
 
 # ЄДИНЕ місце, де клік по 2D-зоні стає знанням. Правило шукається в ДАНИХ.
-func _apply_zone(zone_id: String) -> void:
-	var rule := RuleEngine.find(_case_rules(), StringName(zone_id), &"*", facts, _flags())
+func _apply_zone(zone_id: String, tool: StringName = &"*") -> void:
+	var rule := RuleEngine.find(_case_rules(), StringName(zone_id), tool, facts, _flags())
 	if rule.is_empty():
 		# правило вже віддало все — повторити say останнього придатного (2.5: перечитати можна)
 		for r in _case_rules():
@@ -1062,6 +1095,10 @@ func _apply_rule(rule: Dictionary) -> void:
 		if add_fact(String(f)): got_new = true
 	var st: Dictionary = rule.get("sets_state", {})
 	for zid in st: zone_states[zid] = st[zid]
+	for tl in rule.get("unlocks", []):
+		if not unlocked_tools.has(tl):
+			unlocked_tools[tl] = true
+			_refresh_tool_row()
 	_play("page_turn" if got_new else "ui_soft")
 	_set_hint(String(rule.get("say", "")))
 
@@ -1094,6 +1131,32 @@ func _object(parent: Control, key: String, ov: Texture2D, hint: String, action: 
 	parent.add_child(b); return b
 
 const MAG_RECT := Rect2(0.588, 0.435, 0.215, 0.300)   # bbox вбудованої лупи (частки кадру)
+# ── РЯД ІНСТРУМЕНТІВ НА СТОЛІ (крок 6, мінімальний пояс) ─────────────────────
+# Текстові пункти в стилі наявного UI; з'являються ПІСЛЯ квитанції (unlocks).
+# Клік по келиху з активним інструментом = замір (правило з data), без lift.
+var tool_row: Control
+func _refresh_tool_row() -> void:
+	if tool_row == null: return
+	for c in tool_row.get_children(): c.queue_free()
+	if not unlocked_tools.has(&"tool.caliper"): return
+	var names := {&"tool.caliper": "⊂  the caliper", &"tool.scales": "⚖  the scales"}
+	var x := 0.0
+	for tl in [&"tool.caliper", &"tool.scales"]:
+		if not unlocked_tools.has(tl): continue
+		var b := Button.new(); b.flat = true
+		b.text = ("● " if active_tool == tl else "") + String(names[tl])
+		b.add_theme_font_override("font", fr)
+		b.add_theme_font_size_override("font_size", int(H*0.026))
+		b.add_theme_color_override("font_color", Color(0.93,0.87,0.72) if active_tool == tl else Color(0.72,0.66,0.54))
+		b.position = Vector2(x, 0); b.pressed.connect(_pick_tool.bind(tl))
+		tool_row.add_child(b); x += b.get_minimum_size().x + W*0.03
+
+func _pick_tool(tl: StringName) -> void:
+	active_tool = (&"*" if active_tool == tl else tl)   # повторний клік — відкласти
+	_play("ui_soft"); _refresh_tool_row()
+	_set_hint("The caliper is in hand — touch it to the cup, or to the receipt." if active_tool == &"tool.caliper"
+		else ("The scales stand ready — set the cup on them." if active_tool == &"tool.scales" else ""))
+
 func _mag_hotspot(parent: Control) -> Button:
 	var b := Button.new(); b.flat = true; b.modulate.a = 0
 	# кадр столу вписаний COVERED — переводимо частки зображення в екранні координати
@@ -1119,6 +1182,10 @@ func _hover_out(b: TextureButton) -> void:
 
 func _obj_press(b: TextureButton, key: String, action: Callable, lift: bool) -> void:
 	if edit_mode: return
+	# КРОК 6: з інструментом у руці клік по келиху — ЗАМІР (правило з data), не lift.
+	# Так штангенциркуль і ваги працюють на столі, як вимагає специфікація §3.
+	if key == "goblet" and active_tool != &"*":
+		_apply_zone("z.cup.whole", active_tool); return
 	_play("ui_soft")
 	if not lift:
 		action.call(); return
@@ -1190,6 +1257,8 @@ func _load_case(n: int) -> void:
 	CSLOTS = (CASES[n] as Dictionary)["slots"]
 	facts.clear()                       # одне речення замість чотирнадцяти drop_fact
 	zone_states.clear()
+	active_tool = &"*"
+	unlocked_tools.clear()
 	cvals = ["", "", "", ""]
 	active_slot = 0
 	sealed = false
@@ -1456,6 +1525,9 @@ func _build_desk() -> void:
 	var s := _screen("DESK")
 	desk_bg = _bg(s, tex["case_desk_loupe"])   # стіл із ВБУДОВАНОЮ лупою (перспектива+тінь у сцені)
 	gob_btn = _object(s, "goblet", tex["ov_goblet"], "The silver goblet — take it in hand", func(): _show("HANDS"), true, tex["ov_goblet_click"])
+	tool_row = Control.new(); tool_row.position = Vector2(W*0.04, H*0.055)
+	tool_row.size = Vector2(W*0.5, H*0.05); s.add_child(tool_row)
+	_refresh_tool_row()
 	# лупа — НЕВИДИМИЙ хотспот над вбудованою лупою (жодних плоских вирізок)
 	mag_btn = _mag_hotspot(s)
 	folder_btn = _object(s, "folder", tex["ov_folder"], "The case papers — read them", func(): _show("DOCS"), false, tex["ov_folder_click"])
@@ -1519,8 +1591,9 @@ func _build_docs() -> void:
 	_paper_catcher("DOCS", s, paper)
 	# навігація — нижній ряд на притемненому столі (геть з паперу), тепла і читабельна
 	_txtbtn(s, "←  back to the desk", Vector2(W*0.04, H*0.92), func(): _show("DESK"))
-	_txtbtn(s, "Open the newspaper  →", Vector2(W*0.40, H*0.92), func(): _show("NEWS"))
-	_txtbtn(s, "Mark catalogue  →", Vector2(W*0.72, H*0.92), func(): _show("CATALOG"))
+	_txtbtn(s, "Open the newspaper  →", Vector2(W*0.34, H*0.92), func(): _show("NEWS"))
+	_txtbtn(s, "The paper with the cup  →", Vector2(W*0.60, H*0.92), func(): _show("DOCS_RECEIPT"))
+	_txtbtn(s, "Mark catalogue  →", Vector2(W*0.84, H*0.92), func(): _show("CATALOG"))
 
 # ---------- NEWS ----------
 func _build_news() -> void:
@@ -1535,6 +1608,75 @@ func _build_news() -> void:
 	_txtbtn(s, "←  back", Vector2(W*0.04, H*0.92), func(): _show("DOCS"))
 
 # ---------- CATALOG (клік по гербу) ----------
+# ── КРОК 6: квитанція 1807 + реєстр + довідник знаків ────────────────────────
+# Поверхні ЧИСТІ (генерація без тексту), увесь текст — шрифтом (правило 10).
+# Факти йдуть через єдиний ловець і правила в data/case_01.gd.
+func _paper_screen(scr: String, texname: String, back_to: String, back_lbl: String) -> Dictionary:
+	var s := _screen(scr)
+	_paper_backdrop(s, 0.18)
+	var t: Texture2D = tex[texname]
+	var ph2 := H*0.92; var pw2 := ph2*float(t.get_width())/float(t.get_height())
+	var pg := TextureRect.new(); pg.texture = t; pg.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	pg.stretch_mode = TextureRect.STRETCH_SCALE; pg.size = Vector2(pw2, ph2)
+	pg.position = Vector2((W-pw2)*0.5, (H-ph2)*0.5)
+	pg.mouse_filter = Control.MOUSE_FILTER_IGNORE; s.add_child(pg)
+	_txtbtn(s, back_lbl, Vector2(W*0.04, H*0.92), func(): _show(back_to))
+	return {"s": s, "pg": pg}
+
+func _ptext(sc: Dictionary, txt: String, ux: float, uy: float, size_f: float,
+			col := Color(0.24,0.17,0.10), italic := false) -> void:
+	var pg := sc["pg"] as TextureRect
+	var l := Label.new(); l.label_settings = _ls(fb if italic else fr, int(pg.size.y*size_f), col)
+	l.text = txt; l.position = pg.position + Vector2(pg.size.x*ux, pg.size.y*uy)
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE; (sc["s"] as Control).add_child(l)
+
+func _build_receipt() -> void:
+	var sc := _paper_screen("DOCS_RECEIPT", "paper_receipt_1807", "DOCS", "←  back to the papers")
+	# текст квитанції — ДОСЛІВНО з case_01.md §3 (f.receipt_1807)
+	_ptext(sc, "R E C E I P T", 0.385, 0.155, 0.030)
+	_ptext(sc, "duty paid on the re-marking of plate", 0.300, 0.195, 0.019)
+	_ptext(sc, "Vienna, the 12th of March 1807", 0.290, 0.360, 0.023, Color(0.16,0.12,0.22), true)
+	_ptext(sc, "one becher, silver, 13 löthig", 0.290, 0.425, 0.023, Color(0.16,0.12,0.22), true)
+	_ptext(sc, "weight 14 loth  ·  height 8 zoll 4 linien", 0.290, 0.490, 0.023, Color(0.16,0.12,0.22), true)
+	_ptext(sc, "for Anna Reithofer", 0.290, 0.555, 0.023, Color(0.16,0.12,0.22), true)
+	_paper_catcher("DOCS_RECEIPT", sc["s"], sc["pg"])
+
+func _build_books() -> void:
+	# реєстр майстерень: рядок Гоффманна серед сусідів — шрифтом у порожню таблицю
+	var rg := _paper_screen("BOOK_REG", "reg_page_h", "CATALOG", "←  back to the catalogue")
+	_ptext(rg, "REGISTER OF THE WORKSHOPS OF VIENNA — H", 0.16, 0.055, 0.020)
+	var rows := [
+		["HABERMANN, Karl", "goldsmith", "1841", "1856"],
+		["HELLER & SON", "silversmiths", "1852", "—"],
+		["HOFFMANN, Leopold", "silversmith", "1859", "1871"],
+		["HUBER, Anton", "silversmith", "1863", "—"],
+		["HORVATH, Emmerich", "goldsmith", "1866", "1870"],
+	]
+	for i in rows.size():
+		var r: Array = rows[i]
+		var uy := 0.165 + 0.0805*float(i)
+		_ptext(rg, String(r[0]), 0.205, uy, 0.0195, Color(0.20,0.15,0.20), true)
+		_ptext(rg, String(r[1]), 0.520, uy, 0.0185, Color(0.24,0.19,0.24), true)
+		_ptext(rg, String(r[2]), 0.705, uy, 0.0195, Color(0.20,0.15,0.20), true)
+		_ptext(rg, String(r[3]), 0.800, uy, 0.0195, Color(0.20,0.15,0.20), true)
+	_paper_catcher("BOOK_REG", rg["s"], rg["pg"])
+
+	# довідник знаків: гравюри вже на аркуші, підписи — шрифтом
+	var mk := _paper_screen("BOOK_MARKS", "marks_page_vienna", "CATALOG", "←  back to the catalogue")
+	_ptext(mk, "THE MARKS OF THE VIENNA ASSAY OFFICE", 0.20, 0.048, 0.020)
+	_ptext(mk, "1807 — 1866", 0.56, 0.130, 0.021)
+	_ptext(mk, "a punch bearing the last two figures", 0.50, 0.165, 0.0165)
+	_ptext(mk, "of the year, the fineness in loth,", 0.50, 0.192, 0.0165)
+	_ptext(mk, "and the office letter struck BESIDE.", 0.50, 0.219, 0.0165)
+	_ptext(mk, "FROM 1867", 0.60, 0.560, 0.021)
+	_ptext(mk, "Diana's head; the numeral gives the", 0.52, 0.598, 0.0165)
+	_ptext(mk, "fineness: 1=950  2=900  3=800  4=750.", 0.52, 0.625, 0.0165)
+	_ptext(mk, "No year is struck at all.", 0.52, 0.652, 0.0165)
+	_ptext(mk, "FROM 1872 the office letter is cut", 0.52, 0.700, 0.0165)
+	_ptext(mk, "INSIDE the head's outline; before,", 0.52, 0.727, 0.0165)
+	_ptext(mk, "it stood as a separate punch beside.", 0.52, 0.754, 0.0165)
+	_paper_catcher("BOOK_MARKS", mk["s"], mk["pg"])
+
 func _build_catalog() -> void:
 	var s := _screen("CATALOG")
 	_paper_backdrop(s, 0.22)
@@ -1573,6 +1715,8 @@ func _build_catalog() -> void:
 	hs.pressed.connect(_cat_click.bind(s, Vector2(mx, my), mr))
 	s.add_child(hs)
 	cat_screen = s; cat_m = Vector2(mx, my); cat_mr = mr; s.set_meta("panx", panx)
+	_txtbtn(s, "The register  →", Vector2(panx, H*0.66), func(): _show("BOOK_REG"))
+	_txtbtn(s, "The handbook of marks  →", Vector2(panx, H*0.73), func(): _show("BOOK_MARKS"))
 	_txtbtn(s, "Write the certificate  →", Vector2(panx, H*0.80), func(): _show("CERT"))
 	_txtbtn(s, "←  back", Vector2(panx, H*0.87), func(): _show("DOCS"))
 
@@ -1594,7 +1738,7 @@ func _cat_click(s: Control, m: Vector2, mr: float) -> void:
 		ring.text = "◯"; ring.position = Vector2(m.x-mr*0.95, m.y-mr*1.15); ring.mouse_filter = Control.MOUSE_FILTER_IGNORE; s.add_child(ring)
 		# підтвердження — у правій панелі, не над сторінкою
 		var lbl := Label.new(); lbl.name = "matchlbl"; lbl.label_settings = _ls(fb, int(H*0.028), Color(0.72,0.14,0.12))
-		lbl.text = "✓ the same mark —\n   Hoffmann, Wien"; lbl.position = Vector2(cat_screen.get_meta("panx"), H*0.46)
+		lbl.text = "✓ the same mark —\n   Hoffmann, Wien\n   (register: 1859–1871)"; lbl.position = Vector2(cat_screen.get_meta("panx"), H*0.46)
 		lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE; s.add_child(lbl)
 
 # ---------- CERTIFICATE ----------
@@ -1687,7 +1831,7 @@ func _basis_opts() -> Array:
 		return o2
 	var o := ["the client's own word"]
 	if found_church: o.append("the effaced church mark beneath")
-	if read_news: o.append("the notice of the sacristy theft")
+	if read_news: o.append("the Herald of 14 March on the sacristy")
 	return o
 
 func _refresh_cert() -> void:

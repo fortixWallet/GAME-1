@@ -46,7 +46,7 @@ fi
 export G3_SHOTDIR="/tmp/g3_verify/"
 rm -rf "$G3_SHOTDIR"; mkdir -p "$G3_SHOTDIR"
 FAIL=""
-for t in "walk a" "walk b" "walk c" "chapters" "outcomes" "layoutcheck" "case2"; do
+for t in "walk a" "walk b" "walk c" "walk e" "chapters" "outcomes" "layoutcheck" "case2"; do
   OUT=$(godot --path . --rendering-driver opengl3 -- $t 2>&1 | grep -v specular)
   echo "--- $t ---" >>"$LOG"; echo "$OUT" >>"$LOG"
   case "$t" in
@@ -57,6 +57,9 @@ for t in "walk a" "walk b" "walk c" "chapters" "outcomes" "layoutcheck" "case2";
     # case2: аудит 26.07 знайшов її повністю зламаною при зеленому гейті — факти
     # жили на видаленому механізмі meta("mark"), і жоден тест цього не бачив
     "case2")    echo "$OUT" | grep -q "CASE2_OK wear=true chain=true docs=true" || FAIL="$FAIL case2" ;;
+    # walk e — інформаційний ланцюг кроку 6: квитанція → інструменти → заміри →
+    # реєстр/довідник → «пустий спід», з НЕГАТИВОМ (довідник до клейма мовчить)
+    "walk e")   echo "$OUT" | grep -q "WALK_E_OK neg=true unlocked=true measured=true books=true alone=true" || FAIL="$FAIL walk-e" ;;
     "walk b")   echo "$OUT" | grep -q "WALK_B_OK found_marks=true found_church=true" || FAIL="$FAIL walk-b"
                 # горбики (5c): рука → f.domes, лупа → f.domes_alike, стан зони raised
                 echo "$OUT" | grep -q "WALK_B_DOMES hand=true alike=true state=raised" || FAIL="$FAIL domes"

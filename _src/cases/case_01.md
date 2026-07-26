@@ -94,7 +94,9 @@
 
 | id зони | де | вид | координати | екран |
 |---|---|---|---|---|
-| `z.papers.receipt` | квитанція 1807 на столі | 2d | `surface: paper_receipt_1807`, `u = (0.500, 0.430)`, `r = 0.190` | DOCS |
+| `z.papers.receipt` | квитанція 1807 (окремий екран DOCS_RECEIPT, вхід із теки) | 2d | `surface: paper_receipt_1807`, `u = (0.500, 0.430)`, `r = 0.190` | DOCS_RECEIPT |
+| `z.papers.letter` | лист клієнтки в теці *(внесено з гри 26.07)* | 2d | `surface: letter_client`, `u = (0.50, 0.42)`, `rect half = (0.34, 0.26)` | DOCS |
+| `z.news.robbery` + 4 зони-статті | газета: крадіжка в ризниці — факт; ще 4 матеріали читаються без фактів *(внесено з гри 26.07)* | 2d | `surface: newspaper_final` | NEWS |
 | `z.book.register` | рядок HOFFMANN у реєстрі майстерень | 2d | `surface: reg_page_h`, `u = (0.315, 0.560)`, `shape: rect`, `half = (0.280, 0.045)` | BOOK_REG |
 | `z.book.marks` | віденська сторінка довідника знаків | 2d | `surface: marks_page_vienna`, `u = (0.660, 0.480)`, `shape: rect`, `half = (0.300, 0.230)` | BOOK_MARKS |
 
@@ -169,9 +171,11 @@
 | `f.weight_331` | "On the balance: 331 g." | "331 g on the balance" | `measure` | 1 |
 | `f.receipt_1807` | "Receipt, Vienna, 12 March 1807, duty paid on re-marking: *one becher, silver, 13 löthig, weight 14 loth, height 8 zoll 4 linien* — for Anna Reithofer." | "the re-marking receipt of 1807" | `papers` | 1 |
 | `f.receipt_mismatch` | "The becher of the receipt stands 219 mm and weighs 246 g. The cup on the desk stands 196 mm and weighs 331 g." | "the receipt is 219 mm, the cup is 196" | `papers` | 2 |
+| `f.letter_read` | "She writes: from an aunt in the monastery, and she is told it is Viennese." *(внесено з гри 26.07)* | "the client's own letter" | `papers` | 1 |
+| `f.news_robbery` | "St. Onuphrius' sacristy, broken into. Among the missing: antique silver goblets." *(внесено з гри 26.07)* | "the Herald of 14 March on the sacristy" | `papers` | 1 |
 | `f.church_mark` | "Where the silver was ground smooth, the raking light finds it: an engraved chalice — a church's mark." | "the effaced church mark beneath" | `marks` | 3 |
 
-**15 фактів** *(з 26.07: + `f.church_mark`)*. Жоден рядок не містить слів *plated, false, forged, stolen, later, therefore*.
+**17 фактів** *(з 26.07: + `f.church_mark`, `f.letter_read`, `f.news_robbery`)*. Жоден рядок не містить слів *plated, false, forged, stolen, later, therefore*.
 
 ---
 
