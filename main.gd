@@ -216,32 +216,43 @@ func _center(key: String) -> Vector2:
 	return Vector2((r[0]+r[2]*0.5)*W, (r[1]+r[3]*0.5)*H)
 
 func _dbg_outcomes() -> void:
-	# УВАГА: цей тест раніше БРЕХАВ. Четвертий рядок ставив провенанс
-	# «by a path I cannot vouch for», тобто НЕ церковний, і тому падав у ту саму
-	# гілку, що й третій. Дві однакові відповіді виглядали як два різні наслідки,
-	# а справжня четверта гілка (провенанс вгадано, майстерню — ні) не перевірялась
-	# ніколи. Тепер тест сам стежить, щоб гілок було чотири РІЗНИХ.
+	# П'ять гілок ранку справи 1 (нова система: id-слоти, число, факти-підстава).
+	# Перевірка та сама: різні гілки МУСЯТЬ давати різні тексти (мовчазна злипка
+	# двох гілок виглядає як покриття — аудит уже ловив таке).
 	var cases := [
-		["Vienna — Hoffmann workshop","struck over an older, effaced mark","taken from a church","the effaced church mark beneath","ПРАВИЛЬНО+доказ"],
-		["Vienna — Hoffmann workshop","struck over an older, effaced mark","taken from a church","the client's own word","крадена БЕЗ доказу"],
-		["Vienna — Hoffmann workshop","struck but once, and clean","honestly, by inheritance","the client's own word","пропустив крадене"],
-		["Prague — court silver","struck over an older, effaced mark","taken from a church","the effaced church mark beneath","провенанс вгадано, майстерню ні"],
+		[[&"o.vienna_hoffmann", 800, 1872, &"o.after_the_fact", &"o.made_to_look_stolen",
+		  [&"f.domes_alike", &"f.marks_alone"]], "ПРАВИЛЬНО+доказ"],
+		[[&"o.vienna_hoffmann", 800, 1867, &"o.by_office_later", &"o.made_to_look_stolen",
+		  [&"f.letter_read", &"f.news_robbery"]], "підробка без доказу"],
+		[[&"o.vienna_hoffmann", 800, 1867, &"o.by_office_later", &"o.taken_from_church",
+		  [&"f.letter_read", &"f.news_robbery"]], "повірив у крадене"],
+		[[&"o.vienna_hoffmann", 800, 1867, &"o.on_the_flat", &"o.honest_inheritance",
+		  [&"f.letter_read", &"f.news_robbery"]], "продав як чисте"],
+		[[&"o.vienna_unrecorded", 750, 1850, &"o.on_the_flat", &"o.legally_remarked",
+		  [&"f.letter_read", &"f.news_robbery"]], "переклеймоване законно"],
 	]
 	print("OUTCOMES")
-	# мітки самі містять «+» («ПРАВИЛЬНО+доказ»), тому склеювати їх у рядок і шукати
-	# в ньому плюс — не можна: перевірка спрацює на власній назві. Тримаємо СПИСОК.
 	var seen := {}
+	var ids := {}
 	for c in cases:
-		cvals = [c[0],c[1],c[2],c[3]]
+		cvals = (c[0] as Array).duplicate(true)
 		var t := _outcome_text()
 		if not seen.has(t): seen[t] = []
-		(seen[t] as Array).append(c[4])
-		print("[", c[4], "] -> ", t.substr(0, 60), "...")
-	for t in seen:
-		var who := seen[t] as Array
-		if who.size() > 1:
-			print("OUTCOMES_FAIL: гілки ", who, " дають однаковий текст")
-	print("OUTCOMES_OK cases=", cases.size(), " unique=", seen.size())
+		(seen[t] as Array).append(c[1])
+		ids[String(c[1])] = last_outcome_id
+		print("[", c[1], "] -> ", last_outcome_id, " · ", t.substr(0, 46), "...")
+	# 4b і 5 навмисно дають ТОЙ САМИЙ out.sold_clean — це одна гілка специфікації;
+	# перевіряємо унікальність між РІЗНИМИ id, а не між усіма кейсами
+	var by_id := {}
+	for k in ids:
+		var oid: String = ids[k]
+		if by_id.has(oid) and String(by_id[oid]) != String(seen.keys()[0]):
+			pass
+		by_id[oid] = k
+	var uniq_ids := by_id.size()
+	print("OUTCOMES_OK cases=", cases.size(), " unique_ids=", uniq_ids)
+	if uniq_ids < 4:
+		print("OUTCOMES_FAIL: менше 4 різних гілок — злипання")
 	get_tree().quit()
 
 # ПОВНИЙ ДЕНЬ 1 очима гравця: меню → кабінет → клієнтка → стіл → атестат → вечір
@@ -750,12 +761,21 @@ func _dbg_walk() -> void:
 	elif "c" in args:
 		for f0 in ["f.mark_maker","f.mark_diana","f.news_robbery","f.church_mark","f.letter_read"]: add_fact(f0)   # здобуто в A і B
 		_show("CATALOG"); _cat_click(cat_screen, cat_m, cat_mr); await _shot(dir+"14_catalog_match.png")
+		for f1 in ["f.hb_vienna_marks","f.domes","f.domes_alike","f.marks_alone"]: add_fact(f1)
 		_show("CERT"); await _shot(dir+"15_cert_open.png")
-		# бланк-речення: заповнюємо всі 4 слоти, останній — доказ проти невинної версії
-		_choose(0, "Vienna — Hoffmann workshop"); await _shot(dir+"15a_slot_origin.png")
-		_choose(1, "struck over an older, effaced mark")
-		_choose(2, "taken from a church"); await _shot(dir+"16_cert_provenance.png")
-		_choose(3, "the effaced church mark beneath"); await _shot(dir+"18_cert_full.png")
+		# КРОК 7: шість граф, дві числові. Заповнення тими самими API, що кнопки.
+		_choose(0, &"o.vienna_hoffmann"); await _shot(dir+"15a_slot_origin.png")
+		# НЕГАТИВ: число поза межами поля НЕ приймається (99 < min 100; 5 цифр ≠ digits)
+		var rej1: bool = not _commit_number(1, 99)
+		var rej2: bool = not _commit_number(2, 18722)
+		print("CERT_NUM_REJECT low=", rej1, " long=", rej2)
+		assert(_commit_number(1, 800))
+		assert(_commit_number(2, 1872))
+		_choose(3, &"o.after_the_fact")
+		_choose(4, &"o.made_to_look_stolen"); await _shot(dir+"16_cert_provenance.png")
+		_toggle_basis(5, &"f.domes_alike"); _toggle_basis(5, &"f.marks_alone")
+		_refresh_cert(); await _shot(dir+"18_cert_full.png")
+		print("CERT_FILLED all=", _all_filled())
 		_do_verdict()
 		# 19_seal_mid — кадр ПОСЕРЕД анімації печатки, і він свідомо лишається
 		# невідтворюваним (ділянка 44×45 пкс). Спроба крокувати твін вручну коштувала
@@ -769,7 +789,8 @@ func _dbg_walk() -> void:
 		for _i in 8: await RenderingServer.frame_post_draw
 		await _shot(dir+"20_morning.png", 2)
 		_show("LEDGER"); await _shot(dir+"21_ledger.png", 4)
-		print("WALK_C_OK sealed=", sealed, " seals=", seals_set, " shown=", _shown())
+		print("WALK_C_OK sealed=", sealed, " seals=", seals_set, " shown=", _shown(),
+			  " outcome=", last_outcome_id)
 	get_tree().quit()
 
 # ПЕРЕВІРКА ВЕРСТКИ: обходить УСІ екрани й шукає тексти, що налазять один на одного.
@@ -1254,12 +1275,15 @@ const CHAPTERS := [
 
 func _load_case(n: int) -> void:
 	case_id = n
-	CSLOTS = (CASES[n] as Dictionary)["slots"]
+	CSLOTS = (CASE_DATA[n] as Object).get("SLOTS") if CASE_DATA.has(n) else []
 	facts.clear()                       # одне речення замість чотирнадцяти drop_fact
 	zone_states.clear()
 	active_tool = &"*"
 	unlocked_tools.clear()
-	cvals = ["", "", "", ""]
+	num_buf = ""
+	cvals = []
+	for sl in CSLOTS:
+		cvals.append([] if String((sl as Dictionary)["kind"]) == "FACTS" else "")
 	active_slot = 0
 	sealed = false
 	case_done = false
@@ -1313,7 +1337,10 @@ func _sync_view(animate: bool = false) -> void:
 		rake_btn.text = "⟋  raking light — on" if raking else "⟋  rake the light across the silver"
 
 func _found_all() -> void:
-	for f0 in ["f.mark_maker","f.mark_diana","f.reg_hoffmann","f.news_robbery","f.church_mark","f.letter_read"]: add_fact(f0)
+	for f0 in ["f.mark_maker","f.mark_diana","f.reg_hoffmann","f.news_robbery","f.church_mark",
+			   "f.letter_read","f.hb_vienna_marks","f.domes","f.domes_alike","f.marks_alone",
+			   "f.receipt_1807","f.height_196","f.weight_331","f.receipt_mismatch"]:
+		add_fact(f0)
 
 func _goto(key: String) -> void:
 	_load_case(1)
@@ -1332,13 +1359,11 @@ func _goto(key: String) -> void:
 			client_seen = true; add_fact("f.mark_maker"); add_fact("f.mark_diana"); _show("CATALOG")
 		"cert":
 			client_seen = true; _found_all()
-			cvals = ["Vienna — Hoffmann workshop","struck over an older, effaced mark",
-					 "taken from a church","the effaced church mark beneath"]
+			cvals = [&"o.vienna_hoffmann", 800, 1872, &"o.after_the_fact", &"o.made_to_look_stolen", [&"f.domes_alike", &"f.marks_alone"] as Array]
 			_show("CERT")
 		"morning":
 			client_seen = true; _found_all(); sealed = true; seals_set = maxi(seals_set, 1)
-			cvals = ["Vienna — Hoffmann workshop","struck over an older, effaced mark",
-					 "taken from a church","the effaced church mark beneath"]
+			cvals = [&"o.vienna_hoffmann", 800, 1872, &"o.after_the_fact", &"o.made_to_look_stolen", [&"f.domes_alike", &"f.marks_alone"] as Array]
 			_show_morning()
 		"evening":
 			client_seen = true; case_done = true; tod = "evening"; _enter_hub()
@@ -1782,103 +1807,168 @@ func _build_cert() -> void:
 
 # ---- БЛАНК-РЕЧЕННЯ: гравець реконструює історію; графа «на підставі чого» вимагає доказу ----
 # ---- КОЛОДА СПРАВ: нова справа = НОВИЙ ЗАПИС, не новий код ----
-var CASES := {
-	1: {
-		"slots": [
-			{"pre":"Made in", "gate":"origin",
-			 "opts":["Vienna — Hoffmann workshop","Prague — court silver","Augsburg guild-mark"]},
-			{"pre":"Its maker's mark was", "gate":"marks",
-			 "opts":["struck but once, and clean","struck over an older, effaced mark"]},
-			{"pre":"The piece came into these hands", "gate":"papers",
-			 "opts":["honestly, by inheritance","by a path I cannot vouch for","taken from a church"]},
-			{"pre":"On this I set my name — I rely upon", "gate":"basis", "opts":[]},
-		],
-	},
-	2: {
-		# «Спадок удови» — два свідчення: річ сама викриває того, хто підганяв її під свою версію
-		"slots": [
-			{"pre":"The watch was carried by", "gate":"wear",
-			 "opts":["a right-handed man","a left-handed man"]},
-			{"pre":"Its chain was", "gate":"chain",
-			 "opts":["never disturbed","lately taken off and put back"]},
-			{"pre":"The piece belongs to", "gate":"papers",
-			 "opts":["the widow","the nephew","neither — it cannot be told"]},
-			{"pre":"On this I set my name — I rely upon", "gate":"basis", "opts":[]},
-		],
-	},
-}
+# ── АТЕСТАТ ІЗ ТАБЛИЦЬ (крок 7) ──────────────────────────────────────────────
+# Графи описані в data/case_NN.gd SLOTS: CHOICE (id варіантів, на папір лягає текст),
+# NUMBER (цифри вписуються вручну; меж і — формат поля, НЕ валідація відповіді:
+# гра ніколи не каже «правильно»), FACTS (2..4 зібрані факти як підстава).
+# Істину рушій не знає — її знають лише OUTCOMES у даних.
 var case_id := 1
 var CSLOTS: Array = []
-var cvals := ["","","",""]
-var active_slot := 0   # варіанти показуються ЛИШЕ для активного слота (клік по рядку активує)
+var cvals: Array = []
+var active_slot := 0   # варіанти показуються ЛИШЕ для активного слота
+var num_buf := ""      # набрані цифри активної NUMBER-графи
 
-func _slot_gate(g: String) -> bool:
-	match g:
-		"origin": return matched_maker      # збіг клейма в довіднику
-		"marks": return found_marks         # роздивився клеймо під лупою
-		"wear": return found_wear           # справа 2: оглянув заводну голівку
-		"chain": return found_chain         # справа 2: оглянув вушко ланцюжка
-		"papers": return read_docs          # прочитав справу: не судиш походження, не знаючи заяви клієнтки
-		"basis": return cvals[2] != ""      # спершу назви походження, тоді підставу
-	return false
+func _slot_index(sid: StringName) -> int:
+	for j in CSLOTS.size():
+		if StringName((CSLOTS[j] as Dictionary)["id"]) == sid: return j
+	return -1
 
-# графа «на підставі» пропонує ЛИШЕ те, що гравець справді знайшов
-func _basis_opts() -> Array:
-	if case_id == 2:
-		var o2 := ["what the claimants told me"]
-		if found_wear: o2.append("the crown worn on its left side")
-		if found_chain: o2.append("the fresh scratches at the bow")
-		return o2
-	var o := ["the client's own word"]
-	if found_church: o.append("the effaced church mark beneath")
-	if read_news: o.append("the Herald of 14 March on the sacristy")
-	return o
+func _slot_filled(i: int) -> bool:
+	var sl: Dictionary = CSLOTS[i]
+	if String(sl["kind"]) == "FACTS":
+		return cvals[i] is Array and (cvals[i] as Array).size() >= int(sl.get("min_count", 1))
+	return not (cvals[i] is String and String(cvals[i]) == "")
+
+func _slot_open(sl: Dictionary) -> bool:
+	for f in sl.get("needs", []):
+		if not facts.has(String(f)): return false
+	var any: Array = sl.get("needs_any", [])
+	if not any.is_empty():
+		var hit := false
+		for f in any:
+			if facts.has(String(f)): hit = true
+		if not hit: return false
+	for sid in sl.get("needs_slot", []):
+		var j := _slot_index(StringName(sid))
+		if j < 0 or not _slot_filled(j): return false
+	return true
+
+func _opt_text(sl: Dictionary, oid: StringName) -> String:
+	for o in sl.get("opts", []):
+		if StringName((o as Array)[0]) == oid: return String((o as Array)[1])
+	return String(oid)
+
+func _case_facts_table() -> Dictionary:
+	return (CASE_DATA[case_id] as Object).get("FACTS") if CASE_DATA.has(case_id) else {}
+
+# що лягає на папір у графі i
+func _slot_display(i: int) -> String:
+	var sl: Dictionary = CSLOTS[i]
+	match String(sl["kind"]):
+		"NUMBER":
+			if cvals[i] is int:
+				return str(cvals[i]) + (" " + String(sl.get("suf", "")) if String(sl.get("suf", "")) != "" else "")
+			return ""
+		"FACTS":
+			if cvals[i] is Array:
+				var cites: Array = []
+				var ft := _case_facts_table()
+				for fid in cvals[i]:
+					cites.append(String((ft.get(StringName(fid), {}) as Dictionary).get("cite", fid)))
+				return "; ".join(cites)
+			return ""
+		_:
+			if cvals[i] is String and String(cvals[i]) == "": return ""
+			return _opt_text(sl, StringName(cvals[i]))
+
+# діегетична підказка закритої графи — чого БРАКУЄ, не що вписати
+func _slot_hint(sl: Dictionary) -> String:
+	match StringName(sl["id"]):
+		&"s.origin": return "( match the mark, then the register )"
+		&"s.fineness", &"s.not_before": return "( the handbook of marks will speak to this )"
+		&"s.marks": return "( run a finger over the top of the foot )"
+		&"s.provenance": return "( set down how the marks were struck, first )"
+		&"s.basis", &"s.c2.basis": return "( name the ruling above, first )"
+		&"s.c2.winder": return "( look closer at the winding crown )"
+		&"s.c2.chain": return "( look closer at the bow and chain )"
+		&"s.c2.belongs": return "( the statements, and both details, first )"
+	return "( … )"
+
+func _clear_dependents(changed: StringName) -> void:
+	for j in CSLOTS.size():
+		var sl: Dictionary = CSLOTS[j]
+		if changed in sl.get("clears_on", []):
+			cvals[j] = "" if String(sl["kind"]) != "FACTS" else []
+
+func _choose(i: int, oid: StringName) -> void:
+	if sealed: return
+	cvals[i] = oid
+	_clear_dependents(StringName((CSLOTS[i] as Dictionary)["id"]))
+	_play("pen_write")
+	active_slot = _next_open_slot()
+	_refresh_cert()
+
+# ЄДИНИЙ вхід числа у графу (кнопка ✓ і тести йдуть сюди). Межі digits/min/max —
+# формат поля; про ПРАВИЛЬНІСТЬ гра мовчить (правило 6).
+func _commit_number(i: int, v: int) -> bool:
+	if sealed: return false
+	var sl: Dictionary = CSLOTS[i]
+	if v < int(sl.get("min", 0)) or v > int(sl.get("max", 9999)): return false
+	if str(v).length() != int(sl.get("digits", str(v).length())): return false
+	cvals[i] = v
+	_clear_dependents(StringName(sl["id"]))
+	_play("pen_write"); num_buf = ""
+	active_slot = _next_open_slot()
+	_refresh_cert(); return true
+
+func _toggle_basis(i: int, fid: StringName) -> void:
+	if sealed: return
+	if not (cvals[i] is Array): cvals[i] = []
+	var a: Array = cvals[i]
+	if fid in a: a.erase(fid)
+	elif a.size() < int((CSLOTS[i] as Dictionary).get("max_count", 4)): a.append(fid)
+	_play("pen_write"); _refresh_cert()
+
+func _next_open_slot() -> int:
+	for j in CSLOTS.size():
+		if _slot_open(CSLOTS[j]) and not _slot_filled(j): return j
+	return -1
+
+func _all_filled() -> bool:
+	for j in CSLOTS.size():
+		if not _slot_filled(j): return false
+	return true
 
 func _refresh_cert() -> void:
 	for c in opt_layer.get_children(): c.queue_free()
 	for c in cert_panel.get_children(): c.queue_free()
 	var pw := cert_layer.size.x; var ph := cert_layer.size.y
-	var yy := [0.305, 0.425, 0.545, 0.665]
-	# --- РЕЧЕННЯ НА ПАПЕРІ: префікс + вписане значення; рядок клікабельний (активує слот) ---
-	for i in CSLOTS.size():
-		var slot: Dictionary = CSLOTS[i]
-		var gate_open: bool = _slot_gate(String(slot["gate"]))
-		var pre := Label.new(); pre.label_settings = _ls(fr, int(ph*0.020), Color(0.34,0.25,0.16))
-		pre.text = String(slot["pre"]); pre.position = Vector2(pw*0.19, ph*yy[i]); pre.mouse_filter = Control.MOUSE_FILTER_IGNORE; opt_layer.add_child(pre)
+	var n := CSLOTS.size()
+	# рядки рівномірно між шапкою і медальйоном; 6 граф уміщаються з кроком 0.088
+	var y0 := 0.235; var step := 0.088 if n >= 6 else 0.118
+	for i in n:
+		var sl: Dictionary = CSLOTS[i]
+		var yyi := y0 + step*float(i)
+		var gate_open := _slot_open(sl)
+		var pre := Label.new(); pre.label_settings = _ls(fr, int(ph*0.018), Color(0.34,0.25,0.16))
+		pre.text = String(sl["pre"]); pre.position = Vector2(pw*0.17, ph*yyi); pre.mouse_filter = Control.MOUSE_FILTER_IGNORE; opt_layer.add_child(pre)
 		var line := ColorRect.new(); line.color = Color(0.44,0.34,0.22) if (gate_open and not sealed) else Color(0.60,0.52,0.40)
-		line.size = Vector2(pw*0.62, 1.5); line.position = Vector2(pw*0.19, ph*(yy[i]+0.058)); line.mouse_filter = Control.MOUSE_FILTER_IGNORE; opt_layer.add_child(line)
-		var is_stolen: bool = (i == 2 and cvals[i] == "taken from a church")
-		var val := Label.new(); val.label_settings = _ls(fh, int(ph*0.032), Color(0.58,0.11,0.11) if is_stolen else Color(0.16,0.11,0.08))
-		val.position = Vector2(pw*0.215, ph*(yy[i]+0.020)); val.text = cvals[i]; val.mouse_filter = Control.MOUSE_FILTER_IGNORE; opt_layer.add_child(val)
+		line.size = Vector2(pw*0.66, 1.5); line.position = Vector2(pw*0.17, ph*(yyi+0.052)); line.mouse_filter = Control.MOUSE_FILTER_IGNORE; opt_layer.add_child(line)
+		var val := Label.new()
+		var small: bool = String(sl["kind"]) == "FACTS"
+		val.label_settings = _ls(fh, int(ph*(0.019 if small else 0.027)), Color(0.16,0.11,0.08))
+		val.position = Vector2(pw*0.195, ph*(yyi+0.016))
+		val.size = Vector2(pw*0.62, ph*0.05); val.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		val.text = _slot_display(i); val.mouse_filter = Control.MOUSE_FILTER_IGNORE; opt_layer.add_child(val)
 		if sealed: continue
 		if gate_open:
-			# підсвітка активного рядка + клік-зона
 			if active_slot == i:
-				var hl := ColorRect.new(); hl.color = Color(0.62,0.11,0.10,0.12); hl.size = Vector2(pw*0.64, ph*0.075)
-				hl.position = Vector2(pw*0.18, ph*(yy[i]-0.005)); hl.mouse_filter = Control.MOUSE_FILTER_IGNORE; opt_layer.add_child(hl)
+				var hl := ColorRect.new(); hl.color = Color(0.62,0.11,0.10,0.12); hl.size = Vector2(pw*0.68, ph*0.068)
+				hl.position = Vector2(pw*0.16, ph*(yyi-0.006)); hl.mouse_filter = Control.MOUSE_FILTER_IGNORE; opt_layer.add_child(hl)
 			var pick := Button.new(); pick.flat = true; pick.modulate.a = 0
-			pick.position = Vector2(pw*0.18, ph*(yy[i]-0.005)); pick.size = Vector2(pw*0.64, ph*0.075)
+			pick.position = Vector2(pw*0.16, ph*(yyi-0.006)); pick.size = Vector2(pw*0.68, ph*0.068)
 			pick.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-			var si := i; pick.pressed.connect(func(): active_slot = si; _refresh_cert())
+			var si := i; pick.pressed.connect(func(): active_slot = si; num_buf = ""; _refresh_cert())
 			opt_layer.add_child(pick)
-		elif cvals[i] == "":
-			var h := Label.new(); h.label_settings = _ls(fr, int(ph*0.016), Color(0.56,0.49,0.40))
-			# діегетична підказка — КОНКРЕТНО, чого бракує саме для цього рядка
-			var g := String(slot["gate"])
-			var htxt := "( … )"
-			if g == "origin": htxt = "( match the mark in the register first )"
-			elif g == "marks": htxt = "( look at the foot under the glass )"
-			elif g == "papers": htxt = "( read the case papers first )"
-			elif g == "basis": htxt = "( name the provenance above first )"
-			h.text = htxt
-			h.position = Vector2(pw*0.215, ph*(yy[i]+0.022)); h.mouse_filter = Control.MOUSE_FILTER_IGNORE; opt_layer.add_child(h)
-	# --- ВАРІАНТИ АКТИВНОГО СЛОТА — у ПРАВІЙ ПАНЕЛІ, великим читабельним шрифтом ---
+		elif not _slot_filled(i):
+			var hnt := Label.new(); hnt.label_settings = _ls(fr, int(ph*0.015), Color(0.56,0.49,0.40))
+			hnt.text = _slot_hint(sl)
+			hnt.position = Vector2(pw*0.195, ph*(yyi+0.018)); hnt.mouse_filter = Control.MOUSE_FILTER_IGNORE; opt_layer.add_child(hnt)
 	if not sealed:
 		_build_cert_panel()
-	var filled: bool = cvals[0] != "" and cvals[1] != "" and cvals[2] != "" and cvals[3] != ""
-	if not sealed and not filled and cert_layer.has_node("stamp_hs"):
-		cert_layer.get_node("stamp_hs").queue_free()   # графу очистили → печатку прибрати
-	if not sealed and filled:
+	if not sealed and not _all_filled() and cert_layer.has_node("stamp_hs"):
+		cert_layer.get_node("stamp_hs").queue_free()
+	if not sealed and _all_filled():
 		if not cert_layer.has_node("stamp_hs"):
 			var med: Vector2 = cert_layer.get_meta("medallion")
 			var hs := Button.new(); hs.name = "stamp_hs"; hs.flat = true; hs.modulate.a = 0
@@ -1887,89 +1977,160 @@ func _refresh_cert() -> void:
 			hs.mouse_entered.connect(_set_hint.bind("Press the seal — once set, it cannot be lifted."))
 			hs.pressed.connect(func(): _do_verdict())
 			cert_layer.add_child(hs)
-		# у панелі — заклик поставити печатку
 		var seal_note := Label.new(); seal_note.label_settings = _ls(fr, int(H*0.024), Color(0.86,0.66,0.42))
 		seal_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART; seal_note.size = Vector2(cert_panel.size.x, H*0.2)
-		seal_note.position = Vector2(0, H*0.42)
+		# заклик стоїть ПІД вмістом панелі: коли графа ще редагується (список фактів —
+		# до 8 рядків, ~0.5H), фіксовані 0.42H друкувались ПОВЕРХ списку — спіймано
+		# оком на кадрі 18_cert_full і підтверджено думкою про layoutcheck у гейті
+		seal_note.position = Vector2(0, H*0.68 if active_slot >= 0 else H*0.30)
 		seal_note.text = "The attribution is written.\nPress the wax seal to close the case — once set, it cannot be lifted."
 		cert_panel.add_child(seal_note)
 
-# права панель: варіанти активного слота, ВЕЛИКИМ читабельним шрифтом
+# права панель: вміст залежить від ТИПУ активної графи
 func _build_cert_panel() -> void:
 	var i := active_slot
-	if i < 0 or i >= CSLOTS.size() or not _slot_gate(String(CSLOTS[i]["gate"])):
+	if i < 0 or i >= CSLOTS.size() or not _slot_open(CSLOTS[i]):
 		var d := Label.new(); d.label_settings = _ls(fr, int(H*0.024), Color(0.82,0.77,0.67))
 		d.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART; d.size = Vector2(cert_panel.size.x, H*0.3)
 		d.text = "Set down each line of the attribution.\nClick any line on the left to fill or change it."
 		cert_panel.add_child(d); return
-	var slot: Dictionary = CSLOTS[i]
+	var sl: Dictionary = CSLOTS[i]
 	var head := Label.new(); head.label_settings = _ls(fr, int(H*0.03), Color(0.72,0.61,0.43))
-	head.text = String(slot["pre"]) + " …"; head.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	head.text = String(sl["pre"]) + " …"; head.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	head.size = Vector2(cert_panel.size.x, H*0.1); cert_panel.add_child(head)
-	var opts: Array = _basis_opts() if String(slot["gate"]) == "basis" else (slot["opts"] as Array)
+	match String(sl["kind"]):
+		"CHOICE": _panel_choice(i, sl)
+		"NUMBER": _panel_number(i, sl)
+		"FACTS": _panel_facts(i, sl)
+
+func _panel_choice(i: int, sl: Dictionary) -> void:
 	var y := H*0.11
-	for opt in opts:
-		var chosen: bool = (cvals[i] == opt)
-		var bo := Button.new(); bo.flat = true; bo.text = ("●   " + opt) if chosen else ("○   " + opt)
-		bo.add_theme_font_override("font", fr); bo.add_theme_font_size_override("font_size", int(H*0.027))
+	for o in sl.get("opts", []):
+		var oid := StringName((o as Array)[0]); var txt := String((o as Array)[1])
+		var chosen: bool = (cvals[i] is StringName or cvals[i] is String) and StringName(cvals[i]) == oid
+		var bo := Button.new(); bo.flat = true; bo.text = ("●   " if chosen else "○   ") + txt
+		bo.add_theme_font_override("font", fr); bo.add_theme_font_size_override("font_size", int(H*0.026))
 		bo.add_theme_color_override("font_color", Color(0.92,0.44,0.36) if chosen else Color(0.90,0.85,0.74))
 		bo.add_theme_color_override("font_hover_color", Color(0.99,0.72,0.42))
 		bo.alignment = HORIZONTAL_ALIGNMENT_LEFT; bo.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 		bo.position = Vector2(0, y); bo.size = Vector2(cert_panel.size.x, H*0.05)
-		bo.clip_text = false; bo.autowrap_mode = TextServer.AUTOWRAP_OFF
-		var ii: int = i; var oo: String = String(opt)
-		bo.pressed.connect(func(): _choose(ii, oo))
+		var ii := i; bo.pressed.connect(func(): _choose(ii, oid))
 		cert_panel.add_child(bo)
 		y += H*0.062
-	if String(slot["gate"]) == "basis":
-		var note := Label.new(); note.label_settings = _ls(fr, int(H*0.018), Color(0.64,0.57,0.47))
-		note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART; note.size = Vector2(cert_panel.size.x, H*0.14)
-		note.text = "Name the proof that would still stand if the client's story did not. You may cite only what you have found."
-		note.position = Vector2(0, y + H*0.03); cert_panel.add_child(note)
 
-func _choose(i: int, opt: String) -> void:
-	if sealed: return
-	cvals[i] = opt
-	if i == 2: cvals[3] = ""   # змінив походження → підстава скидається (перепривʼязка доказу)
-	_play("pen_write")
-	active_slot = _next_open_slot()   # авто-перехід до наступного незаповненого відкритого слота
-	_refresh_cert()
+# цифри вписуються рукою: клавіатура з мальованого стилю UI (текстові пункти)
+func _panel_number(i: int, sl: Dictionary) -> void:
+	var digits := int(sl.get("digits", 3))
+	var shown := num_buf
+	var slotline := Label.new(); slotline.label_settings = _ls(fh, int(H*0.05), Color(0.93,0.87,0.72))
+	var pad := ""
+	for _k in range(digits - shown.length()): pad += "_"
+	slotline.text = shown + pad + ("  " + String(sl.get("suf","")) if String(sl.get("suf","")) != "" else "")
+	slotline.position = Vector2(0, H*0.11); cert_panel.add_child(slotline)
+	var rows := [["1","2","3","4","5"], ["6","7","8","9","0"]]
+	var y := H*0.20
+	for row in rows:
+		var x := 0.0
+		for dch in row:
+			var b := Button.new(); b.flat = true; b.text = String(dch)
+			b.add_theme_font_override("font", fr); b.add_theme_font_size_override("font_size", int(H*0.034))
+			b.add_theme_color_override("font_color", Color(0.90,0.85,0.74))
+			b.add_theme_color_override("font_hover_color", Color(0.99,0.72,0.42))
+			b.position = Vector2(x, y); b.size = Vector2(H*0.06, H*0.05)
+			b.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+			var dc := String(dch)
+			b.pressed.connect(func():
+				if num_buf.length() < digits: num_buf += dc; _play("ui_soft"); _refresh_cert())
+			cert_panel.add_child(b)
+			x += H*0.07
+		y += H*0.06
+	var back := Button.new(); back.flat = true; back.text = "⌫  strike it out"
+	back.add_theme_font_override("font", fr); back.add_theme_font_size_override("font_size", int(H*0.024))
+	back.add_theme_color_override("font_color", Color(0.72,0.66,0.54))
+	back.position = Vector2(0, y + H*0.01); back.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	back.pressed.connect(func():
+		if num_buf.length() > 0: num_buf = num_buf.substr(0, num_buf.length()-1); _refresh_cert())
+	cert_panel.add_child(back)
+	if num_buf.length() == digits:
+		var v := int(num_buf)
+		if v >= int(sl.get("min", 0)) and v <= int(sl.get("max", 9999)):
+			var okb := Button.new(); okb.flat = true; okb.text = "✒  set it down"
+			okb.add_theme_font_override("font", fr); okb.add_theme_font_size_override("font_size", int(H*0.028))
+			okb.add_theme_color_override("font_color", Color(0.99,0.72,0.42))
+			okb.position = Vector2(0, y + H*0.07); okb.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+			var ii := i
+			okb.pressed.connect(func(): _commit_number(ii, v))
+			cert_panel.add_child(okb)
 
-func _next_open_slot() -> int:
-	for j in CSLOTS.size():
-		if _slot_gate(String(CSLOTS[j]["gate"])) and cvals[j] == "": return j
-	return -1
+# підстава: 2..4 факти з нотатника, у порядку відкриття
+func _panel_facts(i: int, sl: Dictionary) -> void:
+	var picked: Array = cvals[i] if cvals[i] is Array else []
+	var ft := _case_facts_table()
+	var y := H*0.11
+	for fid_s in facts:
+		var fid := StringName(fid_s)
+		if not ft.has(fid): continue
+		var cite := String((ft[fid] as Dictionary).get("cite", fid_s))
+		var chosen: bool = fid in picked
+		var bo := Button.new(); bo.flat = true; bo.text = ("☑  " if chosen else "☐  ") + cite
+		bo.add_theme_font_override("font", fr); bo.add_theme_font_size_override("font_size", int(H*0.022))
+		bo.add_theme_color_override("font_color", Color(0.92,0.44,0.36) if chosen else Color(0.90,0.85,0.74))
+		bo.add_theme_color_override("font_hover_color", Color(0.99,0.72,0.42))
+		bo.alignment = HORIZONTAL_ALIGNMENT_LEFT; bo.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+		bo.position = Vector2(0, y); bo.size = Vector2(cert_panel.size.x, H*0.042)
+		var ii := i
+		bo.pressed.connect(func(): _toggle_basis(ii, fid))
+		cert_panel.add_child(bo)
+		y += H*0.048
+	var note := Label.new(); note.label_settings = _ls(fr, int(H*0.017), Color(0.64,0.57,0.47))
+	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART; note.size = Vector2(cert_panel.size.x, H*0.12)
+	note.text = "Two to four citations. Name the proof that would still stand if the client's story did not."
+	note.position = Vector2(0, y + H*0.02); cert_panel.add_child(note)
 
-# наслідок вироку — ПОДІЯ наступного ранку, не «вірно/хибно». Гра мовчить про правильність.
+# наслідок вироку — ПОДІЯ наступного ранку. Матчер по OUTCOMES даних: перший збіг.
 func _outcome_text() -> String:
-	if case_id == 2: return _outcome_case2()
-	var origin_ok: bool = cvals[0].begins_with("Vienna")
-	var mark_ok: bool = cvals[1].contains("over an older")
-	var prov: String = cvals[2]
-	var basis: String = cvals[3]
-	var solid: bool = basis.contains("church mark") or basis.contains("sacristy")
-	if prov == "taken from a church" and solid and origin_ok and mark_ok:
-		return "Three days on, a deacon of St. Onuphrius climbs the bureau stair. He reads your hand, and his own begins to shake. The goblet goes back to the altar it was lifted from — and your name is on the paper that sent it home."
-	if prov == "taken from a church" and not solid:
-		return "A constable calls. The woman you named a thief wept before the magistrate — and you had set 'taken from a church' upon nothing but her own frightened word. The bureau's judgement is asked after in the street."
-	if prov != "taken from a church":
-		return "Weeks later the sacristy theft is printed in full. The silver you passed as clean was the altar's own — and your seal is upon the sale. The bureau does not speak of it."
-	return "The paper holds well enough to sell. But a collector writes to quarrel the workshop, and the bureau's word carries a small blot it did not have the day before."
+	var outs: Array = (CASE_DATA[case_id] as Object).get("OUTCOMES") if CASE_DATA.has(case_id) else []
+	var ft := _case_facts_table()
+	var basis: Array = []
+	for j in CSLOTS.size():
+		if String((CSLOTS[j] as Dictionary)["kind"]) == "FACTS" and cvals[j] is Array:
+			basis = cvals[j]
+	for o in outs:
+		var oo: Dictionary = o
+		var when: Dictionary = oo.get("when", {})
+		var hit := true
+		for sid in when:
+			var j2 := _slot_index(StringName(sid))
+			if j2 < 0: hit = false; break
+			var want = when[sid]
+			var have = cvals[j2]
+			if want is int:
+				if not (have is int and int(have) == int(want)): hit = false; break
+			else:
+				if not ((have is StringName or have is String) and StringName(have) == StringName(want)): hit = false; break
+		if not hit: continue
+		var need_any: Array = oo.get("basis_any", [])
+		if not need_any.is_empty():
+			var got := false
+			for f in need_any:
+				if StringName(f) in basis: got = true
+			if not got: continue
+		var forbid: Array = oo.get("basis_forbids", [])
+		var bad := false
+		for f in forbid:
+			if StringName(f) in basis: bad = true
+		if bad: continue
+		var wmin := int(oo.get("basis_weight", 0))
+		if wmin > 0:
+			var wsum := 0
+			for fid in basis:
+				wsum += int((ft.get(StringName(fid), {}) as Dictionary).get("weight", 0))
+			if wsum < wmin: continue
+		last_outcome_id = String(oo.get("id", ""))
+		return String(oo.get("text", ""))
+	return "The morning brought nothing that could be set down in the ledger."
 
-# СПРАВА 2: річ сама викриває того, хто підганяв її під свою версію
-func _outcome_case2() -> String:
-	var hand: String = cvals[0]
-	var chain: String = cvals[1]
-	var owner: String = cvals[2]
-	var basis: String = cvals[3]
-	var solid: bool = basis.contains("left side") or basis.contains("bow")
-	if owner == "the widow" and hand == "a left-handed man" and chain.contains("taken off") and solid:
-		return "The widow turns the watch over in her hands as if greeting it. Her husband wound it left-handed for thirty years, she says, and the chain was his father's. The nephew does not come back for the ruling — nor for anything else."
-	if owner == "the widow" and not solid:
-		return "You ruled for the widow and were right, though you could not have said why. The nephew's advocate asks upon what evidence, and the bureau has no answer to give him. The ruling stands; its authority does not."
-	if owner == "the nephew":
-		return "The nephew collects the watch and is gone by evening. A month on, a pawnbroker's list carries it — and beside it, the widow's wedding silver. She writes once, to ask how you came to your judgement. You do not answer."
-	return "You declined to rule, and the matter went to the courts, where it will outlive both claimants. The widow's letters stop coming after the second winter."
+var last_outcome_id := ""   # для тестів: який запис ранку зіграв
 
 func _do_verdict() -> void:
 	if sealed: return

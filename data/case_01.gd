@@ -250,3 +250,65 @@ const FACTS := {
 	&"f.receipt_1807":    {"cite": "the re-marking receipt of 1807", "tag": &"papers", "weight": 1},
 	&"f.receipt_mismatch":{"cite": "the receipt is 219 mm, the cup is 196", "tag": &"papers", "weight": 2},
 }
+
+
+# ── АТЕСТАТ: 6 граф (case_01.md §6). CHOICE тримає id; NUMBER без валідації
+# відповіді (межі — формат поля, не підказка); FACTS — вибір 2..4 зібраних фактів.
+# Істину рушій НЕ знає — її знають лише OUTCOMES.
+const SLOTS := [
+	{"id": &"s.origin", "pre": "Wrought at", "kind": &"CHOICE",
+	 "needs": [&"f.mark_maker", &"f.reg_hoffmann"],
+	 "opts": [
+		[&"o.vienna_hoffmann", "Vienna — the workshop of L. Hoffmann"],
+		[&"o.vienna_unrecorded", "Vienna — a hand not in the register"],
+		[&"o.outside_empire", "outside the Empire"],
+	]},
+	{"id": &"s.fineness", "pre": "Fineness claimed by the mark:", "suf": "in 1000",
+	 "kind": &"NUMBER", "digits": 3, "min": 100, "max": 999,
+	 "needs": [&"f.mark_diana", &"f.hb_vienna_marks"]},
+	{"id": &"s.not_before", "pre": "The marks were struck not earlier than", "suf": "",
+	 "kind": &"NUMBER", "digits": 4, "min": 1700, "max": 1900,
+	 "needs": [&"f.mark_diana", &"f.hb_vienna_marks"]},
+	{"id": &"s.marks", "pre": "The marks were struck", "kind": &"CHOICE",
+	 "needs_any": [&"f.domes"],
+	 "opts": [
+		[&"o.on_the_flat", "on the flat metal, before the vessel was raised"],
+		[&"o.by_office_later", "on the finished vessel, at the assay office"],
+		[&"o.after_the_fact", "on the finished vessel, by a hand not the office's"],
+	]},
+	{"id": &"s.provenance", "pre": "The piece reached the bearer", "kind": &"CHOICE",
+	 "needs_slot": [&"s.marks"],
+	 "opts": [
+		[&"o.honest_inheritance", "by inheritance, as she states"],
+		[&"o.legally_remarked", "as old plate, lawfully re-marked at a later sale"],
+		[&"o.taken_from_church", "out of a church, and worked upon after it left"],
+		[&"o.made_to_look_stolen", "as new work, carrying the marks of church plate"],
+	]},
+	{"id": &"s.basis", "pre": "On the strength of:", "kind": &"FACTS",
+	 "min_count": 2, "max_count": 4,
+	 "needs_slot": [&"s.provenance"], "clears_on": [&"s.provenance"]},
+]
+
+# ── НАСЛІДКИ РАНКУ (case_01.md §7): перший збіг виграє, default — останній. ──
+const OUTCOMES := [
+	{"id": &"out.forgery_named",
+	 "when": {&"s.marks": &"o.after_the_fact", &"s.not_before": 1872,
+			  &"s.provenance": &"o.made_to_look_stolen"},
+	 "basis_any": [&"f.domes_alike", &"f.marks_alone"], "basis_weight": 5,
+	 "text": "A dealer in the Judengasse writes. On Tuesday a man offered him the cup at a third of its silver and told him it had come out of a church at Pressburg. He read your certificate and did not buy. He asks — politely, and then again — who else you have written for. Frau Reithofer's eight gulden were found by the parish. The grave is marked."},
+	{"id": &"out.forgery_loose",
+	 "when": {&"s.provenance": &"o.made_to_look_stolen"},
+	 "text": "The dealer did not buy, and did not answer your letter. A clerk at the assay office in Vienna returned your certificate by the second post. There is one pencil line in the margin, drawn against a single figure, and no signature under it."},
+	{"id": &"out.church_named",
+	 "when": {&"s.provenance": &"o.taken_from_church"},
+	 "basis_forbids": [&"f.domes_alike"],
+	 "text": "Two constables at eight. They took the cup, the certificate, and Frau Reithofer, who had come back to ask whether there was more to pay. No church in the city reports a cup missing. The file stays open until one does. Her father went into the common ground on Saturday."},
+	{"id": &"out.sold_clean",
+	 "when": {&"s.provenance": &"o.honest_inheritance"},
+	 "text": "The cup sold on Thursday, ninety gulden, to a house on the Graben. They copied your certificate into their book and spelled your name correctly. Frau Reithofer paid the burial ground and sent up a note of one line. On Friday the same house wrote to ask whether you would look at four more pieces from the same seller."},
+	{"id": &"out.sold_clean",
+	 "when": {&"s.provenance": &"o.legally_remarked"},
+	 "text": "The cup sold on Thursday, ninety gulden, to a house on the Graben. They copied your certificate into their book and spelled your name correctly. Frau Reithofer paid the burial ground and sent up a note of one line. On Friday the same house wrote to ask whether you would look at four more pieces from the same seller."},
+	{"id": &"out.default", "when": {},
+	 "text": "Nothing came in the morning post. The cup went out at eight in the same shawl, and she said nothing at all about it. The ledger line for the day reads: sealed, one."},
+]

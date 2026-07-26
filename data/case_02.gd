@@ -49,3 +49,43 @@ const FACTS := {
 	&"f.crown_wear":     {"cite": "the crown worn on its left side", "tag": &"body", "weight": 2},
 	&"f.bow_scratches":  {"cite": "the fresh scratches at the bow", "tag": &"body", "weight": 2},
 }
+
+
+# ── АТЕСТАТ справи 2 (чернетка, той самий формат, що в case_01) ──────────────
+const SLOTS := [
+	{"id": &"s.c2.winder", "pre": "The watch was wound, these thirty years,", "kind": &"CHOICE",
+	 "needs": [&"f.crown_wear"],
+	 "opts": [
+		[&"o.left_hand", "by a left hand"],
+		[&"o.right_hand", "by a right hand"],
+		[&"o.several_hands", "by more hands than one"],
+	]},
+	{"id": &"s.c2.chain", "pre": "The chain now upon it", "kind": &"CHOICE",
+	 "needs": [&"f.bow_scratches"],
+	 "opts": [
+		[&"o.worn_thirty", "has ridden on it for thirty years"],
+		[&"o.put_on_lately", "was put on lately"],
+	]},
+	{"id": &"s.c2.belongs", "pre": "The watch answers the account of", "kind": &"CHOICE",
+	 "needs": [&"f.testimony_read"], "needs_slot": [&"s.c2.winder", &"s.c2.chain"],
+	 "opts": [
+		[&"o.the_widow", "the widow"],
+		[&"o.the_nephew", "the nephew"],
+		[&"o.neither", "neither account as given"],
+	]},
+	{"id": &"s.c2.basis", "pre": "On the strength of:", "kind": &"FACTS",
+	 "min_count": 2, "max_count": 3,
+	 "needs_slot": [&"s.c2.belongs"], "clears_on": [&"s.c2.belongs"]},
+]
+
+const OUTCOMES := [
+	{"id": &"out.c2.widow",
+	 "when": {&"s.c2.winder": &"o.left_hand", &"s.c2.chain": &"o.put_on_lately",
+			  &"s.c2.belongs": &"o.the_widow"},
+	 "text": "The nephew did not come back for the paper. The widow carried the watch out wound, and wound it that night, the constable says, before her lamp."},
+	{"id": &"out.c2.nephew",
+	 "when": {&"s.c2.belongs": &"o.the_nephew"},
+	 "text": "The nephew sold the watch by Friday. The chain he kept. A watch that remembered one hand for thirty years now lies in a drawer on the Graben, stopped."},
+	{"id": &"out.c2.default", "when": {},
+	 "text": "The claimants were sent away with the watch in neither hand. It sits in the bureau's iron press, wound by no one, and the ledger line reads: undecided."},
+]

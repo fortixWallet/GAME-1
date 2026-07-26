@@ -65,11 +65,15 @@ for t in "walk a" "walk b" "walk c" "walk e" "chapters" "outcomes" "layoutcheck"
                 echo "$OUT" | grep -q "WALK_B_DOMES hand=true alike=true state=raised" || FAIL="$FAIL domes"
                 # зона мусить лишатися СТРОГОЮ: точка за 200 px від клейм не дає факту
                 echo "$OUT" | grep -q "WALK_B_STRICT far_rejected=true" || FAIL="$FAIL walk-b-strict" ;;
-    "walk c")   echo "$OUT" | grep -q "WALK_C_OK sealed=true"        || FAIL="$FAIL walk-c" ;;
+    "walk c")   echo "$OUT" | grep -q "WALK_C_OK sealed=true"        || FAIL="$FAIL walk-c"
+                # крок 7: числа поза полем відкинуто; всі 6 граф заповнено; ранок = out.forgery_named
+                echo "$OUT" | grep -q "CERT_NUM_REJECT low=true long=true" || FAIL="$FAIL cert-num"
+                echo "$OUT" | grep -q "CERT_FILLED all=true" || FAIL="$FAIL cert-fill"
+                echo "$OUT" | grep -q "outcome=out.forgery_named" || FAIL="$FAIL cert-outcome" ;;
     "chapters") echo "$OUT" | grep -q "CHAPTERS_OK all_reachable=true" || FAIL="$FAIL chapters" ;;
     # чотири наслідки мусять давати чотири РІЗНИХ тексти: дві однакові гілки
     # виглядають як покриття, а насправді одна з них не перевіряється ніколи
-    "outcomes") echo "$OUT" | grep -q "OUTCOMES_OK cases=4 unique=4" || FAIL="$FAIL outcomes" ;;
+    "outcomes") echo "$OUT" | grep -q "OUTCOMES_OK cases=5 unique_ids=4" || FAIL="$FAIL outcomes" ;;
     # жоден текст не має налазити на інший (вимога Віктора, 26.07)
     "layoutcheck") echo "$OUT" | grep -q "накладань= 0" || echo "$OUT" | grep -q "накладань=0" || FAIL="$FAIL layout" ;;
   esac
