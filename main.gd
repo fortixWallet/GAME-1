@@ -175,6 +175,8 @@ func _ready() -> void:
 
 	if "layoutcheck" in OS.get_cmdline_user_args():
 		_dbg_layoutcheck()
+	if "savetest" in OS.get_cmdline_user_args():
+		_dbg_savetest()
 	if "zonemap" in OS.get_cmdline_user_args():
 		_dbg_zonemap()
 	if "loupeshot" in OS.get_cmdline_user_args():
@@ -799,6 +801,36 @@ func _dbg_walk() -> void:
 			  " outcome=", last_outcome_id)
 	get_tree().quit()
 
+# ПЕРЕВІРКА СЕЙВА: зберегти → зіпсувати стан → відновити → звірити ДО ПОЛЯ.
+# Негатив: сейв чужої версії чесно відкидається, а не читається криво.
+func _dbg_savetest() -> void:
+	dbg_mode = true
+	await get_tree().process_frame
+	add_fact("f.mark_maker"); add_fact("f.mark_diana"); add_fact("f.reg_hoffmann")
+	unlocked_tools[&"tool.caliper"] = true
+	zone_states[&"z.foot.top"] = &"raised"
+	_choose(0, &"o.vienna_hoffmann")
+	assert(_commit_number(1, 800))
+	var facts_before: Array = facts.keys()
+	_save_game()
+	# зіпсувати все
+	_load_case(1)
+	var wiped: bool = facts.is_empty() and (cvals[0] is String and String(cvals[0]) == "")
+	# відновити
+	var ok := _load_game()
+	var facts_after: Array = facts.keys()
+	var same_order: bool = str(facts_before) == str(facts_after)
+	var cv_ok: bool = StringName(cvals[0]) == &"o.vienna_hoffmann" and cvals[1] is int and int(cvals[1]) == 800
+	var zs_ok: bool = zone_states.get(&"z.foot.top", &"") == &"raised"
+	var tools_ok: bool = unlocked_tools.has(&"tool.caliper")
+	# негатив: версія з майбутнього
+	var f := FileAccess.open(_save_path(), FileAccess.WRITE)
+	f.store_string(JSON.stringify({"version": 99, "case_id": 1})); f.close()
+	var rejected: bool = not _load_game()
+	print("SAVE_OK wiped=", wiped, " restored=", ok, " order=", same_order,
+		  " cvals=", cv_ok, " zones=", zs_ok, " tools=", tools_ok, " reject_v99=", rejected)
+	get_tree().quit()
+
 # ПЕРЕВІРКА ВЕРСТКИ: обходить УСІ екрани й шукає тексти, що налазять один на одного.
 # Причина: підпис клієнтки й кнопка «go on» стояли в одній смузі, і кнопка друкувалась
 # просто поверх репліки. Такі речі не видно в коді — лише в кадрі, і лише якщо дивитись.
@@ -1128,6 +1160,7 @@ func _apply_rule(rule: Dictionary) -> void:
 			_refresh_tool_row()
 	_play("page_turn" if got_new else "ui_soft")
 	_set_hint(String(rule.get("say", "")))
+	if got_new: _save_game()
 
 # Тести клікають так само, як гравець клікає зону (друк ZONE_MISSING — правило 17)
 func _click_zone(id: String) -> void:
@@ -1418,6 +1451,12 @@ func _build_menu() -> void:
 	sub.size = Vector2(W*0.46, H*0.05); sub.position = Vector2(W*0.065, H*0.50); sub.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	s0.add_child(sub)
 	_txtbtn(s0, "unlock the door  →", Vector2(W*0.065, H*0.60), func(): _play("door_bell"); _load_case(1); _enter_hub(), 0.034)
+	# продовжити з сейва — тільки якщо він є, читається і має поступ
+	if FileAccess.file_exists(_save_path()):
+		_txtbtn(s0, "return to the desk  →", Vector2(W*0.065, H*0.66),
+			func():
+				if _load_game(): _play("ui_soft"); _show("DESK" if not sealed else "LEDGER")
+				else: _play("ui_soft"); _set_hint("The ledger of that day cannot be read."), 0.030)
 	_txtbtn(s0, "choose a scene  →", Vector2(W*0.065, H*0.68), func(): _show("CHAPTERS"), 0.028)
 
 # --- КАБІНЕТ ---
@@ -1670,6 +1709,62 @@ func _ptext(sc: Dictionary, txt: String, ux: float, uy: float, size_f: float,
 # розслідування кнопкою або клавішею N; повертає туди, звідки відкрили.
 var notebook_prev := "DESK"
 var notebook_rows := 0
+
+# ── СЕЙВ (крок 9). Формат із version З ПЕРШОГО ДНЯ (пастка §8: id фактів ще
+# перейменуються — невідома версія чесно відкидається, а не читається криво).
+# Тести пишуть в ОКРЕМИЙ файл, щоб не затирати сейв гравця.
+const SAVE_VERSION := 1
+
+func _save_path() -> String:
+	return "user://save_test.json" if dbg_mode else "user://save_v1.json"
+
+func _save_game() -> void:
+	var d := {
+		"version": SAVE_VERSION,
+		"case_id": case_id,
+		"facts": facts.keys(),          # порядок = хронологія нотатника
+		"zone_states": zone_states,
+		"unlocked_tools": unlocked_tools.keys(),
+		"active_tool": String(active_tool),
+		"cvals": cvals,
+		"active_slot": active_slot,
+		"sealed": sealed,
+		"seals_set": seals_set,
+		"tod": tod, "lamp_on": lamp_on,
+		"case_done": case_done, "client_seen": client_seen, "client_line": client_line,
+	}
+	var f := FileAccess.open(_save_path(), FileAccess.WRITE)
+	if f: f.store_string(JSON.stringify(d)); f.close()
+
+# → true, якщо стан відновлено. Невідома версія/битий файл — чесна відмова.
+func _load_game() -> bool:
+	if not FileAccess.file_exists(_save_path()): return false
+	var f := FileAccess.open(_save_path(), FileAccess.READ)
+	if f == null: return false
+	var parsed = JSON.parse_string(f.get_as_text()); f.close()
+	if not (parsed is Dictionary): return false
+	var d: Dictionary = parsed
+	if int(d.get("version", -1)) != SAVE_VERSION:
+		print("SAVE: невідома версія ", d.get("version"), " — починаємо заново")
+		return false
+	_load_case(int(d.get("case_id", 1)))
+	for k in d.get("facts", []): facts[String(k)] = true
+	var zs: Dictionary = d.get("zone_states", {})
+	for k2 in zs: zone_states[StringName(k2)] = StringName(zs[k2])
+	for tl in d.get("unlocked_tools", []): unlocked_tools[StringName(tl)] = true
+	active_tool = StringName(d.get("active_tool", "*"))
+	var cv: Array = d.get("cvals", [])
+	for i in mini(cv.size(), cvals.size()):
+		# JSON числа приходять float; NUMBER-графи тримають int
+		cvals[i] = int(cv[i]) if cv[i] is float else cv[i]
+	active_slot = int(d.get("active_slot", 0))
+	sealed = bool(d.get("sealed", false))
+	seals_set = int(d.get("seals_set", 0))
+	tod = String(d.get("tod", "day")); lamp_on = bool(d.get("lamp_on", true))
+	case_done = bool(d.get("case_done", false))
+	client_seen = bool(d.get("client_seen", false)); client_line = int(d.get("client_line", 0))
+	_refresh_tool_row(); _sync_view()
+	return true
 
 func _show_notebook() -> void:
 	if _shown() != "NOTEBOOK": notebook_prev = _shown()
@@ -1972,6 +2067,7 @@ func _choose(i: int, oid: StringName) -> void:
 	_play("pen_write")
 	active_slot = _next_open_slot()
 	_refresh_cert()
+	_save_game()
 
 # ЄДИНИЙ вхід числа у графу (кнопка ✓ і тести йдуть сюди). Межі digits/min/max —
 # формат поля; про ПРАВИЛЬНІСТЬ гра мовчить (правило 6).
@@ -1984,7 +2080,7 @@ func _commit_number(i: int, v: int) -> bool:
 	_clear_dependents(StringName(sl["id"]))
 	_play("pen_write"); num_buf = ""
 	active_slot = _next_open_slot()
-	_refresh_cert(); return true
+	_refresh_cert(); _save_game(); return true
 
 func _toggle_basis(i: int, fid: StringName) -> void:
 	if sealed: return
@@ -1992,7 +2088,7 @@ func _toggle_basis(i: int, fid: StringName) -> void:
 	var a: Array = cvals[i]
 	if fid in a: a.erase(fid)
 	elif a.size() < int((CSLOTS[i] as Dictionary).get("max_count", 4)): a.append(fid)
-	_play("pen_write"); _refresh_cert()
+	_play("pen_write"); _refresh_cert(); _save_game()
 
 func _next_open_slot() -> int:
 	for j in CSLOTS.size():
@@ -2210,6 +2306,7 @@ var last_outcome_id := ""   # для тестів: який запис ранк�
 func _do_verdict() -> void:
 	if sealed: return
 	sealed = true; seals_set += 1
+	_save_game()
 	if cert_layer.has_node("stamp_hs"): cert_layer.get_node("stamp_hs").queue_free()
 	_set_hint("")
 	await _verdict_anim()

@@ -46,7 +46,7 @@ fi
 export G3_SHOTDIR="/tmp/g3_verify/"
 rm -rf "$G3_SHOTDIR"; mkdir -p "$G3_SHOTDIR"
 FAIL=""
-for t in "walk a" "walk b" "walk c" "walk e" "chapters" "outcomes" "layoutcheck" "case2"; do
+for t in "walk a" "walk b" "walk c" "walk e" "chapters" "outcomes" "layoutcheck" "case2" "savetest"; do
   OUT=$(godot --path . --rendering-driver opengl3 -- $t 2>&1 | grep -v specular)
   echo "--- $t ---" >>"$LOG"; echo "$OUT" >>"$LOG"
   case "$t" in
@@ -57,6 +57,8 @@ for t in "walk a" "walk b" "walk c" "walk e" "chapters" "outcomes" "layoutcheck"
     # case2: аудит 26.07 знайшов її повністю зламаною при зеленому гейті — факти
     # жили на видаленому механізмі meta("mark"), і жоден тест цього не бачив
     "case2")    echo "$OUT" | grep -q "CASE2_OK wear=true chain=true docs=true" || FAIL="$FAIL case2" ;;
+    # сейв: відновлення ДО ПОЛЯ (факти в порядку, cvals, стани зон, інструменти) + відмова чужій версії
+    "savetest") echo "$OUT" | grep -q "SAVE_OK wiped=true restored=true order=true cvals=true zones=true tools=true reject_v99=true" || FAIL="$FAIL savetest" ;;
     # walk e — інформаційний ланцюг кроку 6: квитанція → інструменти → заміри →
     # реєстр/довідник → «пустий спід», з НЕГАТИВОМ (довідник до клейма мовчить)
     "walk e")   echo "$OUT" | grep -q "WALK_E_OK neg=true unlocked=true measured=true books=true alone=true" || FAIL="$FAIL walk-e"
