@@ -56,7 +56,7 @@ for t in "walk a" "walk b" "walk c" "walk e" "chapters" "outcomes" "layoutcheck"
     "walk a")   echo "$OUT" | grep -q "WALK_A_OK read_news=true" || FAIL="$FAIL walk-a" ;;
     # case2: аудит 26.07 знайшов її повністю зламаною при зеленому гейті — факти
     # жили на видаленому механізмі meta("mark"), і жоден тест цього не бачив
-    "case2")    echo "$OUT" | grep -q "CASE2_OK wear=true chain=true docs=true" || FAIL="$FAIL case2" ;;
+    "case2")    echo "$OUT" | grep -q "CASE2_OK neg_flag=true knocked=true measured=true neg_state=true confirm=true opened=true num19=true filled=true outcome=out.void_named" || FAIL="$FAIL case2" ;;
     # сейв: відновлення ДО ПОЛЯ (факти в порядку, cvals, стани зон, інструменти) + відмова чужій версії
     "savetest") echo "$OUT" | grep -q "SAVE_OK wiped=true restored=true order=true cvals=true zones=true tools=true reject_v99=true" || FAIL="$FAIL savetest" ;;
     # walk e — інформаційний ланцюг кроку 6: квитанція → інструменти → заміри →

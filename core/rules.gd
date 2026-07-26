@@ -23,17 +23,32 @@ static func applicable(rule: Dictionary, facts: Dictionary, flags: Dictionary) -
 	var nf: Dictionary = rule.get("needs_flag", {})
 	for k in nf:
 		if flags.get(k, null) != nf[k]: return false
+	# requires_flag — прапорці СПРАВИ (простукав, відчинив сейф): живуть у тому
+	# самому словнику flags, що й стан світу; окреме ім'я — щоб дані читались
+	var rf: Dictionary = rule.get("requires_flag", {})
+	for k2 in rf:
+		if flags.get(k2, null) != rf[k2]: return false
 	return true
 
 
-# Чи дасть правило щось НОВЕ. Правило, всі факти якого вже здобуті, не має
+# Чи дасть правило щось НОВЕ. Правило, все з якого вже здобуто/виконано, не має
 # перехоплювати чергу в наступного — інакше друге клеймо не знайдеться ніколи.
-static func yields_new(rule: Dictionary, facts: Dictionary) -> bool:
+static func yields_new(rule: Dictionary, facts: Dictionary,
+					   flags: Dictionary = {}, zone_states: Dictionary = {}) -> bool:
 	if bool(rule.get("repeat", false)): return true
-	var fs: Array = rule.get("facts", [])
-	if fs.is_empty(): return false          # say-only правила черги не займають
-	for f in fs:
+	for f in rule.get("facts", []):
 		if not facts.has(String(f)): return true
+	# без нових фактів: дія (прапорець / стан зони / перехід екрана) вважається
+	# новою, лише поки її результат ЩЕ НЕ настав — інакше спрацьовувала б вічно
+	var sf: Dictionary = rule.get("sets_flag", {})
+	for k in sf:
+		if flags.get(k, null) != sf[k]: return true
+	var st: Dictionary = rule.get("sets_state", {})
+	for z2 in st:
+		if zone_states.get(z2, &"default") != st[z2]: return true
+	if rule.has("screen") and rule.get("facts", []).is_empty() \
+			and sf.is_empty() and st.is_empty():
+		return true    # чистий перехід (взяти в руки) — повторюваний за задумом
 	return false
 
 
@@ -42,14 +57,15 @@ static func yields_new(rule: Dictionary, facts: Dictionary) -> bool:
 # з довшою витримкою (dwell) стоїть ПІСЛЯ коротшого — коротке спрацює першим,
 # і лише коли його факт уже здобутий, черга дійде до довгого.
 static func find(rules: Array, zone: StringName, tool: StringName,
-				 facts: Dictionary, flags: Dictionary) -> Dictionary:
+				 facts: Dictionary, flags: Dictionary,
+				 zone_states: Dictionary = {}) -> Dictionary:
 	for r in rules:
 		var rr: Dictionary = r
 		if StringName(rr.get("zone", &"")) != zone: continue
 		var rt := StringName(rr.get("tool", &"*"))
 		if rt != &"*" and rt != tool: continue
 		if not applicable(rr, facts, flags): continue
-		if not yields_new(rr, facts): continue
+		if not yields_new(rr, facts, flags, zone_states): continue
 		return rr
 	return {}
 

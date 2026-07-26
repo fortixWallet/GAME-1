@@ -310,28 +310,61 @@ func _dbg_day1() -> void:
 	get_tree().quit()
 
 func _dbg_case2() -> void:
-	# АУДИТ 26.07: старий тест друкував CASE2_OK безумовно — з wear=false він
-	# виглядав зеленим. Тепер: кліки ЯК ГРАВЕЦЬ (_click_zone → _apply_zone) і вердикт
-	# рахується по фактах; гейт greп-ає саме "wear=true chain=true docs=true".
+	# СПРАВА 2 «СЕКРЕТЕР»: повний ланцюг даних через рушій правил.
+	# Меші ще в дорозі (Meshy), тому зони застосовуються по id — це чесно тестує
+	# ДАНІ й РУШІЙ: гейти, прапорці, підтвердження, обидві дороги до inner_depth,
+	# стан open, вирок. Кліки по мешах додасться разом із екранами FURN/WELL.
 	dbg_mode = true
-	var dir := _shotdir()
 	await get_tree().process_frame
 	_load_case(2)
-	_show("DESK2"); await _shot(dir+"c2_01_desk.png")
-	_show("TESTIMONY"); _click_zone("z.testimony.widow"); _click_zone("z.testimony.nephew")
-	await _shot(dir+"c2_02_statements.png")
-	_show("DESK2"); _click_zone("z.watch.crown"); await _shot(dir+"c2_03_crown.png")
-	_click_zone("z.watch.bow"); await _shot(dir+"c2_04_bow.png")
-	_show("CERT"); await _shot(dir+"c2_05_cert.png")
-	_choose(0, "a left-handed man"); _choose(1, "lately taken off and put back")
-	_choose(2, "the widow"); _choose(3, "the crown worn on its left side")
-	await _shot(dir+"c2_06_cert_full.png")
-	await _do_verdict()
-	for _i in 20: await RenderingServer.frame_post_draw
-	_show_morning()
-	await _shot(dir+"c2_07_morning.png", 6)
-	_show("LEDGER"); await _shot(dir+"c2_08_ledger.png", 4)
-	print("CASE2_OK wear=", found_wear, " chain=", found_chain, " docs=", read_docs, " sealed=", sealed, " seals=", seals_set)
+	# 0. НЕГАТИВ: ноніус ДО простукування мовчить (requires_flag knock_heard)
+	_apply_zone("z.sec.carcass_side", &"tool.caliper")
+	var neg_flag: bool = not facts.has("f.outer_depth")
+	# 1. простукати → прапорець
+	_apply_zone("z.sec.drawer_front", &"tool.hand")
+	var knocked: bool = case_flags.get(&"knock_heard", false) == true
+	# 2. три виміри → 486 − 12 − 455 = 19
+	_apply_zone("z.sec.carcass_side", &"tool.caliper")
+	_apply_zone("z.sec.back_edge", &"tool.caliper")
+	_apply_zone("z.well.back_board", &"tool.caliper")
+	var measured: bool = facts.has("f.outer_depth") and facts.has("f.back_thickness") and facts.has("f.inner_depth")
+	# 3. шурупи: око → лупа → лупа → довідник
+	_apply_zone("z.well.back_board", &"tool.eye")
+	_apply_zone("z.well.back_board", &"tool.loupe")
+	_apply_zone("z.well.back_board", &"tool.loupe")
+	_apply_zone("z.doc.ref_screws")
+	# 4. НЕГАТИВ: порожнина недосяжна, поки дошка не знята (requires_state)
+	_apply_zone("z.void.floor", &"tool.rake")
+	var neg_state: bool = not facts.has("f.dust_rectangle")
+	# 5. викрутка: ПЕРШИЙ клік — питання, не дія; другий — дія
+	_apply_zone("z.well.back_board", &"tool.screwdriver")
+	var confirm_held: bool = not facts.has("f.board_lifted")
+	_apply_zone("z.well.back_board", &"tool.screwdriver")
+	var opened: bool = facts.has("f.board_lifted") and zone_states.get(&"z.well.back_board", &"") == &"open"
+	# 6. порожнина: підкладка + пил
+	_apply_zone("z.void.lining", &"tool.loupe")
+	_apply_zone("z.void.floor", &"tool.rake")
+	# 7. решта фактів для граф
+	_apply_zone("z.sec.escutcheon", &"tool.loupe")
+	_apply_zone("z.doc.daybook_intake")
+	_apply_zone("z.drawer.underside", &"tool.rake")
+	_apply_zone("z.doc.register_gruber")
+	_apply_zone("z.doc.label_pigeonhole", &"tool.loupe")
+	# 8. атестат: 19 мм руками, правильні вироки, підстава
+	_choose(0, &"o.vienna_1820s")
+	var num_ok: bool = _commit_number(1, 19)
+	_choose(2, &"o.private_later")
+	_choose(3, &"o.within_fortnight")
+	_choose(4, &"o.our_locksmith")
+	_toggle_basis(5, &"f.dust_rectangle"); _toggle_basis(5, &"f.slot_burr")
+	var filled: bool = _all_filled()
+	_do_verdict()
+	var guard := 0
+	while not (screens.has("MORNING") and screens["MORNING"].visible) and guard < 600:
+		await RenderingServer.frame_post_draw; guard += 1
+	print("CASE2_OK neg_flag=", neg_flag, " knocked=", knocked, " measured=", measured,
+		  " neg_state=", neg_state, " confirm=", confirm_held, " opened=", opened,
+		  " num19=", num_ok, " filled=", filled, " outcome=", last_outcome_id)
 	get_tree().quit()
 
 func _dbg_clicktest() -> void:
@@ -581,7 +614,9 @@ func _case_rules() -> Array:
 	return (CASE_DATA[case_id] as Object).get("RULES") if CASE_DATA.has(case_id) else []
 # стан світу для needs_flag правил і зон
 func _flags() -> Dictionary:
-	return {&"raking": raking, &"tod": StringName(tod), &"lamp_on": lamp_on}
+	var f := {&"raking": raking, &"tod": StringName(tod), &"lamp_on": lamp_on}
+	f.merge(case_flags)
+	return f
 
 # Крок часу для накопичення витримки (dwell). У тестах — ФІКСОВАНИЙ, бо інакше
 # результат залежить від fps: на вільній машині кадр коротший, і за ті самі 140 кадрів
@@ -610,7 +645,7 @@ func _hover_zone_3d(gc: Vector2) -> void:
 	var zid := _pick_3d_at(gc, &"tool.loupe")
 	if zid == "":
 		found_time = maxf(0.0, found_time - _dt()); return
-	var rule := RuleEngine.find(_case_rules(), StringName(zid), &"tool.loupe", facts, _flags())
+	var rule := RuleEngine.find(_case_rules(), StringName(zid), &"tool.loupe", facts, _flags(), zone_states)
 	if rule.is_empty():
 		# 2.5: усе віддано — повторити say придатного правила (перечитати можна)
 		found_time += _dt()
@@ -633,7 +668,7 @@ func _click_zone_3d(gc: Vector2) -> void:
 	if not goblet_pivot or not main_cam3: return
 	var zid := _pick_3d_at(gc, &"tool.hand")
 	if zid == "": return
-	var rule := RuleEngine.find(_case_rules(), StringName(zid), &"tool.hand", facts, _flags())
+	var rule := RuleEngine.find(_case_rules(), StringName(zid), &"tool.hand", facts, _flags(), zone_states)
 	if not rule.is_empty(): _apply_rule(rule)
 
 func _process(_delta: float) -> void:
@@ -1204,6 +1239,8 @@ func _set_hint(t: String) -> void:
 # більше не дублюються в main.gd.
 var paper_frames := {}   # screen_name → {"frame": Rect2, "aspect": float}
 var zone_states := {}    # id зони → StringName стану (sets_state правил; скидається _load_case)
+var case_flags := {}     # прапорці справи (sets_flag правил: простукав, відчинив…)
+var pending_confirm := ""  # зона, що чекає другого кліку на руйнівну дію
 var active_tool: StringName = &"*"     # обраний вимірювальний інструмент (крок 6)
 var unlocked_tools := {}               # tool id → true (unlocks правил; скидається _load_case)
 
@@ -1236,7 +1273,13 @@ func _pick_2d_at(screen_name: String, p: Vector2) -> String:
 
 # ЄДИНЕ місце, де клік по 2D-зоні стає знанням. Правило шукається в ДАНИХ.
 func _apply_zone(zone_id: String, tool: StringName = &"*") -> void:
-	var rule := RuleEngine.find(_case_rules(), StringName(zone_id), tool, facts, _flags())
+	# ДОСЯЖНІСТЬ ЗОНИ перевіряється і тут, а не лише в піку: прямий виклик по id
+	# (тести, майбутні скрипти сцен) не має обходити requires_state/needs_flag —
+	# інакше порожнина «відкривається» крізь зачинену дошку (зловив тест case2)
+	var z: Dictionary = _case_zones().get(StringName(zone_id), {})
+	if not z.is_empty() and not ZoneHit.reachable(z, zone_states, _flags()):
+		return
+	var rule := RuleEngine.find(_case_rules(), StringName(zone_id), tool, facts, _flags(), zone_states)
 	if rule.is_empty():
 		# правило вже віддало все — повторити say останнього придатного (2.5: перечитати можна)
 		for r in _case_rules():
@@ -1249,11 +1292,25 @@ func _apply_zone(zone_id: String, tool: StringName = &"*") -> void:
 
 # ЄДИНЕ місце, де правило віддає результат: факти, стани зон, звук, рядок.
 func _apply_rule(rule: Dictionary) -> void:
+	# руйнівна дія вимагає ДРУГОГО кліку: перший — мальоване питання, відмова
+	# (клік деінде) не карається (case_02.md: «гейт входу в порожнину»)
+	if rule.has("confirm"):
+		var key := String(rule.get("zone", "")) + "|" + String(rule.get("tool", ""))
+		if pending_confirm != key:
+			pending_confirm = key
+			_play("ui_soft"); _set_hint(String(rule["confirm"]))
+			return
+	pending_confirm = ""
 	var got_new := false
 	for f in RuleEngine.facts_of(rule):
 		if add_fact(String(f)): got_new = true
 	var st: Dictionary = rule.get("sets_state", {})
 	for zid in st: zone_states[zid] = st[zid]
+	var sfl: Dictionary = rule.get("sets_flag", {})
+	for k in sfl:
+		if case_flags.get(k, null) != sfl[k]: got_new = true
+		case_flags[k] = sfl[k]
+	if rule.has("screen"): _show(String(rule["screen"]))
 	for tl in rule.get("unlocks", []):
 		if not unlocked_tools.has(tl):
 			unlocked_tools[tl] = true
@@ -1398,7 +1455,7 @@ const CHAPTERS := [
 	["9 · Evening — the room",        "evening"],
 	["10 · Darkness",                 "dark"],
 	["11 · The ledger",               "ledger"],
-	["12 · Case 2 — the watch (draft)",  "case2"],
+	# case2 повернеться в меню разом із мешами секретера (Meshy в дорозі)
 ]
 
 # ── СТАН → ВИГЛЯД: рівно три входи, і четвертого нема ────────────────────────
@@ -1417,6 +1474,8 @@ func _load_case(n: int) -> void:
 	CSLOTS = (CASE_DATA[n] as Object).get("SLOTS") if CASE_DATA.has(n) else []
 	facts.clear()                       # одне речення замість чотирнадцяти drop_fact
 	zone_states.clear()
+	case_flags.clear()
+	pending_confirm = ""
 	active_tool = &"*"
 	unlocked_tools.clear()
 	num_buf = ""
@@ -1824,6 +1883,7 @@ func _save_game() -> void:
 		"case_id": case_id,
 		"facts": facts.keys(),          # порядок = хронологія нотатника
 		"zone_states": zone_states,
+		"case_flags": case_flags,
 		"unlocked_tools": unlocked_tools.keys(),
 		"active_tool": String(active_tool),
 		"cvals": cvals,
@@ -1851,6 +1911,8 @@ func _load_game() -> bool:
 	for k in d.get("facts", []): facts[String(k)] = true
 	var zs: Dictionary = d.get("zone_states", {})
 	for k2 in zs: zone_states[StringName(k2)] = StringName(zs[k2])
+	var cf: Dictionary = d.get("case_flags", {})
+	for k3 in cf: case_flags[StringName(k3)] = cf[k3]
 	for tl in d.get("unlocked_tools", []): unlocked_tools[StringName(tl)] = true
 	active_tool = StringName(d.get("active_tool", "*"))
 	var cv: Array = d.get("cvals", [])
@@ -2375,7 +2437,11 @@ func _outcome_text() -> String:
 			if j2 < 0: hit = false; break
 			var want = when[sid]
 			var have = cvals[j2]
-			if want is int:
+			if want is Dictionary:
+				# діапазон для NUMBER-графи: {"min": 18, "max": 20}
+				if not (have is int and int(have) >= int(want.get("min", -2147483648)) \
+						and int(have) <= int(want.get("max", 2147483647))): hit = false; break
+			elif want is int:
 				if not (have is int and int(have) == int(want)): hit = false; break
 			else:
 				if not ((have is StringName or have is String) and StringName(have) == StringName(want)): hit = false; break
