@@ -179,6 +179,8 @@ func _ready() -> void:
 		_dbg_layoutcheck()
 	if "pilot" in OS.get_cmdline_user_args():
 		_dbg_pilot()
+	if "furnprobe" in OS.get_cmdline_user_args():
+		_dbg_furnprobe()
 	if "savetest" in OS.get_cmdline_user_args():
 		_dbg_savetest()
 	if "zonemap" in OS.get_cmdline_user_args():
@@ -630,13 +632,18 @@ func _dt() -> float:
 # Стало: пік серед усіх mesh-зон екрана + правило з ДАНИХ. dwell — із правила
 # (0.5 у клейм, 1.2 у «пустого споду»), say — єдина копія в data/case_01.gd.
 func _pick_3d_at(gc: Vector2, tool: StringName) -> String:
+	var scr := _shown()
+	var cam: Camera3D = screen_cams.get(scr, main_cam3)
 	for id in _case_zones():
 		var z: Dictionary = _case_zones()[id]
 		if String(z.get("kind", &"")) != "mesh": continue
+		if String(z.get("screen", &"")) != scr: continue
 		if not ZoneHit.reachable(z, zone_states, _flags()): continue
 		var tools: Array = z.get("tools", [])
 		if not tools.is_empty() and not (tool in tools): continue
-		if ZoneHit.inside_3d(gc, z, goblet_pivot, main_cam3): return String(id)
+		var node: Node3D = mesh_nodes.get(StringName(z.get("node", &"goblet_pivot")), goblet_pivot)
+		if node == null or cam == null: continue
+		if ZoneHit.inside_3d(gc, z, node, cam): return String(id)
 	return ""
 
 # наведення лупи: акумулює витримку правила під прицілом
@@ -936,6 +943,39 @@ func _dbg_pilot() -> void:
 		fd.close()
 	get_tree().quit()
 
+func _dbg_furnprobe() -> void:
+	dbg_mode = true
+	var dir := _shotdir(); DirAccess.make_dir_recursive_absolute(dir)
+	await get_tree().process_frame
+	_goto("case2")
+	for _i in 10: await RenderingServer.frame_post_draw
+	print("FURN дерево sec_vp:")
+	for ch in sec_vp.get_children():
+		print("  ", ch.get_class(), " ", ch.name)
+	var n := 0
+	for m in sec_vp.find_children("*", "MeshInstance3D", true, false):
+		var mi := m as MeshInstance3D
+		print("  MESH ", mi.get_path(), " vis=", mi.is_visible_in_tree(), " aabb=", mi.get_aabb().size)
+		n += 1
+	print("FURNPROBE meshes=", n, " shown=", _shown())
+	await _shot(dir + "furnprobe.png", 3)
+	# бінарний пошук «вази»: ховаємо по одному
+	(mesh_nodes[&"sec_backboard"] as Node3D).visible = false
+	await _shot(dir + "probe_no_bb.png", 3)
+	(mesh_nodes[&"sec_backboard"] as Node3D).visible = true
+	(mesh_nodes[&"sec_body"] as Node3D).visible = false
+	await _shot(dir + "probe_no_body.png", 3)
+	(mesh_nodes[&"sec_body"] as Node3D).visible = true
+	print("GOBLET path=", goblet_pivot.get_path())
+	var nn: Node = goblet_pivot
+	while nn:
+		var vis = nn.visible if (nn is Node3D or nn is CanvasItem) else "n/a"
+		print("  ланка ", nn.name, " class=", nn.get_class(), " visible=", vis)
+		nn = nn.get_parent()
+	goblet_pivot.visible = false
+	await _shot(dir + "probe_no_goblet.png", 3)
+	get_tree().quit()
+
 # ПЕРЕВІРКА СЕЙВА: зберегти → зіпсувати стан → відновити → звірити ДО ПОЛЯ.
 # Негатив: сейв чужої версії чесно відкидається, а не читається криво.
 func _dbg_savetest() -> void:
@@ -1215,6 +1255,7 @@ func _show(name: String) -> void:
 		_drop_loupe()
 	cup_dragging = false   # не тягнемо чашу крізь зміну екрана (інакше лупа завмирає)
 	for k in screens: screens[k].visible = (k == name)
+	_sync_case2_view()
 	if hint_label: hint_label.text = ""
 	if name == "CERT":
 		if not sealed: active_slot = _next_open_slot()
@@ -1238,6 +1279,11 @@ func _set_hint(t: String) -> void:
 # pick_2d рушія, факт і say — через RuleEngine.find по ДАНИХ справи. Рядки say
 # більше не дублюються в main.gd.
 var paper_frames := {}   # screen_name → {"frame": Rect2, "aspect": float}
+# 3D-реєстри справи: вузол зони (data z.node) → Node3D; екран → його Camera3D.
+# Заповнюються білдером сцени справи; _pick_3d_at працює через них, а не через
+# зашиті goblet_pivot/main_cam3 (узагальнено для секретера, крок «повноцінна гра»).
+var mesh_nodes := {}
+var screen_cams := {}
 var zone_states := {}    # id зони → StringName стану (sets_state правил; скидається _load_case)
 var case_flags := {}     # прапорці справи (sets_flag правил: простукав, відчинив…)
 var pending_confirm := ""  # зона, що чекає другого кліку на руйнівну дію
@@ -1455,7 +1501,7 @@ const CHAPTERS := [
 	["9 · Evening — the room",        "evening"],
 	["10 · Darkness",                 "dark"],
 	["11 · The ledger",               "ledger"],
-	# case2 повернеться в меню разом із мешами секретера (Meshy в дорозі)
+	["12 · Case 2 — the secretaire", "case2"],
 ]
 
 # ── СТАН → ВИГЛЯД: рівно три входи, і четвертого нема ────────────────────────
@@ -1572,9 +1618,7 @@ func _goto(key: String) -> void:
 			client_seen = true; case_done = true; tod = "evening"
 			seals_set = maxi(seals_set, 1); _show("LEDGER")
 		"case2":
-			# чернетка справи 2: жива точка входу (аудит 26.07 — контент був
-			# недосяжний: _load_case(2) кликався лише з debug-режиму)
-			_load_case(2); client_seen = true; _show("DESK2")
+			_load_case(2); client_seen = true; _show("FURN")
 		_:
 			_show("MENU")
 
@@ -1779,6 +1823,10 @@ func _build_hands() -> void:
 	svc.set_anchors_preset(Control.PRESET_FULL_RECT); svc.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	s.add_child(svc)
 	var sv := SubViewport.new(); sv.size = Vector2i(int(W), int(H)); sv.transparent_bg = true; sv.msaa_3d = Viewport.MSAA_4X
+	# ВЛАСНИЙ СВІТ — обов'язково. Без own_world_3d SubViewport УСПАДКОВУЄ світ
+	# root-в'юпорта, і всі 3D-сцени гри зливаються в одну: камера секретера
+	# чесно бачила чашу в нулі координат — «ваза в шафі» (Віктор, 27.07).
+	sv.own_world_3d = true
 	svc.add_child(sv); _build_goblet_world(sv)
 	# 3D-в'юпорт лупи: СПІЛЬНИЙ світ чаші → зум-камера показує РЕАЛЬНЕ клеймо (не картинку)
 	loupe_vp = SubViewport.new(); loupe_vp.size = Vector2i(760,760)
@@ -2501,39 +2549,143 @@ func _show_morning() -> void:
 # ================= СПРАВА 2 «СПАДОК УДОВИ» (два свідчення) =================
 # Річ сама викриває брехуна: знос голівки під ліву руку + свіжі подряпини на вушку.
 func _build_case2() -> void:
-	# --- стіл справи 2 ---
-	var s := _screen("DESK2")
-	if tex.has("case2_desk"): _bg(s, tex["case2_desk"])
-	else: _bg(s, tex["case_desk"])
-	var intro := Label.new(); intro.label_settings = _ls(fr, int(H*0.028), Color(0.92,0.88,0.78))
-	intro.text = "A pocket watch, and two people who both call it theirs.\nThe watch was carried for thirty years. It remembers the hand."
-	intro.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	intro.size = Vector2(W*0.64, H*0.12); intro.position = Vector2(W*0.18, H*0.05)
-	intro.mouse_filter = Control.MOUSE_FILTER_IGNORE; s.add_child(intro)
-	var itw := create_tween(); itw.tween_interval(7.0); itw.tween_property(intro, "modulate:a", 0.0, 2.0)
-	# ЗОНИ НА САМОМУ ГОДИННИКУ (вимога Віктора 26.07: «підказки на ньому, а не
-	# окремі картинки»). Кадр столу вписаний COVER — рамку для ловця рахує рушій.
-	var frame := ZoneHit.image_rect(Vector2(tex["case2_desk"].get_width(), tex["case2_desk"].get_height()), Vector2(W, H), true)
-	var pane := Control.new(); pane.position = frame.position; pane.size = frame.size
-	pane.mouse_filter = Control.MOUSE_FILTER_IGNORE; s.add_child(pane)
-	_paper_catcher("DESK2", s, pane)
-	_txtbtn(s, "the statements  →", Vector2(W*0.05, H*0.92), func(): _show("TESTIMONY"))
-	_txtbtn(s, "Write the certificate  →", Vector2(W*0.74, H*0.92), func(): _show("CERT"))
-	# --- два свідчення на одному аркуші (їх треба ЗІСТАВИТИ) ---
-	var t := _screen("TESTIMONY")
-	_paper_backdrop(t)
-	var lt: Texture2D = tex["letter_client"] if tex.has("letter_client") else tex["atestat_flat_blank"]
+	# СПРАВА 2 «СЕКРЕТЕР» (27.07): три меші Meshy в одному світі; три екрани —
+	# три камери на той самий предмет (FURN загальний 3/4 · WELL писальний відділ
+	# · DRAWER шухляда в руках). Правило РЕЖИСУРИ 14: план загальний → середній →
+	# деталь, географія предмета не ламається.
+	var sv := SubViewport.new(); sv.size = Vector2i(int(W), int(H))
+	sv.msaa_3d = Viewport.MSAA_4X; add_child(sv)
+	sv.own_world_3d = true    # свій світ: див. урок «ваза в шафі» вище
+	# фон НЕ прозорий: небо-градієнт бюро з env і є кімнатою за предметом
+	_build_bureau_light(sv, false, Color(0.055, 0.048, 0.042))   # тепла темна кімната
+	var body_s: PackedScene = load("res://models/secretaire_body.glb")
+	var body := body_s.instantiate() as Node3D
+	sv.add_child(body); mesh_nodes[&"sec_body"] = body
+	# нормування: корпус ~1.9 h у метрах моделі — ставимо в нуль, камери від нього
+	var drawer_s: PackedScene = load("res://models/secretaire_drawer.glb")
+	var drawer := drawer_s.instantiate() as Node3D
+	drawer.scale = Vector3(0.55, 0.55, 0.55)
+	drawer.position = Vector3(0.0, -0.35, 0.55)   # висунута з нижньої секції
+	drawer.visible = false
+	sv.add_child(drawer); mesh_nodes[&"sec_drawer"] = drawer
+	var bb_s: PackedScene = load("res://models/secretaire_backboard.glb")
+	var bb := bb_s.instantiate() as Node3D
+	bb.scale = Vector3(0.42, 0.42, 0.42)
+	bb.position = Vector3(0.0, 0.62, -0.10)       # у ніші писального відділу
+	bb.rotation_degrees = Vector3(6, 0, 0)
+	sv.add_child(bb); mesh_nodes[&"sec_backboard"] = bb
+	sec_backboard = bb; sec_drawer = drawer
+	# три камери — ВІД ФАКТИЧНОГО ГАБАРИТУ моделі, не з голови (низ різало)
+	var bb3 := _aabb(body)
+	var c3 := bb3.get_center()
+	var rr3 := bb3.size.length()
+	var cf := Camera3D.new(); sv.add_child(cf); cf.fov = 36
+	cf.position = c3 + Vector3(0.62, 0.18, 1.0).normalized()*rr3*1.38
+	cf.look_at(c3, Vector3.UP)
+	var cw := Camera3D.new(); sv.add_child(cw); cw.fov = 30
+	var well_c := c3 + Vector3(0, bb3.size.y*0.12, 0)
+	cw.position = well_c + Vector3(0.0, 0.35, 1.0).normalized()*rr3*0.52
+	cw.look_at(well_c, Vector3.UP)
+	var cd := Camera3D.new(); sv.add_child(cd); cd.fov = 30
+	cd.position = drawer.position + Vector3(0.25, 0.55, 1.0).normalized()*rr3*0.5
+	cd.look_at(drawer.position, Vector3.UP)
+	sec_cams = {"FURN": cf, "WELL": cw, "DRAWER": cd}
+	for scr in ["FURN", "WELL", "DRAWER"]:
+		var sc := _screen(scr)
+		var cont := SubViewportContainer.new()
+		# ОДИН вьюпорт на три екрани: контейнер лише в активному (інакше Godot
+		# лається на подвійне батьківство) — перемикає _sync_case2_view()
+		sc.set_meta("wants_sv", true)
+		var catcher := Control.new(); catcher.name = "catch3d"
+		catcher.size = Vector2(W, H); catcher.mouse_filter = Control.MOUSE_FILTER_STOP
+		catcher.gui_input.connect(_case2_input)
+		sc.add_child(catcher)
+		screen_cams[scr] = sec_cams[scr]
+	sec_vp = sv
+	# навігація: план → деталь і назад (режисура: без стрибків повз середній план)
+	_txtbtn(screens["FURN"], "the writing well  →", Vector2(W*0.40, H*0.92), func(): _show("WELL"))
+	_txtbtn(screens["FURN"], "take the drawer out  →", Vector2(W*0.64, H*0.92), func(): _apply_zone("z.sec.drawer_front", &"tool.hand"))
+	_txtbtn(screens["FURN"], "the papers  →", Vector2(W*0.05, H*0.92), func(): _show("C2DOCS"))
+	_txtbtn(screens["FURN"], "Write the certificate  →", Vector2(W*0.84, H*0.92), func(): _show("CERT"))
+	_txtbtn(screens["WELL"], "←  step back", Vector2(W*0.04, H*0.92), func(): _show("FURN"))
+	_txtbtn(screens["WELL"], "✎", Vector2(W*0.945, H*0.055), func(): _show_notebook(), 0.030)
+	_txtbtn(screens["DRAWER"], "←  slide it back", Vector2(W*0.04, H*0.92), func(): _show("FURN"))
+	# папери справи 2 (гросбух + реєстр на одному аркуші) і довідник шурупів
+	var d2 := _screen("C2DOCS")
+	_paper_backdrop(d2)
+	var lt: Texture2D = tex["letter_client"]
 	var lh := H*0.84; var lw := lh*float(lt.get_width())/float(lt.get_height())
 	var paper := TextureRect.new(); paper.texture = lt; paper.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	paper.stretch_mode = TextureRect.STRETCH_SCALE; paper.size = Vector2(lw, lh)
-	paper.position = Vector2((W-lw)*0.5, (H-lh)*0.5 - H*0.02); paper.mouse_filter = Control.MOUSE_FILTER_IGNORE; t.add_child(paper)
-	var tx := Label.new(); tx.label_settings = _ls(fr, int(lh*0.028), Color(0.20,0.14,0.09))
-	tx.text = "THE WIDOW:\n\"He wound it every night before\nthe lamp. Thirty years. The chain\nwas his father's — it was never\noff the watch.\"\n\nTHE NEPHEW:\n\"My uncle gave it me in his last\nweek. I put the chain on myself,\nfresh, to carry it properly.\nHe was right-handed, as I am.\""
-	tx.position = paper.position + Vector2(lw*0.11, lh*0.11); tx.mouse_filter = Control.MOUSE_FILTER_IGNORE; t.add_child(tx)
-	_paper_catcher("TESTIMONY", t, paper)
-	_txtbtn(t, "←  back to the desk", Vector2(W*0.04, H*0.92), func(): _show("DESK2"))
-	_txtbtn(t, "Write the certificate  →", Vector2(W*0.72, H*0.92), func(): _show("CERT"))
+	paper.position = Vector2((W-lw)*0.5, (H-lh)*0.5 - H*0.02); paper.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	d2.add_child(paper)
+	var t2 := Label.new(); t2.label_settings = _ls(fr, int(lh*0.026), Color(0.20,0.14,0.09))
+	t2.text = "DAY-BOOK — the 3rd\n\nSecretaire, walnut, estate of Herr F.\nOpened on arrival by Krenn, our locksmith\n— lock seized. House keys surrendered\nwith the piece.\n\n\nREGISTER OF WORKSHOPS\n\nGRUBER, Michael. Möbeltischler,\nWien, Gumpendorf.\nWorkshop stamp in use 1822–1841.\nNumbered his carcasses in chalk."
+	t2.position = paper.position + Vector2(lw*0.12, lh*0.10); t2.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	d2.add_child(t2)
+	_paper_catcher("C2DOCS", d2, paper)
+	_txtbtn(d2, "←  back", Vector2(W*0.04, H*0.92), func(): _show("FURN"))
+	_txtbtn(d2, "the chapter on screws  →", Vector2(W*0.60, H*0.92), func(): _show("BOOK_SCREWS"))
+	var bs := _paper_screen("BOOK_SCREWS", "reg_page_h", "C2DOCS", "←  back to the papers")
+	_ptext(bs, "OF SCREWS AND THEIR MAKING", 0.22, 0.055, 0.020)
+	_ptext(bs, "Before 1846: blunt end, hand-filed thread,", 0.16, 0.20, 0.019)
+	_ptext(bs, "uneven pitch, the slot off centre; a hole", 0.16, 0.245, 0.019)
+	_ptext(bs, "must first be bored.", 0.16, 0.29, 0.019)
+	_ptext(bs, "Patented 1846: the pointed screw that cuts", 0.16, 0.38, 0.019)
+	_ptext(bs, "its own way; made in quantity at Birmingham", 0.16, 0.425, 0.019)
+	_ptext(bs, "from 1854.", 0.16, 0.47, 0.019)
+	_paper_catcher("BOOK_SCREWS", bs["s"], bs["pg"])
 
+var sec_vp: SubViewport
+var sec_cams := {}
+var sec_backboard: Node3D
+var sec_drawer: Node3D
+
+# вигляд сцени секретера ВИВОДИТЬСЯ зі стану (закон кроку 2)
+func _sync_case2_view() -> void:
+	if sec_vp == null: return
+	var scr := _shown()
+	var on_c2: bool = scr in ["FURN", "WELL", "DRAWER"]
+	# перемкнути активну камеру
+	if on_c2 and screen_cams.has(scr):
+		(screen_cams[scr] as Camera3D).current = true
+	# контейнер вьюпорта — лише на активному екрані
+	for s2 in ["FURN", "WELL", "DRAWER"]:
+		if not screens.has(s2): continue
+		var host: Control = screens[s2]
+		var have := host.get_node_or_null("svc")
+		if s2 == scr and have == null:
+			var cont := SubViewportContainer.new(); cont.name = "svc"
+			cont.stretch = true; cont.size = Vector2(W, H)
+			cont.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			if sec_vp.get_parent(): sec_vp.get_parent().remove_child(sec_vp)
+			cont.add_child(sec_vp)
+			host.add_child(cont); host.move_child(cont, 0)
+		elif s2 != scr and have != null:
+			(have as SubViewportContainer).remove_child(sec_vp)
+			add_child(sec_vp)
+			have.queue_free()
+	# стан дошки: відкручена — з'їжджає вниз і зникає, ніша відкрита
+	if sec_backboard:
+		sec_backboard.visible = zone_states.get(&"z.well.back_board", &"default") != &"open"
+	if sec_drawer:
+		sec_drawer.visible = zone_states.get(&"z.sec.drawer_front", &"default") == &"out"
+
+func _case2_input(ev: InputEvent) -> void:
+	if ev is InputEventMouseButton and (ev as InputEventMouseButton).pressed \
+			and (ev as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT:
+		var pos: Vector2 = (ev as InputEventMouseButton).position
+		var zid := _pick_3d_at(pos, active_tool if active_tool != &"*" else &"tool.hand")
+		if zid == "":
+			# другий шанс: зона могла вимагати саме активний інструмент «око»
+			zid = _pick_3d_at(pos, &"tool.eye")
+		if zid != "": _apply_zone(zid, active_tool if active_tool != &"*" else &"tool.hand")
+	elif ev is InputEventMouseMotion:
+		var zid2 := _pick_3d_at((ev as InputEventMouseMotion).position, &"tool.eye")
+		if zid2 == "":
+			zid2 = _pick_3d_at((ev as InputEventMouseMotion).position, &"tool.hand")
+		var z: Dictionary = _case_zones().get(StringName(zid2), {})
+		_set_hint(String(z.get("hint", "")) if zid2 != "" else "")
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -2648,26 +2800,40 @@ func _case_closed() -> void:
 	t.tween_property(lab, "scale", Vector2(1.0,1.0), 0.08)
 
 # ---------- 3D ----------
-func _build_goblet_world(sv: SubViewport) -> void:
+# СВІТЛО Й НЕБО БЮРО — окремо від предмета. 27.07: _build_goblet_world будував
+# І світло, І ЧАШУ; виклик його для сцени секретера виростив келих-гігант у шафі
+# (Віктор: «що це за жах»). Тепер світло — своя функція; предмет — своя.
+func _build_bureau_light(sv: SubViewport, take_key := false, room_color := Color(0,0,0,0)) -> DirectionalLight3D:
 	var we := WorldEnvironment.new(); var env := Environment.new()
 	var sky := Sky.new(); var sm := ProceduralSkyMaterial.new()
 	sm.sky_top_color = Color(0.17,0.16,0.17); sm.sky_horizon_color = Color(0.21,0.18,0.15)
 	sm.ground_bottom_color = Color(0.03,0.03,0.04); sm.ground_horizon_color = Color(0.10,0.08,0.06)
 	sm.sky_energy_multiplier = 1.5; sky.sky_material = sm
 	env.background_mode = Environment.BG_SKY; env.sky = sky
+	if room_color.a > 0.0:
+		# глухий колір кімнати замість неба: для меблів лінія «горизонту» за
+		# спиною предмета читалась як сяюча стеля
+		env.background_mode = Environment.BG_COLOR
+		env.background_color = room_color
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY; env.ambient_light_energy = 1.35
 	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC; env.tonemap_exposure = 0.95
 	we.environment = env; sv.add_child(we)
 	# тепла лампа — світить НИЗЬКО і КОСО через ногу (щоб клеймо блисло при оберті)
 	var key := DirectionalLight3D.new(); key.light_color = Color(1.0,0.92,0.82); key.light_energy = 1.9
-	key.rotation_degrees = Vector3(-9,-62,0); sv.add_child(key); key_light = key
+	key.rotation_degrees = Vector3(-9,-62,0); sv.add_child(key)
+	if take_key: key_light = key
 	var rim := DirectionalLight3D.new(); rim.light_color = Color(0.72,0.76,0.88); rim.light_energy = 0.8
 	rim.rotation_degrees = Vector3(-12,-135,0); sv.add_child(rim)
 	# фронтальний фIll — ТЕПЛИЙ і сильний: він освітлює перевернутий спід, тож клеймо срібне, не синє
 	var fl := DirectionalLight3D.new(); fl.light_color = Color(1.0,0.93,0.82); fl.light_energy = 1.5
 	fl.rotation_degrees = Vector3(-5,8,0); sv.add_child(fl)
+	return key
+
+func _build_goblet_world(sv: SubViewport) -> void:
+	_build_bureau_light(sv, true)
 	var cam := Camera3D.new(); sv.add_child(cam); main_cam3 = cam
 	goblet_pivot = Node3D.new(); sv.add_child(goblet_pivot)
+	mesh_nodes[&"goblet_pivot"] = goblet_pivot
 	var scn := load("res://models/goblet.glb") as PackedScene
 	var inst := scn.instantiate(); goblet_pivot.add_child(inst)
 	var aabb := _aabb(inst); inst.position = -aabb.get_center()
