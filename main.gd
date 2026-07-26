@@ -121,7 +121,9 @@ var loupe_lw := 0.0
 var loupe_lh := 0.0
 var tex_comp: Texture2D    # композит стола З предметами — джерело скла лупи
 var cup_dragging := false
-var drag_travel := 0.0       # накопичений рух миші: <8 px = клік, не оберт
+var drag_travel := 0.0       # накопичений рух миші: <70 px = жест пальця, не оберт
+var drag_press_pos := Vector2.ZERO
+var drag_press_basis := Basis()   # для відкату мікро-оберту при жесті
 var tex_loupe: Texture2D
 var found_time := 0.0
 var mag_btn: Button           # хотспот лупи на столі — ховаємо, коли взяли в руки
@@ -175,6 +177,8 @@ func _ready() -> void:
 
 	if "layoutcheck" in OS.get_cmdline_user_args():
 		_dbg_layoutcheck()
+	if "pilot" in OS.get_cmdline_user_args():
+		_dbg_pilot()
 	if "savetest" in OS.get_cmdline_user_args():
 		_dbg_savetest()
 	if "zonemap" in OS.get_cmdline_user_args():
@@ -537,15 +541,27 @@ func _glass_desk(gc: Vector2) -> void:
 	mat.set_shader_parameter("span", Vector2(gr/(dw*LOUPE_ZOOM), gr/(dh*LOUPE_ZOOM)))
 
 func _aim_loupe(gc: Vector2) -> void:
-	# ЛУПА = РІВНО LOUPE_MAG× збільшення того, що під курсором.
-	# Той самий fov, що в головної камери, але вдвічі ближче → чесний, передбачуваний зум.
-	var ro: Vector3 = main_cam3.project_ray_origin(gc)
+	# ЛУПА = ТЕЛЕОБ'ЄКТИВ (баг Віктора 26.07 + плейтест: «збільшення не побачив
+	# жодного разу»). Стара схема «підійти ближче до точки під курсором» вимагала
+	# ЗНАТИ відстань до поверхні, а рядок dist = ro.length()−0.5 її не знав — то
+	# була здогадка «поверхня за пів одиниці від центру світу», випадково правдива
+	# лише для дна ніжки. Для стінки чи вінець «hit» рахувався В ПОВІТРІ, камера
+	# лупи стрибала туди і бачила ВСЮ чашу здалеку — звідси «менша чаша в лупі,
+	# ще одна поверх», а зумило тільки дно.
+	# Телезум відстані не потребує: камера лупи стоїть ТАМ САМО, де головна,
+	# дивиться вздовж променя курсора, а кут огляду звужений рівно в LOUPE_MAG
+	# разів — чесне ×4.3 для будь-якої точки чаші на будь-якій глибині.
+	# КУТ РАХУЄТЬСЯ ДО ПІКСЕЛІВ СКЛА, а не «просто вужчий у 4.3 раза».
+	# Конвеєр: кадр лупи (760 px) стискається у скло (GLASS_R·loupe_lw·2 ≈ 283 px)
+	# — і це стискання МОВЧКИ ділило будь-який оптичний зум на ~2.7. Саме тому
+	# «збільшення не бачив ніколи»: стара схема давала ефективні ~1.6×.
+	# Умова чесних LOUPE_MAG×: (glass_px/2)/tan(fov_l/2) = MAG·(H/2)/tan(fov_m/2).
+	var ro: Vector3 = main_cam3.global_position
 	var rn: Vector3 = main_cam3.project_ray_normal(gc)
-	var dist: float = maxf(ro.length() - 0.5, 0.2)     # відстань до поверхні під курсором
-	var hit: Vector3 = ro + rn*dist
-	loupe_cam.fov = main_cam3.fov
-	loupe_cam.global_position = hit - rn*(dist/LOUPE_MAG)
-	loupe_cam.look_at(hit, Vector3.UP)
+	loupe_cam.global_position = ro
+	loupe_cam.look_at(ro + rn, Vector3.UP)
+	var glass_px: float = GLASS_R*loupe_lw*2.0
+	loupe_cam.fov = rad_to_deg(2.0*atan((glass_px/H)*tan(deg_to_rad(main_cam3.fov)*0.5)/LOUPE_MAG))
 
 # ── ТІНЬОВИЙ ПРОГІН РУШІЯ ЗОН (крок 4, доказова частина) ─────────────────────
 # Новий рушій рахує ту саму зону поруч зі старим кодом і НЕ впливає на гру.
@@ -766,6 +782,26 @@ func _dbg_walk() -> void:
 			if facts.has("f.domes_alike"): break
 		print("WALK_B_DOMES hand=", domes_ok, " alike=", facts.has("f.domes_alike"),
 			  " state=", zone_states.get(&"z.foot.top", &"default"))
+		# ЖЕСТ «провести пальцем»: справжній drag 40 px через input-конвеєр.
+		# Плейтест показав, що казуал робить саме це — і раніше отримував оберт.
+		drop_fact("f.domes"); drop_fact("f.domes_alike"); zone_states.erase(&"z.foot.top")
+		if loupe_held: _drop_loupe()
+		dbg_mode = false          # жест іде через живий _unhandled_input
+		var pr := InputEventMouseButton.new()
+		pr.button_index = MOUSE_BUTTON_LEFT; pr.pressed = true
+		pr.position = top_gc; pr.global_position = top_gc
+		get_viewport().push_input(pr, true); await get_tree().process_frame
+		for st in range(1, 5):
+			var mm := InputEventMouseMotion.new()
+			var pnt: Vector2 = top_gc + Vector2(10.0*float(st), 0)
+			mm.position = pnt; mm.global_position = pnt; mm.relative = Vector2(10, 0)
+			get_viewport().push_input(mm, true); await get_tree().process_frame
+		var rl := InputEventMouseButton.new()
+		rl.button_index = MOUSE_BUTTON_LEFT; rl.pressed = false
+		rl.position = top_gc + Vector2(40, 0); rl.global_position = top_gc + Vector2(40, 0)
+		get_viewport().push_input(rl, true); await get_tree().process_frame
+		dbg_mode = true
+		print("WALK_B_FINGER swipe_gives_domes=", facts.has("f.domes"))
 	elif "c" in args:
 		for f0 in ["f.mark_maker","f.mark_diana","f.news_robbery","f.church_mark","f.letter_read"]: add_fact(f0)   # здобуто в A і B
 		_show("CATALOG"); _cat_click(cat_screen, cat_m, cat_mr); await _shot(dir+"14_catalog_match.png")
@@ -799,6 +835,70 @@ func _dbg_walk() -> void:
 		_show("LEDGER"); await _shot(dir+"21_ledger.png", 4)
 		print("WALK_C_OK sealed=", sealed, " seals=", seals_set, " shown=", _shown(),
 			  " outcome=", last_outcome_id)
+	get_tree().quit()
+
+# ── ПІЛОТ-МІСТ ДЛЯ ПЛЕЙТЕСТУ КАЗУАЛОМ (правило 13) ──────────────────────────
+# Агент не має фізичного екрана й миші. Його око — знімок, його рука — команда.
+# Гра щокроку виконує ОДНУ команду з user://pilot_cmd.txt і відповідає знімком
+# і рядком стану в user://pilot_done.txt. Кліки йдуть через push_input — той
+# самий конвеєр, що в живої миші (стретч, порядок дітей, маски — все справжнє).
+# Команди:  click X Y · drag X1 Y1 X2 Y2 · key N · shot · quit
+func _dbg_pilot() -> void:
+	dbg_mode = false          # ПОВНИЙ живий конвеєр: _process, ловці, твіни
+	var dirp := _shotdir()
+	DirAccess.make_dir_recursive_absolute(dirp)
+	await get_tree().process_frame
+	_show("MENU")
+	var seq := 0
+	var cmd_path := "user://pilot_cmd.txt"
+	var done_path := "user://pilot_done.txt"
+	if FileAccess.file_exists(cmd_path): DirAccess.remove_absolute(cmd_path)
+	# стартовий кадр
+	await _shot(dirp + "p000.png", 4)
+	var f0 := FileAccess.open(done_path, FileAccess.WRITE)
+	f0.store_string("ready 0 screen=MENU shot=p000.png"); f0.close()
+	while true:
+		await get_tree().create_timer(0.15).timeout
+		if not FileAccess.file_exists(cmd_path): continue
+		var fc := FileAccess.open(cmd_path, FileAccess.READ)
+		var line := fc.get_as_text().strip_edges(); fc.close()
+		DirAccess.remove_absolute(cmd_path)
+		if line == "": continue
+		var parts := line.split(" ", false)
+		var op := String(parts[0])
+		if op == "quit": break
+		elif op == "click" and parts.size() >= 3:
+			await _click_at(Vector2(float(parts[1]), float(parts[2])))
+		elif op == "drag" and parts.size() >= 5:
+			# затиснути → рушити кількома кроками → відпустити (оберт чаші)
+			var a := Vector2(float(parts[1]), float(parts[2]))
+			var b := Vector2(float(parts[3]), float(parts[4]))
+			var ev := InputEventMouseButton.new()
+			ev.button_index = MOUSE_BUTTON_LEFT; ev.pressed = true
+			ev.position = a; ev.global_position = a
+			get_viewport().push_input(ev, true); await get_tree().process_frame
+			for step in range(1, 9):
+				var m := InputEventMouseMotion.new()
+				var pnt := a.lerp(b, float(step)/8.0)
+				m.position = pnt; m.global_position = pnt
+				m.relative = (b - a)/8.0
+				get_viewport().push_input(m, true); await get_tree().process_frame
+			var ev2 := InputEventMouseButton.new()
+			ev2.button_index = MOUSE_BUTTON_LEFT; ev2.pressed = false
+			ev2.position = b; ev2.global_position = b
+			get_viewport().push_input(ev2, true); await get_tree().process_frame
+		elif op == "key" and parts.size() >= 2:
+			var ke := InputEventKey.new(); ke.pressed = true
+			ke.keycode = OS.find_keycode_from_string(String(parts[1]))
+			get_viewport().push_input(ke, true); await get_tree().process_frame
+		# після будь-якої команди: пауза на твіни, знімок, звіт
+		for _i in 14: await RenderingServer.frame_post_draw
+		seq += 1
+		var shot_name := "p%03d.png" % seq
+		await _shot(dirp + shot_name, 2)
+		var fd := FileAccess.open(done_path, FileAccess.WRITE)
+		fd.store_string("done " + str(seq) + " screen=" + _shown() + " shot=" + shot_name)
+		fd.close()
 	get_tree().quit()
 
 # ПЕРЕВІРКА СЕЙВА: зберегти → зіпсувати стан → відновити → звірити ДО ПОЛЯ.
@@ -1453,11 +1553,11 @@ func _build_menu() -> void:
 	_txtbtn(s0, "unlock the door  →", Vector2(W*0.065, H*0.60), func(): _play("door_bell"); _load_case(1); _enter_hub(), 0.034)
 	# продовжити з сейва — тільки якщо він є, читається і має поступ
 	if FileAccess.file_exists(_save_path()):
-		_txtbtn(s0, "return to the desk  →", Vector2(W*0.065, H*0.66),
+		_txtbtn(s0, "return to the desk  →", Vector2(W*0.065, H*0.655),
 			func():
 				if _load_game(): _play("ui_soft"); _show("DESK" if not sealed else "LEDGER")
 				else: _play("ui_soft"); _set_hint("The ledger of that day cannot be read."), 0.030)
-	_txtbtn(s0, "choose a scene  →", Vector2(W*0.065, H*0.68), func(): _show("CHAPTERS"), 0.028)
+	_txtbtn(s0, "choose a scene  →", Vector2(W*0.065, H*0.71), func(): _show("CHAPTERS"), 0.028)
 
 # --- КАБІНЕТ ---
 func _hub_tex() -> Texture2D:
@@ -2383,12 +2483,20 @@ func _unhandled_input(event: InputEvent) -> void:
 		var mb := event as InputEventMouseButton
 		if mb.pressed:
 			cup_dragging = true; drag_travel = 0.0
+			drag_press_pos = mb.position
+			drag_press_basis = goblet_pivot.basis
 		else:
 			cup_dragging = false
-			# КОРОТКИЙ КЛІК ≠ ОБЕРТ (крок 5c): якщо миша майже не рухалась — це дія
-			# рукою по зоні (горбики z.foot.top). Драг лишається обертом чаші.
-			if drag_travel < 8.0 and not loupe_held:
-				_click_zone_3d(mb.position)
+			# «ПРОВЕСТИ ПАЛЬЦЕМ» = КОРОТКЕ ПРОВЕДЕННЯ, не лише клік (плейтест 26.07:
+			# казуал 12 разів «проводив пальцем по стопі», бо так каже підказка, — і
+			# гра щоразу КРУТИЛА чашу; до печатки він так і не дійшов). Тепер жест
+			# до 70 px, що ПОЧАВСЯ над hand-зоною, — це дія пальця; випадковий
+			# мікро-оберт від проведення відкочується до положення на момент
+			# натискання. Довгий рух — як і був, оберт. Працює і з лупою в руці.
+			if drag_travel < 70.0:
+				if drag_travel >= 8.0 and _pick_3d_at(drag_press_pos, &"tool.hand") != "":
+					goblet_pivot.basis = drag_press_basis
+				_click_zone_3d(drag_press_pos)
 	elif event is InputEventMouseMotion and cup_dragging:
 		var mm := event as InputEventMouseMotion
 		# БУЛО: rotation.y — оберт навколо СВІТОВОЇ вертикалі. Коли чашу перевернуто

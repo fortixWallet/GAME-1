@@ -67,6 +67,8 @@ for t in "walk a" "walk b" "walk c" "walk e" "chapters" "outcomes" "layoutcheck"
     "walk b")   echo "$OUT" | grep -q "WALK_B_OK found_marks=true found_church=true" || FAIL="$FAIL walk-b"
                 # горбики (5c): рука → f.domes, лупа → f.domes_alike, стан зони raised
                 echo "$OUT" | grep -q "WALK_B_DOMES hand=true alike=true state=raised" || FAIL="$FAIL domes"
+                # «провести пальцем»(drag 40px) — це дія, а не оберт (плейтест 26.07)
+                echo "$OUT" | grep -q "WALK_B_FINGER swipe_gives_domes=true" || FAIL="$FAIL finger"
                 # зона мусить лишатися СТРОГОЮ: точка за 200 px від клейм не дає факту
                 echo "$OUT" | grep -q "WALK_B_STRICT far_rejected=true" || FAIL="$FAIL walk-b-strict" ;;
     "walk c")   echo "$OUT" | grep -q "WALK_C_OK sealed=true"        || FAIL="$FAIL walk-c"
