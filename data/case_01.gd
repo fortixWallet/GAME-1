@@ -130,6 +130,13 @@ const RULES := [
 	{"zone": &"z.foot.underside", "tool": &"tool.loupe", "dwell": 0.5,
 	 "facts": [&"f.mark_maker", &"f.mark_diana"],
 	 "say": "A maker's shield. Beside it a woman's head in profile — a numeral 3 before the chin, a letter A inside the same outline. The silver to the right is scored smooth."},
+	# ЦЕ ПРАВИЛО БУЛО В ГРІ Й В АРТІ, АЛЕ НЕ В ДАНИХ. Якби дані підключили як є,
+	# гра втратила б церковне клеймо — головну знахідку другого шару справи.
+	# needs_flag: косе світло. Саме воно проявляє зішліфовану ділянку.
+	{"zone": &"z.foot.underside", "tool": &"tool.loupe", "dwell": 0.5,
+	 "needs_flag": {&"raking": true}, "requires": [&"f.mark_maker"],
+	 "facts": [&"f.church_mark"],
+	 "say": "Where the silver was ground smooth, the raking light finds it: an engraved chalice — a church's mark."},
 	{"zone": &"z.foot.underside", "tool": &"tool.loupe", "dwell": 1.2,
 	 "requires": [&"f.hb_vienna_marks"], "facts": [&"f.marks_alone"],
 	 "say": "The rest of the underside is bare. No third punch, no figures, and no bright patch where one had been taken off."},
@@ -166,6 +173,7 @@ const FACTS := {
 	&"f.mark_maker":      {"cite": "the maker's shield on the foot", "tag": &"marks", "weight": 1},
 	&"f.mark_diana":      {"cite": "the letter set inside the head", "tag": &"marks", "weight": 2},
 	&"f.marks_alone":     {"cite": "no earlier assay punch on the piece", "tag": &"marks", "weight": 2},
+	&"f.church_mark":     {"cite": "the effaced church mark beneath", "tag": &"marks", "weight": 3},
 	&"f.reg_hoffmann":    {"cite": "the register: Hoffmann, 1859 to 1871", "tag": &"books", "weight": 2},
 	&"f.hb_vienna_marks": {"cite": "the handbook of Vienna marks", "tag": &"books", "weight": 2},
 	&"f.domes":           {"cite": "two domes on the top of the foot", "tag": &"body", "weight": 2},

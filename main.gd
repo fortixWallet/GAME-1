@@ -1998,7 +1998,11 @@ func _build_hallmark(parent: Node3D) -> void:
 			verts.append(Vector3(rr * cos(a), yy, rr * sin(a)))
 			norms.append(Vector3(slope * cos(a), -1.0, slope * sin(a)).normalized())
 			# PLATE_UV<1 → на дно лягає лише центральна частина пластини, тож МАРКИ БІЛЬШІ й читаються
-			uvs.append(Vector2(0.5 + 0.5 * PLATE_UV * (rr / rad) * cos(a), 0.5 + 0.5 * PLATE_UV * (rr / rad) * sin(a)))
+			# МІНУС перед sin(a) — НЕ описка. Спід дивиться в −Y, тобто гравець бачить
+			# пластину з ЗВОРОТНОГО боку, і без дзеркалення вся текстура лягала
+			# перевернутою: голова Діани опинялась НАД щитом замість під ним, а самі
+			# клейма стояли боком. Скарга Віктора 26.07: «всі мітки вверх ногами».
+			uvs.append(Vector2(0.5 + 0.5 * PLATE_UV * (rr / rad) * cos(a), 0.5 - 0.5 * PLATE_UV * (rr / rad) * sin(a)))
 	var idx := PackedInt32Array(); var row := ns + 1
 	for ir in nr:
 		for iseg in ns:
@@ -2040,5 +2044,11 @@ func _unhandled_input(event: InputEvent) -> void:
 		cup_dragging = (event as InputEventMouseButton).pressed
 	elif event is InputEventMouseMotion and cup_dragging:
 		var mm := event as InputEventMouseMotion
-		goblet_pivot.rotation.y -= mm.relative.x * 0.012
-		goblet_pivot.rotation.x = clampf(goblet_pivot.rotation.x - mm.relative.y*0.012, -2.7, 2.7)
+		# БУЛО: rotation.y — оберт навколо СВІТОВОЇ вертикалі. Коли чашу перевернуто
+		# спідом до камери, ця вісь дивиться в об'єктив, і перетягування вбік уже не
+		# крутить клейма в площині екрана, а хитає чашу. Через це гравець фізично не
+		# міг поставити клейма рівно (скарга Віктора, 26.07).
+		# СТАЛО: горизонталь крутить навколо ВЛАСНОЇ осі предмета (як чашку в руці),
+		# вертикаль нахиляє навколо горизонталі ЕКРАНА. Це звичний «turntable».
+		goblet_pivot.rotate_object_local(Vector3.UP, -mm.relative.x * 0.012)
+		goblet_pivot.rotate(Vector3.RIGHT, -mm.relative.y * 0.012)
