@@ -87,9 +87,43 @@ const ZONES := {
 		"tools": [&"tool.rake", &"tool.loupe"],
 	},
 	# --- папери й довідники: той самий рушій, будь-який інструмент, on_click ---
+	# ⚠ КРОК 6: екран квитанції ЩЕ НЕ ІСНУЄ (на DOCS зараз лист клієнтки — інший папір).
+	# screen позначено майбутнім ім'ям, щоб ловець DOCS не пропонував зону без поверхні.
 	&"z.papers.receipt": {
-		"kind": &"img", "screen": &"DOCS", "surface": &"paper_receipt_1807",
+		"kind": &"img", "screen": &"DOCS_RECEIPT", "surface": &"paper_receipt_1807",
 		"u": Vector2(0.500, 0.430), "r": 0.190, "tools": [], "on_click": true,
+	},
+	# --- ЗОНИ З ГРИ, ЩЕ НЕ ВНЕСЕНІ В case_01.md (аудит 26.07, знахідки 1 і 24):
+	# лист клієнтки і газета. Вносити в §2–§4 специфікації разом із квитанцією (крок 6).
+	&"z.papers.letter": {
+		"kind": &"img", "screen": &"DOCS", "surface": &"letter_client",
+		"u": Vector2(0.50, 0.42), "shape": &"rect", "half": Vector2(0.34, 0.26),
+		"hint": "The client's letter", "tools": [], "on_click": true,
+	},
+	&"z.news.robbery": {
+		"kind": &"img", "screen": &"NEWS", "surface": &"newspaper_final",
+		"u": Vector2(0.499, 0.185), "shape": &"rect", "half": Vector2(0.392, 0.045),
+		"hint": "The lead of the paper", "tools": [], "on_click": true,
+	},
+	&"z.news.later": {
+		"kind": &"img", "screen": &"NEWS", "surface": &"newspaper_final",
+		"u": Vector2(0.201, 0.830), "shape": &"rect", "half": Vector2(0.136, 0.104),
+		"hint": "A later paragraph", "tools": [], "on_click": true,
+	},
+	&"z.news.society": {
+		"kind": &"img", "screen": &"NEWS", "surface": &"newspaper_final",
+		"u": Vector2(0.494, 0.541), "shape": &"rect", "half": Vector2(0.136, 0.100),
+		"hint": "About the town", "tools": [], "on_click": true,
+	},
+	&"z.news.assayer": {
+		"kind": &"img", "screen": &"NEWS", "surface": &"newspaper_final",
+		"u": Vector2(0.502, 0.872), "shape": &"rect", "half": Vector2(0.132, 0.050),
+		"hint": "Correspondence", "tools": [], "on_click": true,
+	},
+	&"z.news.market": {
+		"kind": &"img", "screen": &"NEWS", "surface": &"newspaper_final",
+		"u": Vector2(0.790, 0.897), "shape": &"rect", "half": Vector2(0.137, 0.053),
+		"hint": "The market column", "tools": [], "on_click": true,
 	},
 	&"z.book.register": {
 		"kind": &"img", "screen": &"BOOK_REG", "surface": &"reg_page_h",
@@ -161,6 +195,20 @@ const RULES := [
 	 "facts": [&"f.receipt_mismatch"],
 	 "say": "By the table on the wall: the becher of the receipt stands 219 mm and weighs 246 g. The cup on the desk stands 196 mm and weighs 331 g."},
 
+	# --- лист і газета (з гри; єдина копія say — ТУТ, main.gd більше їх не тримає) ---
+	{"zone": &"z.papers.letter", "tool": &"*", "facts": [&"f.letter_read"],
+	 "say": "She writes: from an aunt in the monastery, and she is told it is Viennese."},
+	{"zone": &"z.news.robbery", "tool": &"*", "facts": [&"f.news_robbery"],
+	 "say": "St. Onuphrius' sacristy, broken into. Among the missing: antique silver goblets."},
+	{"zone": &"z.news.later", "tool": &"*", "facts": [],
+	 "say": "The bell-rope of the sacristy had lately been renewed, and the old watchman dismissed a week before."},
+	{"zone": &"z.news.society", "tool": &"*", "facts": [],
+	 "say": "The Antiquarian Society meets Thursday: a paper on the perils of the re-struck punch."},
+	{"zone": &"z.news.assayer", "tool": &"*", "facts": [],
+	 "say": "A letter: 'a mark half-struck is not a mark honestly worn.' — An Old Assayer"},
+	{"zone": &"z.news.market", "tool": &"*", "facts": [],
+	 "say": "Market: old silver plate high; church work in brisk demand, and few questions asked."},
+
 	{"zone": &"z.book.register", "tool": &"*", "requires": [&"f.mark_maker"],
 	 "facts": [&"f.reg_hoffmann"],
 	 "say": "Register of Vienna workshops: HOFFMANN, Leopold — silversmith. Mark entered 1859. Mark struck out 1871."},
@@ -187,6 +235,9 @@ const FACTS := {
 	&"f.mark_diana":      {"cite": "the letter set inside the head", "tag": &"marks", "weight": 2},
 	&"f.marks_alone":     {"cite": "no earlier assay punch on the piece", "tag": &"marks", "weight": 2},
 	&"f.church_mark":     {"cite": "the effaced church mark beneath", "tag": &"marks", "weight": 3},
+	# факти з гри, ще не внесені в case_01.md §4 (вносити при кроці 6):
+	&"f.letter_read":     {"cite": "the client's own letter", "tag": &"papers", "weight": 1},
+	&"f.news_robbery":    {"cite": "the notice of the sacristy theft", "tag": &"papers", "weight": 1},
 	&"f.reg_hoffmann":    {"cite": "the register: Hoffmann, 1859 to 1871", "tag": &"books", "weight": 2},
 	&"f.hb_vienna_marks": {"cite": "the handbook of Vienna marks", "tag": &"books", "weight": 2},
 	&"f.domes":           {"cite": "two domes on the top of the foot", "tag": &"body", "weight": 2},

@@ -291,7 +291,7 @@ func _dbg_day1() -> void:
 
 func _dbg_case2() -> void:
 	# АУДИТ 26.07: старий тест друкував CASE2_OK безумовно — з wear=false він
-	# виглядав зеленим. Тепер: кліки ЯК ГРАВЕЦЬ (через zone_btns) і вердикт
+	# виглядав зеленим. Тепер: кліки ЯК ГРАВЕЦЬ (_click_zone → _apply_zone) і вердикт
 	# рахується по фактах; гейт greп-ає саме "wear=true chain=true docs=true".
 	dbg_mode = true
 	var dir := _shotdir()
@@ -539,6 +539,17 @@ const Case01 := preload("res://data/case_01.gd")
 # Зона клейм на споді. Тримаємо посиланням на дані справи — щоб координата й радіус
 # жили в одному місці, а не двома копіями, які роз'їдуться.
 const UNDERSIDE_ZONE: Dictionary = Case01.ZONES[&"z.foot.underside"]
+const Case02 := preload("res://data/case_02.gd")
+# дані поточної справи: зони/правила/факти беруться ЗВІДСИ, а не з гілок if
+const CASE_DATA := {1: Case01, 2: Case02}
+
+func _case_zones() -> Dictionary:
+	return (CASE_DATA[case_id] as Object).get("ZONES") if CASE_DATA.has(case_id) else {}
+func _case_rules() -> Array:
+	return (CASE_DATA[case_id] as Object).get("RULES") if CASE_DATA.has(case_id) else []
+# стан світу для needs_flag правил і зон
+func _flags() -> Dictionary:
+	return {&"raking": raking, &"tod": StringName(tod), &"lamp_on": lamp_on}
 
 # Крок часу для накопичення витримки (dwell). У тестах — ФІКСОВАНИЙ, бо інакше
 # результат залежить від fps: на вільній машині кадр коротший, і за ті самі 140 кадрів
@@ -605,13 +616,6 @@ func _shot(path: String, pre := 6) -> void:
 func _walk_glass(gc: Vector2) -> void:
 	loupe_ui.position = gc - Vector2(GLASS_CX*loupe_lw, GLASS_CY*loupe_lh)
 	_glass_desk(gc)
-
-# Натиснути зону як гравець. Друкує скаргу, якщо зони нема, — мовчазний промах
-# у тесті виглядає точнісінько як успіх (правило 17 CLAUDE.md).
-func _click_zone(id: String) -> void:
-	if not zone_btns.has(id):
-		print("ZONE_MISSING ", id); return
-	(zone_btns[id] as Button).pressed.emit()
 
 func _dbg_walk() -> void:
 	dbg_mode = true
@@ -955,79 +959,68 @@ func _show(name: String) -> void:
 	# КРОК 3: тут БУЛА роздача фактів за появу екрана — NEWS давав read_news,
 	# DOCS і TESTIMONY давали read_docs, а будь-який екран із meta("mark") давав
 	# свій факт просто тому, що відкрився. Гравець отримував знання за гортання.
-	# Тепер факт здобувається лише дією по місцю на аркуші — див. PAPER_ZONES.
+	# Тепер факт здобувається лише дією по зоні (єдиний ловець — _paper_catcher).
 
 func _set_hint(t: String) -> void:
 	if hint_label: hint_label.text = t
 
-# ── ЗОНИ НА ПАПЕРАХ (крок 3) ─────────────────────────────────────────────────
-# Було: факт давався за те, що екран ПОКАЗАВСЯ. Гравець гортав сторінки й отримував
-# знання ні за що — це половина відчуття «гра сама веде до відповіді».
-# Стало: на аркуші є місця, і значення має лише те, яке гравець знайшов сам.
-#
-# Координати — у частках САМОГО АРКУША, не екрана: аркуш вписується по-різному
-# (COVER, CONTAIN, фіксована висота), а зона мусить лишатися на тому самому малюнку.
-# «half» — піврозміри, теж у частках аркуша.
-const PAPER_ZONES := {
-	"NEWS": [
-		{"id": "z.news.robbery", "u": Vector2(0.499, 0.185), "half": Vector2(0.392, 0.045),
-		 "fact": "f.news_robbery", "hint": "The lead of the paper",
-		 "say": "St. Onuphrius' sacristy, broken into. Among the missing: antique silver goblets."},
-		{"id": "z.news.later", "u": Vector2(0.201, 0.830), "half": Vector2(0.136, 0.104),
-		 "fact": "", "hint": "A later paragraph",
-		 "say": "The bell-rope of the sacristy had lately been renewed, and the old watchman dismissed a week before."},
-		{"id": "z.news.society", "u": Vector2(0.494, 0.541), "half": Vector2(0.136, 0.100),
-		 "fact": "", "hint": "About the town",
-		 "say": "The Antiquarian Society meets Thursday: a paper on the perils of the re-struck punch."},
-		{"id": "z.news.assayer", "u": Vector2(0.502, 0.872), "half": Vector2(0.132, 0.050),
-		 "fact": "", "hint": "Correspondence",
-		 "say": "A letter: 'a mark half-struck is not a mark honestly worn.' — An Old Assayer"},
-		{"id": "z.news.market", "u": Vector2(0.790, 0.897), "half": Vector2(0.137, 0.053),
-		 "fact": "", "hint": "The market column",
-		 "say": "Market: old silver plate high; church work in brisk demand, and few questions asked."},
-	],
-	"TESTIMONY": [
-		{"id": "z.testimony.widow", "u": Vector2(0.50, 0.28), "half": Vector2(0.36, 0.16),
-		 "fact": "f.testimony_read", "hint": "The widow's statement",
-		 "say": "The widow: wound every night before the lamp, thirty years; the chain was his father's and never off the watch."},
-		{"id": "z.testimony.nephew", "u": Vector2(0.50, 0.63), "half": Vector2(0.36, 0.16),
-		 "fact": "f.testimony_read", "hint": "The nephew's statement",
-		 "say": "The nephew: given in the last week; the chain put on fresh, by his own hand. Right-handed, as the uncle was."},
-	],
-	"DOCS": [
-		{"id": "z.papers.letter", "u": Vector2(0.50, 0.42), "half": Vector2(0.34, 0.26),
-		 "fact": "f.letter_read", "hint": "The client's letter",
-		 "say": "She writes: from an aunt in the monastery, and she is told it is Viennese."},
-	],
-}
-var zone_btns := {}     # id зони → кнопка. Потрібне тестам, щоб клікати як гравець.
+# ── ЄДИНИЙ ЛОВЕЦЬ 2D-ЗОН (крок 5b) ───────────────────────────────────────────
+# До 5b було ДВІ системи зон: PAPER_ZONES (кнопки в частках аркуша, свій хіт-тест
+# через Button) і core/zones.gd (pick_2d, який гра не викликала взагалі) — аудит
+# 26.07, знахідка 13. Тепер: один прозорий Control поверх аркуша, клік іде через
+# pick_2d рушія, факт і say — через RuleEngine.find по ДАНИХ справи. Рядки say
+# більше не дублюються в main.gd.
+var paper_frames := {}   # screen_name → {"frame": Rect2, "aspect": float}
 
-# Невидима зона поверх аркуша. Жодного мальованого пікселя: підказка — текст шрифтом
-# на наявній поверхні, зворотний зв'язок — курсор-рука (те саме, що вже робить _mag_hotspot).
-func _paper_zone(parent: Control, paper: Control, z: Dictionary) -> Button:
-	var b := Button.new(); b.flat = true; b.modulate.a = 0.0
-	var u: Vector2 = z["u"]; var half: Vector2 = z["half"]
-	b.size = Vector2(paper.size.x*half.x*2.0, paper.size.y*half.y*2.0)
-	b.position = paper.position + Vector2(paper.size.x*u.x, paper.size.y*u.y) - b.size*0.5
-	b.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-	b.mouse_entered.connect(_set_hint.bind(String(z["hint"])))
-	b.mouse_exited.connect(_set_hint.bind(""))
-	b.pressed.connect(_zone_press.bind(z))
-	zone_btns[String(z["id"])] = b
-	parent.add_child(b); return b
+func _paper_catcher(screen_name: String, parent: Control, paper: Control) -> void:
+	paper_frames[screen_name] = {
+		"frame": Rect2(paper.position, paper.size),
+		"aspect": paper.size.x / maxf(paper.size.y, 1.0),
+	}
+	var c := Control.new()
+	c.name = "zone_catcher"
+	c.position = paper.position; c.size = paper.size
+	c.mouse_filter = Control.MOUSE_FILTER_STOP
+	c.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	c.gui_input.connect(func(ev: InputEvent):
+		if ev is InputEventMouseButton and (ev as InputEventMouseButton).pressed \
+				and (ev as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT:
+			var id := _pick_2d_at(screen_name, c.position + (ev as InputEventMouseButton).position)
+			if id != "": _apply_zone(id)
+		elif ev is InputEventMouseMotion:
+			var id2 := _pick_2d_at(screen_name, c.position + (ev as InputEventMouseMotion).position)
+			var z: Dictionary = _case_zones().get(StringName(id2), {})
+			_set_hint(String(z.get("hint", "")) if id2 != "" else ""))
+	parent.add_child(c)
 
-# ЄДИНЕ місце, де клік по паперу перетворюється на знання.
-func _zone_press(z: Dictionary) -> void:
-	var f := String(z["fact"])
-	# add_fact сам гасить дублі; звук і рядок даємо щоразу — гравець має право перечитати
-	if f != "" and add_fact(f): _play("page_turn")
-	else: _play("ui_soft")
-	_set_hint(String(z["say"]))
+func _pick_2d_at(screen_name: String, p: Vector2) -> String:
+	var pf: Dictionary = paper_frames.get(screen_name, {})
+	if pf.is_empty(): return ""
+	return ZoneHit.pick_2d(p, _case_zones(), screen_name,
+		pf["frame"] as Rect2, float(pf["aspect"]), {}, _flags())
 
-func _build_paper_zones(screen_name: String, parent: Control, paper: Control) -> void:
-	if not PAPER_ZONES.has(screen_name): return
-	for z in PAPER_ZONES[screen_name]:
-		_paper_zone(parent, paper, z)
+# ЄДИНЕ місце, де клік по 2D-зоні стає знанням. Правило шукається в ДАНИХ.
+func _apply_zone(zone_id: String) -> void:
+	var rule := RuleEngine.find(_case_rules(), StringName(zone_id), &"*", facts, _flags())
+	if rule.is_empty():
+		# правило вже віддало все — повторити say останнього придатного (2.5: перечитати можна)
+		for r in _case_rules():
+			var rr: Dictionary = r
+			if StringName(rr.get("zone", &"")) == StringName(zone_id) \
+					and RuleEngine.applicable(rr, facts, _flags()):
+				_play("ui_soft"); _set_hint(String(rr.get("say", ""))); return
+		return
+	var got_new := false
+	for f in RuleEngine.facts_of(rule):
+		if add_fact(String(f)): got_new = true
+	_play("page_turn" if got_new else "ui_soft")
+	_set_hint(String(rule.get("say", "")))
+
+# Тести клікають так само, як гравець клікає зону (друк ZONE_MISSING — правило 17)
+func _click_zone(id: String) -> void:
+	if not _case_zones().has(StringName(id)):
+		print("ZONE_MISSING ", id); return
+	_apply_zone(id)
 
 # інтерактивна РІЧ: мальований оверлей, що світиться на наведення і діє на клік
 func _object(parent: Control, key: String, ov: Texture2D, hint: String, action: Callable, lift := false, mask: Texture2D = null) -> TextureButton:
@@ -1051,9 +1044,6 @@ func _object(parent: Control, key: String, ov: Texture2D, hint: String, action: 
 	obj_btns[key] = b
 	parent.add_child(b); return b
 
-# ХОТСПОТ ЛУПИ: сама лупа ВБУДОВАНА в кадр столу; тут лише невидима зона кліку.
-# Наведення підсвічує НЕ спрайт (нема чого), а весь кадр столу з лупою — свопом на теплішу версію
-# не робимо; просто курсор-рука + підказка. Жодних плоских вирізок і напівпрозорих країв.
 const MAG_RECT := Rect2(0.588, 0.435, 0.215, 0.300)   # bbox вбудованої лупи (частки кадру)
 func _mag_hotspot(parent: Control) -> Button:
 	var b := Button.new(); b.flat = true; b.modulate.a = 0
@@ -1476,7 +1466,7 @@ func _build_docs() -> void:
 	var t := Label.new(); t.label_settings = _ls(fr, int(lh*0.033), Color(0.20,0.14,0.09))
 	t.text = "From the client:\n\n\"This goblet came to me\nfrom an aunt in the monastery.\nI am told it is Viennese.\nI should like to know its worth —\nand whether it is mine to sell.\"\n\nShe would not meet my eye\nas she said it."
 	t.position = paper.position + Vector2(lw*0.13, lh*0.15); t.mouse_filter = Control.MOUSE_FILTER_IGNORE; s.add_child(t)
-	_build_paper_zones("DOCS", s, paper)
+	_paper_catcher("DOCS", s, paper)
 	# навігація — нижній ряд на притемненому столі (геть з паперу), тепла і читабельна
 	_txtbtn(s, "←  back to the desk", Vector2(W*0.04, H*0.92), func(): _show("DESK"))
 	_txtbtn(s, "Open the newspaper  →", Vector2(W*0.40, H*0.92), func(): _show("NEWS"))
@@ -1491,7 +1481,7 @@ func _build_news() -> void:
 	var np := TextureRect.new(); np.texture = nt; np.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	np.stretch_mode = TextureRect.STRETCH_SCALE; np.size = Vector2(nw, nh)
 	np.position = Vector2((W-nw)*0.5, (H-nh)*0.5); np.mouse_filter = Control.MOUSE_FILTER_IGNORE; s.add_child(np)
-	_build_paper_zones("NEWS", s, np)
+	_paper_catcher("NEWS", s, np)
 	_txtbtn(s, "←  back", Vector2(W*0.04, H*0.92), func(): _show("DOCS"))
 
 # ---------- CATALOG (клік по гербу) ----------
@@ -1850,16 +1840,12 @@ func _build_case2() -> void:
 	var tx := Label.new(); tx.label_settings = _ls(fr, int(lh*0.028), Color(0.20,0.14,0.09))
 	tx.text = "THE WIDOW:\n\"He wound it every night before\nthe lamp. Thirty years. The chain\nwas his father's — it was never\noff the watch.\"\n\nTHE NEPHEW:\n\"My uncle gave it me in his last\nweek. I put the chain on myself,\nfresh, to carry it properly.\nHe was right-handed, as I am.\""
 	tx.position = paper.position + Vector2(lw*0.11, lh*0.11); tx.mouse_filter = Control.MOUSE_FILTER_IGNORE; t.add_child(tx)
-	_build_paper_zones("TESTIMONY", t, paper)
+	_paper_catcher("TESTIMONY", t, paper)
 	_txtbtn(t, "←  back to the desk", Vector2(W*0.04, H*0.92), func(): _show("DESK2"))
 	_txtbtn(t, "Write the certificate  →", Vector2(W*0.72, H*0.92), func(): _show("CERT"))
 	# --- дві деталі під лупою: голівка (знос) і вушко (подряпини) ---
-	_build_detail("WATCH_WEAR", "watch_wear", "z.watch.wear",
-		"The crown is worn flat on its LEFT side — wound for years by a left hand.",
-		"f.crown_wear", "WATCH_CHAIN", "the bow and chain  →")
-	_build_detail("WATCH_CHAIN", "watch_chain", "z.watch.chain",
-		"The bow is scratched bright and raw — this chain was put on lately, not worn for thirty years.",
-		"f.bow_scratches", "WATCH_WEAR", "←  the winding crown")
+	_build_detail("WATCH_WEAR", "watch_wear", "WATCH_CHAIN", "the bow and chain  →")
+	_build_detail("WATCH_CHAIN", "watch_chain", "WATCH_WEAR", "←  the winding crown")
 
 # екран-деталь: велике фото; знахідка ставиться КЛІКОМ по самій деталі, не показом.
 # ІСТОРІЯ РЕГРЕСІЇ (аудит 26.07): раніше факт клали через set_meta("mark", ...) і його
@@ -1867,7 +1853,7 @@ func _build_case2() -> void:
 # записом — found_wear і found_chain не ставилися НІДЕ, атестат справи 2 став
 # непрохідним, і гейт мовчав, бо case2 у ньому не було. Тепер факт = дія по зоні
 # (той самий закон, що PAPER_ZONES), зона зареєстрована в zone_btns для тестів.
-func _build_detail(scr: String, texname: String, zone_id: String, note: String, fact_id: String, other: String, other_lbl: String) -> void:
+func _build_detail(scr: String, texname: String, other: String, other_lbl: String) -> void:
 	var d := _screen(scr)
 	_paper_backdrop(d, 0.12)
 	var im_pos := Vector2(W*0.3, H*0.10); var im_size := Vector2(W*0.4, H*0.74)
@@ -1878,18 +1864,11 @@ func _build_detail(scr: String, texname: String, zone_id: String, note: String, 
 		im.stretch_mode = TextureRect.STRETCH_SCALE; im.size = Vector2(dw, dh)
 		im.position = Vector2((W-dw)*0.5, H*0.10); im.mouse_filter = Control.MOUSE_FILTER_IGNORE; d.add_child(im)
 		im_pos = im.position; im_size = im.size
-	# зона огляду — центральні 62% фото; напис-відповідь з'являється ПІСЛЯ дії
-	var hb := Button.new(); hb.flat = true; hb.modulate.a = 0
-	hb.size = im_size*0.62; hb.position = im_pos + (im_size - hb.size)*0.5
-	hb.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-	hb.mouse_entered.connect(_set_hint.bind("Bring the eye close."))
-	hb.mouse_exited.connect(_set_hint.bind(""))
-	hb.pressed.connect(func():
-		if add_fact(fact_id): _play("page_turn")
-		else: _play("ui_soft")
-		_set_hint(note))
-	d.add_child(hb)
-	zone_btns[zone_id] = hb
+	# зона огляду — з ДАНИХ справи (data/case_02.gd), через єдиний ловець;
+	# напис-відповідь (say із правила) з'являється ПІСЛЯ дії, не до неї
+	var ph := Control.new(); ph.position = im_pos; ph.size = im_size
+	ph.mouse_filter = Control.MOUSE_FILTER_IGNORE; d.add_child(ph)
+	_paper_catcher(scr, d, ph)
 	_txtbtn(d, "←  set it down", Vector2(W*0.04, H*0.92), func(): _show("DESK2"))
 	_txtbtn(d, other_lbl, Vector2(W*0.42, H*0.92), func(): _show(other))
 	_txtbtn(d, "Write the certificate  →", Vector2(W*0.74, H*0.92), func(): _show("CERT"))
