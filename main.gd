@@ -303,8 +303,8 @@ func _dbg_case2() -> void:
 	_show("DESK2"); await _shot(dir+"c2_01_desk.png")
 	_show("TESTIMONY"); _click_zone("z.testimony.widow"); _click_zone("z.testimony.nephew")
 	await _shot(dir+"c2_02_statements.png")
-	_show("WATCH_WEAR"); _click_zone("z.watch.wear"); await _shot(dir+"c2_03_crown.png")
-	_show("WATCH_CHAIN"); _click_zone("z.watch.chain"); await _shot(dir+"c2_04_bow.png")
+	_show("DESK2"); _click_zone("z.watch.crown"); await _shot(dir+"c2_03_crown.png")
+	_click_zone("z.watch.bow"); await _shot(dir+"c2_04_bow.png")
 	_show("CERT"); await _shot(dir+"c2_05_cert.png")
 	_choose(0, "a left-handed man"); _choose(1, "lately taken off and put back")
 	_choose(2, "the widow"); _choose(3, "the crown worn on its left side")
@@ -2012,16 +2012,13 @@ func _build_case2() -> void:
 	intro.size = Vector2(W*0.64, H*0.12); intro.position = Vector2(W*0.18, H*0.05)
 	intro.mouse_filter = Control.MOUSE_FILTER_IGNORE; s.add_child(intro)
 	var itw := create_tween(); itw.tween_interval(7.0); itw.tween_property(intro, "modulate:a", 0.0, 2.0)
-	# хотспот самого годинника → огляд
-	var wb := Button.new(); wb.flat = true; wb.modulate.a = 0
-	wb.position = Vector2(W*0.33, H*0.40); wb.size = Vector2(W*0.20, H*0.28)
-	wb.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-	wb.mouse_entered.connect(_set_hint.bind("The watch — take it up and look closer"))
-	wb.mouse_exited.connect(_set_hint.bind(""))
-	wb.pressed.connect(func(): _play("goblet_set"); _show("WATCH_WEAR"))
-	s.add_child(wb)
+	# ЗОНИ НА САМОМУ ГОДИННИКУ (вимога Віктора 26.07: «підказки на ньому, а не
+	# окремі картинки»). Кадр столу вписаний COVER — рамку для ловця рахує рушій.
+	var frame := ZoneHit.image_rect(Vector2(tex["case2_desk"].get_width(), tex["case2_desk"].get_height()), Vector2(W, H), true)
+	var pane := Control.new(); pane.position = frame.position; pane.size = frame.size
+	pane.mouse_filter = Control.MOUSE_FILTER_IGNORE; s.add_child(pane)
+	_paper_catcher("DESK2", s, pane)
 	_txtbtn(s, "the statements  →", Vector2(W*0.05, H*0.92), func(): _show("TESTIMONY"))
-	_txtbtn(s, "examine the watch  →", Vector2(W*0.40, H*0.92), func(): _show("WATCH_WEAR"))
 	_txtbtn(s, "Write the certificate  →", Vector2(W*0.74, H*0.92), func(): _show("CERT"))
 	# --- два свідчення на одному аркуші (їх треба ЗІСТАВИТИ) ---
 	var t := _screen("TESTIMONY")
@@ -2037,35 +2034,33 @@ func _build_case2() -> void:
 	_paper_catcher("TESTIMONY", t, paper)
 	_txtbtn(t, "←  back to the desk", Vector2(W*0.04, H*0.92), func(): _show("DESK2"))
 	_txtbtn(t, "Write the certificate  →", Vector2(W*0.72, H*0.92), func(): _show("CERT"))
-	# --- дві деталі під лупою: голівка (знос) і вушко (подряпини) ---
-	_build_detail("WATCH_WEAR", "watch_wear", "WATCH_CHAIN", "the bow and chain  →")
-	_build_detail("WATCH_CHAIN", "watch_chain", "WATCH_WEAR", "←  the winding crown")
 
-# екран-деталь: велике фото; знахідка ставиться КЛІКОМ по самій деталі, не показом.
-# ІСТОРІЯ РЕГРЕСІЇ (аудит 26.07): раніше факт клали через set_meta("mark", ...) і його
-# викликав _show(). Крок 3 прибрав читача мети, але ці два екрани лишилися з мертвим
-# записом — found_wear і found_chain не ставилися НІДЕ, атестат справи 2 став
-# непрохідним, і гейт мовчав, бо case2 у ньому не було. Тепер факт = дія по зоні
-# (той самий закон, що PAPER_ZONES), зона зареєстрована в zone_btns для тестів.
-func _build_detail(scr: String, texname: String, other: String, other_lbl: String) -> void:
-	var d := _screen(scr)
-	_paper_backdrop(d, 0.12)
-	var im_pos := Vector2(W*0.3, H*0.10); var im_size := Vector2(W*0.4, H*0.74)
-	if tex.has(texname):
-		var t2: Texture2D = tex[texname]
-		var dh := H*0.74; var dw := dh*float(t2.get_width())/float(t2.get_height())
-		var im := TextureRect.new(); im.texture = t2; im.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		im.stretch_mode = TextureRect.STRETCH_SCALE; im.size = Vector2(dw, dh)
-		im.position = Vector2((W-dw)*0.5, H*0.10); im.mouse_filter = Control.MOUSE_FILTER_IGNORE; d.add_child(im)
-		im_pos = im.position; im_size = im.size
-	# зона огляду — з ДАНИХ справи (data/case_02.gd), через єдиний ловець;
-	# напис-відповідь (say із правила) з'являється ПІСЛЯ дії, не до неї
-	var ph := Control.new(); ph.position = im_pos; ph.size = im_size
-	ph.mouse_filter = Control.MOUSE_FILTER_IGNORE; d.add_child(ph)
-	_paper_catcher(scr, d, ph)
-	_txtbtn(d, "←  set it down", Vector2(W*0.04, H*0.92), func(): _show("DESK2"))
-	_txtbtn(d, other_lbl, Vector2(W*0.42, H*0.92), func(): _show(other))
-	_txtbtn(d, "Write the certificate  →", Vector2(W*0.74, H*0.92), func(): _show("CERT"))
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	# у HANDS: тягнеш — ОБЕРТАЄШ чашу (можна перевернути й глянути спід). Лупа кладеться кнопкою.
+	if not (screens.has("HANDS") and screens["HANDS"].visible and goblet_pivot): return
+	if event is InputEventMouseButton and (event as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT:
+		var mb := event as InputEventMouseButton
+		if mb.pressed:
+			cup_dragging = true; drag_travel = 0.0
+		else:
+			cup_dragging = false
+			# КОРОТКИЙ КЛІК ≠ ОБЕРТ (крок 5c): якщо миша майже не рухалась — це дія
+			# рукою по зоні (горбики z.foot.top). Драг лишається обертом чаші.
+			if drag_travel < 8.0 and not loupe_held:
+				_click_zone_3d(mb.position)
+	elif event is InputEventMouseMotion and cup_dragging:
+		var mm := event as InputEventMouseMotion
+		# БУЛО: rotation.y — оберт навколо СВІТОВОЇ вертикалі. Коли чашу перевернуто
+		# спідом до камери, ця вісь дивиться в об'єктив, і перетягування вбік уже не
+		# крутить клейма в площині екрана, а хитає чашу. Через це гравець фізично не
+		# міг поставити клейма рівно (скарга Віктора, 26.07).
+		# СТАЛО: горизонталь крутить навколо ВЛАСНОЇ осі предмета (як чашку в руці),
+		# вертикаль нахиляє навколо горизонталі ЕКРАНА. Це звичний «turntable».
+		drag_travel += mm.relative.length()
+		goblet_pivot.rotate_object_local(Vector3.UP, -mm.relative.x * 0.012)
+		goblet_pivot.rotate(Vector3.RIGHT, -mm.relative.y * 0.012)
 
 func _evening() -> void:
 	case_done = true
@@ -2257,28 +2252,3 @@ func _aabb(n: Node) -> AABB:
 		if first: a = wa; first = false
 		else: a = a.merge(wa)
 	return a
-
-func _unhandled_input(event: InputEvent) -> void:
-	# у HANDS: тягнеш — ОБЕРТАЄШ чашу (можна перевернути й глянути спід). Лупа кладеться кнопкою.
-	if not (screens.has("HANDS") and screens["HANDS"].visible and goblet_pivot): return
-	if event is InputEventMouseButton and (event as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT:
-		var mb := event as InputEventMouseButton
-		if mb.pressed:
-			cup_dragging = true; drag_travel = 0.0
-		else:
-			cup_dragging = false
-			# КОРОТКИЙ КЛІК ≠ ОБЕРТ (крок 5c): якщо миша майже не рухалась — це дія
-			# рукою по зоні (горбики z.foot.top). Драг лишається обертом чаші.
-			if drag_travel < 8.0 and not loupe_held:
-				_click_zone_3d(mb.position)
-	elif event is InputEventMouseMotion and cup_dragging:
-		var mm := event as InputEventMouseMotion
-		# БУЛО: rotation.y — оберт навколо СВІТОВОЇ вертикалі. Коли чашу перевернуто
-		# спідом до камери, ця вісь дивиться в об'єктив, і перетягування вбік уже не
-		# крутить клейма в площині екрана, а хитає чашу. Через це гравець фізично не
-		# міг поставити клейма рівно (скарга Віктора, 26.07).
-		# СТАЛО: горизонталь крутить навколо ВЛАСНОЇ осі предмета (як чашку в руці),
-		# вертикаль нахиляє навколо горизонталі ЕКРАНА. Це звичний «turntable».
-		drag_travel += mm.relative.length()
-		goblet_pivot.rotate_object_local(Vector3.UP, -mm.relative.x * 0.012)
-		goblet_pivot.rotate(Vector3.RIGHT, -mm.relative.y * 0.012)
