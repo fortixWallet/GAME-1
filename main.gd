@@ -807,7 +807,7 @@ func _dbg_loupe() -> void:
 	get_tree().quit()
 
 func _load() -> void:
-	for n in ["case_desk","case_desk_loupe","atestat_flat_blank","newspaper_final","catalog_final","stamp_top_cut","wax_stick","seal_cut","ov_goblet","ov_goblet_click","ov_folder","ov_folder_click"]:
+	for n in ["case_desk","case_desk_loupe","atestat_flat_blank","newspaper_final","catalog_final_v2","stamp_top_cut","wax_stick","seal_cut","ov_goblet","ov_goblet_click","ov_folder","ov_folder_click"]:
 		tex[n] = load(ART + n + ".png")
 	tex["mark_maker"] = load(ART + "mark_ref_v3.png")   # еталон клейма майстра = той самий щит, що комірка r3c8 каталогу
 	# детальні кадри дна для лупи: звичайне світло (клеймо+зішліфована ділянка) і косе світло (церковна мітка)
@@ -1406,7 +1406,9 @@ func _build_catalog() -> void:
 	var s := _screen("CATALOG")
 	_paper_backdrop(s, 0.22)
 	# СТОРІНКА КАТАЛОГУ ліворуч; праворуч — темна панель столу з еталоном і навігацією
-	var ct: Texture2D = tex["catalog_final"]
+	# v2: у вихідного файла була ЗАПЕЧЕНА біла рамка (полотно генерації) — на темному
+	# столі вона читалась як біла облямівка навколо сторінки. Обрізано, кути в альфу.
+	var ct: Texture2D = tex["catalog_final_v2"]
 	var pw: float = W*0.70; var ph: float = pw*float(ct.get_height())/float(ct.get_width())
 	var px: float = W*0.015; var py: float = (H-ph)*0.5
 	var cat := TextureRect.new(); cat.texture = ct; cat.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
@@ -1428,7 +1430,9 @@ func _build_catalog() -> void:
 	rl.mouse_filter = Control.MOUSE_FILTER_IGNORE; s.add_child(rl)
 	# хотспот саме на щиті r3c8 (крилата Хі-Ро — точний двійник клейма чаші)
 	var hs := Button.new(); hs.flat = true; hs.modulate.a = 0
-	var mx: float = px + pw*0.867; var my: float = py + ph*0.612; var mr: float = pw*0.042
+	# частки перераховані під ОБРІЗАНУ текстуру v2 (знято поля 39 злів / 40 згори з
+	# кадру 1792×1128 → 1716×1088). Стара пара (0.867, 0.612) вказувала б повз комірку.
+	var mx: float = px + pw*0.8827; var my: float = py + ph*0.5977; var mr: float = pw*0.0439
 	hs.position = Vector2(mx-mr, my-mr); hs.size = Vector2(mr*2, mr*2)
 	hs.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	hs.mouse_entered.connect(_cat_hover)

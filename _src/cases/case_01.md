@@ -154,7 +154,7 @@
 
 | fact_id | text (EN, спостереження) | cite (EN) | tag | weight |
 |---|---|---|---|---|
-| `f.mark_maker` | "A rectangular punch with clipped corners on the underside of the foot: **L·HOFFMANN**." | "the maker's punch on the foot" | `marks` | 1 |
+| `f.mark_maker` | "A punch struck into the underside of the foot: a shield, and within it a winged monogram set between two letters." *(приведено до арту 26.07: на пластині ЩИТ із крилатою монограмою, а не прямокутник із написом. Саме цей щит гравець шукає в каталозі, і збіг дає «Hoffmann, Wien».)* | "the maker's shield on the foot" | `marks` | 1 |
 | `f.mark_diana` | "Beside it, a woman's head in profile. A numeral **3** stands before the chin. The letter **A** stands **inside the same outline**, under the throat." | "the letter set inside the head" | `marks` | 2 |
 | `f.marks_alone` | "The rest of the underside is bare. No third punch, no figures, no bright patch where one had been taken off." | "no earlier assay punch on the piece" | `marks` | 2 |
 | `f.reg_hoffmann` | "Register of Vienna workshops: HOFFMANN, Leopold — silversmith. Mark entered 1859. Mark struck out 1871." | "the register: Hoffmann, 1859 to 1871" | `books` | 2 |
