@@ -697,6 +697,12 @@ func _dbg_walk() -> void:
 		_show("BOOK_REG"); await _shot(dir+"e2_register.png")
 		_show("BOOK_MARKS"); await _shot(dir+"e3_handbook.png")
 		_show("DESK"); _refresh_tool_row(); await _shot(dir+"e4_desk_tools.png")
+		_show_notebook(); await _shot(dir+"e5_notebook.png")
+		var nfacts := 0
+		var ft2 := _case_facts_table()
+		for ff in facts:
+			if ft2.has(StringName(ff)): nfacts += 1
+		print("NOTEBOOK_OK rows=", notebook_rows, " facts=", nfacts, " match=", notebook_rows == nfacts)
 		print("WALK_E_OK neg=", neg_ok, " unlocked=", unlocked, " measured=", measured,
 			  " books=", books, " alone=", facts.has("f.marks_alone"))
 	elif "b" in args:
@@ -995,7 +1001,7 @@ func _load() -> void:
 	# справа 2 «Спадок удови»
 	for n3 in ["hub_day","hub_day_case","hub_lamp_off","hub_evening","hub_evening_figure","hub_night","hub_darkness","menu_door","client_woman","client_in_room","subtitle_band"]:
 		if ResourceLoader.exists(ART + n3 + ".png"): tex[n3] = load(ART + n3 + ".png")
-	for n2 in ["case2_desk","watch_wear","watch_chain","paper_receipt_1807","reg_page_h","marks_page_vienna"]:
+	for n2 in ["case2_desk","watch_wear","watch_chain","paper_receipt_1807","reg_page_h","marks_page_vienna","notebook_spread"]:
 		if ResourceLoader.exists(ART + n2 + ".png"): tex[n2] = load(ART + n2 + ".png")
 	# опційний арт (додано 24.07): чистий лист клієнтки
 	if ResourceLoader.exists(ART + "letter_client.png"):
@@ -1550,6 +1556,7 @@ func _build_desk() -> void:
 	var s := _screen("DESK")
 	desk_bg = _bg(s, tex["case_desk_loupe"])   # стіл із ВБУДОВАНОЮ лупою (перспектива+тінь у сцені)
 	gob_btn = _object(s, "goblet", tex["ov_goblet"], "The silver goblet — take it in hand", func(): _show("HANDS"), true, tex["ov_goblet_click"])
+	_txtbtn(s, "✎  the notebook", Vector2(W*0.855, H*0.185), func(): _show_notebook(), 0.026)
 	tool_row = Control.new(); tool_row.position = Vector2(W*0.04, H*0.055)
 	tool_row.size = Vector2(W*0.5, H*0.05); s.add_child(tool_row)
 	_refresh_tool_row()
@@ -1616,6 +1623,7 @@ func _build_docs() -> void:
 	_paper_catcher("DOCS", s, paper)
 	# навігація — нижній ряд на притемненому столі (геть з паперу), тепла і читабельна
 	_txtbtn(s, "←  back to the desk", Vector2(W*0.04, H*0.92), func(): _show("DESK"))
+	_txtbtn(s, "✎", Vector2(W*0.945, H*0.055), func(): _show_notebook(), 0.030)
 	_txtbtn(s, "Open the newspaper  →", Vector2(W*0.34, H*0.92), func(): _show("NEWS"))
 	_txtbtn(s, "The paper with the cup  →", Vector2(W*0.60, H*0.92), func(): _show("DOCS_RECEIPT"))
 	_txtbtn(s, "Mark catalogue  →", Vector2(W*0.84, H*0.92), func(): _show("CATALOG"))
@@ -1654,6 +1662,73 @@ func _ptext(sc: Dictionary, txt: String, ux: float, uy: float, size_f: float,
 	var l := Label.new(); l.label_settings = _ls(fb if italic else fr, int(pg.size.y*size_f), col)
 	l.text = txt; l.position = pg.position + Vector2(pg.size.x*ux, pg.size.y*uy)
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE; (sc["s"] as Control).add_child(l)
+
+# ── НОТАТНИК (крок 6 плану) ──────────────────────────────────────────────────
+# Розворот записника; кожен здобутий факт — рядок рукописом У ПОРЯДКУ ВІДКРИТТЯ
+# (порядок вставки Dictionary = хронологія), при деяких — вклейка-вирізка арту
+# (AtlasTexture з region у пікселях текстури). Відкривається з будь-якого екрана
+# розслідування кнопкою або клавішею N; повертає туди, звідки відкрили.
+var notebook_prev := "DESK"
+var notebook_rows := 0
+
+func _show_notebook() -> void:
+	if _shown() != "NOTEBOOK": notebook_prev = _shown()
+	_refresh_notebook()
+	_show("NOTEBOOK")
+
+func _refresh_notebook() -> void:
+	if not screens.has("NOTEBOOK"):
+		var s0 := _screen("NOTEBOOK")
+		_paper_backdrop(s0, 0.14)
+		s0.set_meta("built", true)
+	var s: Control = screens["NOTEBOOK"]
+	for c in s.get_children():
+		if c is TextureRect or c is Label or c is Button: c.queue_free()
+	var t: Texture2D = tex["notebook_spread"]
+	var nh := H*0.96; var nw := nh*float(t.get_width())/float(t.get_height())
+	var pg := TextureRect.new(); pg.texture = t; pg.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	pg.stretch_mode = TextureRect.STRETCH_SCALE; pg.size = Vector2(nw, nh)
+	pg.position = Vector2((W-nw)*0.5, (H-nh)*0.5); pg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	s.add_child(pg)
+	var ft := _case_facts_table()
+	# дві сторінки розвороту: x-межі у частках аркуша
+	var cols := [[0.075, 0.315], [0.560, 0.315]]
+	var row_h := 0.105
+	notebook_rows = 0
+	var idx := 0
+	for fid_s in facts:
+		var fid := StringName(fid_s)
+		if not ft.has(fid): continue
+		var fd: Dictionary = ft[fid]
+		var col: int = 0 if idx < 8 else 1
+		var yy: float = 0.075 + row_h*float(idx - (0 if col == 0 else 8))
+		if yy > 0.86: break   # розворот повний — далі майбутня друга сторінка (справа 8+)
+		var x0: float = (cols[col] as Array)[0]
+		var cw: float = (cols[col] as Array)[1]
+		var has_crop: bool = fd.has("crop")
+		var l := Label.new(); l.label_settings = _ls(fh, int(nh*0.0205), Color(0.21,0.15,0.10))
+		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		l.size = Vector2(nw*(cw - (0.085 if has_crop else 0.0)), nh*(row_h - 0.012))
+		l.position = pg.position + Vector2(nw*x0, nh*yy)
+		l.text = "— " + String(fd.get("text", fd.get("cite", fid_s)))
+		l.clip_text = true
+		l.mouse_filter = Control.MOUSE_FILTER_IGNORE; s.add_child(l)
+		if has_crop:
+			var cr: Dictionary = fd["crop"]
+			var at := AtlasTexture.new(); at.atlas = tex[String(cr["tex"])]; at.region = cr["region"]
+			var im := TextureRect.new(); im.texture = at; im.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			im.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			im.size = Vector2(nw*0.078, nh*(row_h - 0.018))
+			im.position = pg.position + Vector2(nw*(x0 + cw - 0.078), nh*(yy + 0.004))
+			im.mouse_filter = Control.MOUSE_FILTER_IGNORE; s.add_child(im)
+		notebook_rows += 1
+		idx += 1
+	if notebook_rows == 0:
+		var e := Label.new(); e.label_settings = _ls(fh, int(nh*0.024), Color(0.44,0.36,0.28))
+		e.text = "Nothing set down yet."
+		e.position = pg.position + Vector2(nw*0.10, nh*0.10)
+		e.mouse_filter = Control.MOUSE_FILTER_IGNORE; s.add_child(e)
+	_txtbtn(s, "←  put it away", Vector2(W*0.04, H*0.92), func(): _show(notebook_prev))
 
 func _build_receipt() -> void:
 	var sc := _paper_screen("DOCS_RECEIPT", "paper_receipt_1807", "DOCS", "←  back to the papers")
@@ -2199,6 +2274,12 @@ func _build_case2() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	# нотатник під рукою всюди: N відкриває, N/Esc з нотатника — назад
+	if event is InputEventKey and (event as InputEventKey).pressed \
+			and (event as InputEventKey).keycode == KEY_N and not dbg_mode:
+		if _shown() == "NOTEBOOK": _show(notebook_prev)
+		else: _show_notebook()
+		return
 	# у HANDS: тягнеш — ОБЕРТАЄШ чашу (можна перевернути й глянути спід). Лупа кладеться кнопкою.
 	if not (screens.has("HANDS") and screens["HANDS"].visible and goblet_pivot): return
 	if event is InputEventMouseButton and (event as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT:

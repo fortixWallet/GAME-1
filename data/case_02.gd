@@ -45,9 +45,12 @@ const RULES := [
 ]
 
 const FACTS := {
-	&"f.testimony_read": {"cite": "the two statements, side by side", "tag": &"papers", "weight": 1},
-	&"f.crown_wear":     {"cite": "the crown worn on its left side", "tag": &"body", "weight": 2},
-	&"f.bow_scratches":  {"cite": "the fresh scratches at the bow", "tag": &"body", "weight": 2},
+	&"f.testimony_read": {"cite": "the two statements, side by side", "tag": &"papers", "weight": 1,
+		"text": "The widow: wound every night, thirty years, the chain his father's. The nephew: given last week, the chain put on fresh by his own hand."},
+	&"f.crown_wear":     {"cite": "the crown worn on its left side", "tag": &"body", "weight": 2,
+		"text": "The crown is worn flat on its LEFT side — wound for years by a left hand."},
+	&"f.bow_scratches":  {"cite": "the fresh scratches at the bow", "tag": &"body", "weight": 2,
+		"text": "The bow is scratched bright and raw — this chain was put on lately, not worn for thirty years."},
 }
 
 

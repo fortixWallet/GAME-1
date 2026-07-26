@@ -59,7 +59,9 @@ for t in "walk a" "walk b" "walk c" "walk e" "chapters" "outcomes" "layoutcheck"
     "case2")    echo "$OUT" | grep -q "CASE2_OK wear=true chain=true docs=true" || FAIL="$FAIL case2" ;;
     # walk e — інформаційний ланцюг кроку 6: квитанція → інструменти → заміри →
     # реєстр/довідник → «пустий спід», з НЕГАТИВОМ (довідник до клейма мовчить)
-    "walk e")   echo "$OUT" | grep -q "WALK_E_OK neg=true unlocked=true measured=true books=true alone=true" || FAIL="$FAIL walk-e" ;;
+    "walk e")   echo "$OUT" | grep -q "WALK_E_OK neg=true unlocked=true measured=true books=true alone=true" || FAIL="$FAIL walk-e"
+                # нотатник: рядків рівно стільки, скільки здобуто фактів справи
+                echo "$OUT" | grep -q "NOTEBOOK_OK.*match=true" || FAIL="$FAIL notebook" ;;
     "walk b")   echo "$OUT" | grep -q "WALK_B_OK found_marks=true found_church=true" || FAIL="$FAIL walk-b"
                 # горбики (5c): рука → f.domes, лупа → f.domes_alike, стан зони raised
                 echo "$OUT" | grep -q "WALK_B_DOMES hand=true alike=true state=raised" || FAIL="$FAIL domes"
