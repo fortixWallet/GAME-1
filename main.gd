@@ -145,7 +145,7 @@ func _ready() -> void:
 	hint_label = Label.new()
 	hint_label.label_settings = _ls(fr, int(H*0.028), Color(0.95,0.91,0.80))
 	hint_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	hint_label.size = Vector2(W*0.86, H*0.05); hint_label.position = Vector2(W*0.07, H*0.02)
+	hint_label.size = Vector2(W*0.86, H*0.10); hint_label.position = Vector2(W*0.07, H*0.02)
 	# запобіжник: задовгий рядок мусить переноситись, а не зрізатися по краях екрана.
 	# Спіймано на кроці 3 — репліка про крадіжку вилазила за обидва краї кадру.
 	hint_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -544,7 +544,7 @@ func _check_underside(gc: Vector2) -> void:
 		if found_time > 0.5:
 			if not found_marks:
 				add_fact("found_marks"); found_time = 0.0; _play("page_turn")
-				_set_hint("A struck maker's mark — a Vienna shield. But the silver beside it is scored, as if an older mark were ground away.")
+				_set_hint("A maker's shield. Beside it a woman's head in profile — a numeral 3 before the chin, a letter A inside the same outline. The silver to the right is scored smooth.")
 			elif raking and not found_church:
 				add_fact("found_church"); _play("page_turn")
 				_set_hint("Where the silver was ground smooth, the raking light finds it: an engraved chalice — a church's mark.")
@@ -811,8 +811,8 @@ func _load() -> void:
 		tex[n] = load(ART + n + ".png")
 	tex["mark_maker"] = load(ART + "mark_ref_v3.png")   # еталон клейма майстра = той самий щит, що комірка r3c8 каталогу
 	# детальні кадри дна для лупи: звичайне світло (клеймо+зішліфована ділянка) і косе світло (церковна мітка)
-	tex["foot_plate_maker"] = load(ART + "foot_plate_maker.png")
-	tex["foot_plate_church"] = load(ART + "foot_plate_church.png")
+	tex["foot_plate_maker"] = load(ART + "foot_plate_maker_v2.png")   # v2: додано клеймо Діани
+	tex["foot_plate_church"] = load(ART + "foot_plate_church_v2.png") # v2: те саме клеймо + потир
 	# справа 2 «Спадок удови»
 	for n3 in ["hub_day","hub_day_case","hub_lamp_off","hub_evening","hub_evening_figure","hub_night","hub_darkness","menu_door","client_woman","client_in_room","subtitle_band"]:
 		if ResourceLoader.exists(ART + n3 + ".png"): tex[n3] = load(ART + n3 + ".png")
@@ -1942,7 +1942,9 @@ func _build_hallmark(parent: Node3D) -> void:
 	var mi := MeshInstance3D.new(); mi.mesh = shared_mesh
 	var um := StandardMaterial3D.new()
 	um.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED   # пластина ЯК Є, без залежності від кута світла
-	um.albedo_texture = load("res://art/foot_plate_maker.png")
+	# ТРЕТЄ місце, де вантажилась пластина. Дві правки з трьох дали б розбіжність:
+	# початковий матеріал зі старим клеймом, а _sync_view — з новим.
+	um.albedo_texture = load("res://art/foot_plate_maker_v2.png")
 	um.albedo_color = Color(1.30, 1.28, 1.22)               # помірно: марки читаються, без пересвіту
 	um.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	um.cull_mode = BaseMaterial3D.CULL_DISABLED
