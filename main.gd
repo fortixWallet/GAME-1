@@ -480,7 +480,7 @@ func _build_loupe() -> void:
 	hand_tool_ui.rotation = 0.14      # легкий нахил — тримана річ, не курсор
 	add_child(hand_tool_ui)
 	add_child(loupe_ui)
-	set_down_btn = _txtbtn(self, "◦ set the glass down  (right-click)", Vector2(W*0.655, H*0.045), func(): _drop_loupe(), 0.026)
+	set_down_btn = _txtbtn(self, "◦ set the glass down  (right-click)", Vector2(W*0.72, H*0.125), func(): _drop_loupe(), 0.026)
 	set_down_btn.add_theme_color_override("font_outline_color", Color(0.05,0.04,0.03,0.9))
 	set_down_btn.add_theme_constant_override("outline_size", 10)
 	set_down_btn.visible = false
@@ -720,6 +720,11 @@ func _hover_zone_3d(gc: Vector2) -> void:
 # короткий клік рукою по 3D-зоні (горбики на піддоні — розводжувальний факт)
 func _click_zone_3d(gc: Vector2) -> void:
 	if not goblet_pivot or not main_cam3: return
+	if loupe_held:
+		var zl := _pick_3d_at(gc, &"tool.loupe")
+		if zl != "":
+			_apply_zone(zl, &"tool.loupe")   # find → apply / req_say / повтор say
+			return
 	var zid := _pick_3d_at(gc, &"tool.hand")
 	if zid == "":
 		# дотик повз зони: гра ПІДТВЕРДЖУЄ, що дотик працює (мовчання читалося
@@ -2191,7 +2196,7 @@ func _build_hands() -> void:
 	var macro_btn := _txtbtn(s, "◉  study the marks up close", Vector2(W*0.55, H*0.78),
 		func():
 			if found_marks: _show("MARKS_MACRO")
-			else: _set_hint("Nothing yet worth the strong glass — find the marks first."), 0.026)
+			else: _set_hint("Nothing under the strong glass yet. Turn the piece over and CLICK the punches under the foot through the lens."), 0.026)
 
 func _toggle_raking() -> void:
 	raking = not raking          # СТАН
