@@ -1047,6 +1047,11 @@ func _dbg_pilot() -> void:
 	f0.store_string("ready 0 screen=MENU shot=p000.png"); f0.close()
 	while true:
 		await get_tree().create_timer(0.15).timeout
+		# згорнуте вікно зупиняє рендер → await frame_post_draw висить вічно
+		# (сесія 28.07 замерзла рівно так). Пілот сам розгортає вікно.
+		if DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_MINIMIZED:
+			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
+			await get_tree().process_frame
 		if not FileAccess.file_exists(cmd_path): continue
 		var fc := FileAccess.open(cmd_path, FileAccess.READ)
 		var line := fc.get_as_text().strip_edges(); fc.close()
@@ -2107,6 +2112,12 @@ func _build_client() -> void:
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART; l.size = Vector2(W*0.62, H*0.13); l.position = Vector2(W*0.19, H*0.815)
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE; s2.add_child(l)
+	# клік БУДЬ-ДЕ гортає репліку (плейтест 28.07: гравець цілився в «go on»
+	# на 70 px вище і вирішив, що діалог зламаний). Ловець ПІД рештою контролів.
+	var adv := Button.new(); adv.flat = true; adv.modulate.a = 0
+	adv.size = Vector2(W, H); adv.position = Vector2.ZERO
+	adv.pressed.connect(func(): _client_next())
+	s2.add_child(adv); s2.move_child(adv, 0)
 	_txtbtn(s2, "go on  →", Vector2(W*0.845, H*0.905), func(): _client_next(), 0.030)
 
 var client_line := 0
