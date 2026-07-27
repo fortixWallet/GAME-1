@@ -47,7 +47,7 @@ fi
 export G3_SHOTDIR="/tmp/g3_verify/"
 rm -rf "$G3_SHOTDIR"; mkdir -p "$G3_SHOTDIR"
 FAIL=""
-for t in "walk a" "walk b" "walk c" "walk e" "walk p" "chapters" "outcomes" "layoutcheck" "case2" "savetest" "furnprobe"; do
+for t in "walk a" "walk b" "walk c" "walk e" "walk p" "walk q" "chapters" "outcomes" "layoutcheck" "case2" "savetest" "furnprobe"; do
   OUT=$(godot --path . --rendering-driver opengl3 -- $t 2>&1 | grep -v specular)
   echo "--- $t ---" >>"$LOG"; echo "$OUT" >>"$LOG"
   case "$t" in
@@ -84,6 +84,8 @@ for t in "walk a" "walk b" "walk c" "walk e" "walk p" "chapters" "outcomes" "lay
     # жоден текст не має налазити на інший (вимога Віктора, 26.07)
     # furnprobe: жодна зона не сміє дивитись нормаллю від своєї камери
     "furnprobe") echo "$OUT" | grep -q "fails= 0" || echo "$OUT" | grep -q "fails=0" || FAIL="$FAIL zone-facing" ;;
+    # walk q: записник гортається; 15 фактів справи 2 розкладено по аркушах
+    "walk q")   echo "$OUT" | grep -q "WALK_Q_OK rows_first=12 rows_last=3 total=15" || FAIL="$FAIL walk-q" ;;
     # walk p: усі лінійовані папери будуються з живими фактами без падінь
     "walk p")   echo "$OUT" | grep -q "WALK_P_OK notebook_rows=8" || FAIL="$FAIL walk-p" ;;
     "layoutcheck") echo "$OUT" | grep -q "накладань= 0" || echo "$OUT" | grep -q "накладань=0" || FAIL="$FAIL layout" ;;

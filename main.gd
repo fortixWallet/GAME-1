@@ -117,6 +117,7 @@ var key_light: DirectionalLight3D    # основне тепле світло (�
 var maker_mat: StandardMaterial3D    # матеріал клейма майстра (під косим світлом приглушується)
 var rake_btn: Button                 # кнопка «косе світло» в руках
 var hand_tool_ui: TextureRect        # активний інструмент «у руці» — йде за курсором
+var notebook_page := -1              # аркуш записника; -1 = найсвіжіший
 var hands_glass_btn: Button          # «взяти скло» просто в руках
 var set_down_btn: Button
 var loupe_held := false
@@ -815,6 +816,17 @@ func _dbg_walk() -> void:
 		_show("BOOK_REG"); await _shot(dir+"p3_register.png", 3)
 		_show("BOOK_SCREWS"); await _shot(dir+"p4_screws.png", 3)
 		print("WALK_P_OK notebook_rows=", notebook_rows)
+	elif "q" in args:
+		# гортання записника: 15 фактів справи 2 → 2 розвороти, стрілки працюють
+		_goto("case2")
+		for _i in 6: await RenderingServer.frame_post_draw
+		for fq in (CASE_DATA[2] as Object).get("FACTS"):
+			add_fact(String(fq))
+		_show_notebook(); await _shot(dir+"q1_last_leaf.png", 6)
+		var rows_last := notebook_rows
+		notebook_page = 0; _refresh_notebook(); await _shot(dir+"q2_first_leaf.png", 6)
+		print("WALK_Q_OK rows_first=", notebook_rows, " rows_last=", rows_last,
+			  " total=", facts.size())
 	elif "e" in args:
 		# КРОК 6: інформаційний ланцюг. Спершу НЕГАТИВ: довідники до клейм мовчать.
 		_apply_zone("z.book.register")
@@ -982,6 +994,7 @@ func _dbg_walk() -> void:
 # Команди:  click X Y · drag X1 Y1 X2 Y2 · key N · shot · quit
 func _dbg_pilot() -> void:
 	dbg_mode = false          # ПОВНИЙ живий конвеєр: _process, ловці, твіни
+	DisplayServer.window_set_flag(DisplayServer.WINDOW_FLAG_ALWAYS_ON_TOP, true)
 	var dirp := _shotdir()
 	DirAccess.make_dir_recursive_absolute(dirp)
 	await get_tree().process_frame
@@ -2297,23 +2310,42 @@ func _refresh_notebook() -> void:
 	var cols := [0.075, 0.560]
 	var col_w := 0.315
 	notebook_rows = 0
+	# ── аркуші: розкласти факти по розворотах ТИМ САМИМ переносом, що малює
+	# (правило 17: не вгадуємо висоту — міряємо; 15 фактів справи 2 в один
+	# розворот не влазили і мовчки зникали — плейтест 27.07)
+	var fids: Array = []
+	for fid_s in facts:
+		if ft.has(StringName(fid_s)): fids.append(StringName(fid_s))
+	var pages: Array = [[]]
+	var mcol := 0
+	var mli := 0
+	for fid in fids:
+		var fd0: Dictionary = ft[fid]
+		var tw0 := col_w - (0.085 if fd0.has("crop") else 0.0)
+		if mli > NB_LINES - 5 and mcol == 0: mcol = 1; mli = 0
+		if mcol == 1 and mli > NB_LINES - 5:
+			pages.append([]); mcol = 0; mli = 0
+		var st0 := mli
+		mli = _lined_text(null, pg, NB_FIRST, NB_STEP, mli, cols[mcol],
+						  tw0, "— " + String(fd0.get("text", fd0.get("cite", String(fid)))),
+						  fh, 0.60)
+		if fd0.has("crop"): mli = maxi(mli, st0 + 3)
+		mli += 1
+		(pages[pages.size()-1] as Array).append(fid)
+	var pcount := pages.size()
+	var pcur: int = (pcount - 1) if notebook_page < 0 else clampi(notebook_page, 0, pcount - 1)
+	notebook_page = pcur if pcur < pcount - 1 else -1   # -1 = «слідкуй за свіжим»
 	var col := 0
 	var li := 0
-	for fid_s in facts:
-		var fid := StringName(fid_s)
-		if not ft.has(fid): continue
+	for fid in (pages[pcur] as Array):
 		var fd: Dictionary = ft[fid]
 		var has_crop: bool = fd.has("crop")
 		var tw := col_w - (0.085 if has_crop else 0.0)
-		# скільки ліній займе — наперед не вгадати;
-		# консервативно: якщо лишилось <5 ліній — наступна колонка
 		if li > NB_LINES - 5 and col == 0:
 			col = 1; li = 0
-		if col == 1 and li > NB_LINES - 5:
-			break   # розворот повний — далі друга сторінка (справа 8+)
 		var start_li := li
 		li = _lined_text(s, pg, NB_FIRST, NB_STEP, li, cols[col],
-						 tw, "— " + String(fd.get("text", fd.get("cite", fid_s))),
+						 tw, "— " + String(fd.get("text", fd.get("cite", String(fid)))),
 						 fh, 0.60, Color(0.21,0.15,0.10))
 		if has_crop:
 			var cr: Dictionary = fd["crop"]
@@ -2326,8 +2358,15 @@ func _refresh_notebook() -> void:
 				pg.size.y*(NB_FIRST + NB_STEP*float(start_li)) - pg.size.y*NB_STEP*0.7)
 			imv.mouse_filter = Control.MOUSE_FILTER_IGNORE; s.add_child(imv)
 			li = maxi(li, start_li + 3)
-		li += 1          # порожня лінія між записами
+		li += 1
 		notebook_rows += 1
+	# гортання: кути розвороту (діегетично — «ранні аркуші» / «пізні аркуші»)
+	if pcur > 0:
+		_txtbtn(s, "⟨  the earlier leaves", Vector2(W*0.16, H*0.92), func():
+			notebook_page = pcur - 1; _refresh_notebook(), 0.024)
+	if pcur < pcount - 1:
+		_txtbtn(s, "the later leaves  ⟩", Vector2(W*0.68, H*0.92), func():
+			notebook_page = pcur + 1; _refresh_notebook(), 0.024)
 	if notebook_rows == 0:
 		var e := Label.new(); e.label_settings = _ls(fh, int(nh*0.024), Color(0.44,0.36,0.28))
 		e.text = "Nothing set down yet."
@@ -2389,12 +2428,13 @@ func _lined_text(sc: Control, pg: Control, grid_first: float, grid_step: float,
 			lines.append(cur); cur = word
 	if cur != "": lines.append(cur)
 	for l in lines:
-		var y_line: float = pg.size.y * (grid_first + grid_step * float(line_idx))
-		var lb := Label.new(); lb.label_settings = _ls(font, fsize, col)
-		lb.text = l
-		lb.position = pg.position + Vector2(pg.size.x * x_frac, y_line - ascent)
-		lb.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		sc.add_child(lb)
+		if sc != null:
+			var y_line: float = pg.size.y * (grid_first + grid_step * float(line_idx))
+			var lb := Label.new(); lb.label_settings = _ls(font, fsize, col)
+			lb.text = l
+			lb.position = pg.position + Vector2(pg.size.x * x_frac, y_line - ascent)
+			lb.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			sc.add_child(lb)
 		line_idx += 1
 	return line_idx
 
@@ -2712,6 +2752,14 @@ func _refresh_cert() -> void:
 			var hnt := Label.new(); hnt.label_settings = _ls(fr, int(ph*0.015), Color(0.56,0.49,0.40))
 			hnt.text = _slot_hint(sl)
 			hnt.position = Vector2(pw*0.195, ph*(yyi+0.018)); hnt.mouse_filter = Control.MOUSE_FILTER_IGNORE; opt_layer.add_child(hnt)
+			# клік по зачиненій графі — підказка СПАЛАХУЄ (тиша = «зламано», плейтест 27.07)
+			var poke := Button.new(); poke.flat = true; poke.modulate.a = 0
+			poke.position = Vector2(pw*0.16, ph*(yyi-0.006)); poke.size = Vector2(pw*0.68, ph*0.068)
+			poke.pressed.connect(func():
+				_play("ui_soft")
+				hnt.modulate = Color(2.2, 1.6, 1.0)
+				create_tween().tween_property(hnt, "modulate", Color(1,1,1), 0.7))
+			opt_layer.add_child(poke)
 	if not sealed:
 		_build_cert_panel()
 	if not sealed and not _all_filled() and cert_layer.has_node("stamp_hs"):
