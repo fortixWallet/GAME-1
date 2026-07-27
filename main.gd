@@ -118,6 +118,10 @@ var maker_mat: StandardMaterial3D    # матеріал клейма майст�
 var rake_btn: Button                 # кнопка «косе світло» в руках
 var hand_tool_ui: TextureRect        # активний інструмент «у руці» — йде за курсором
 var notebook_page := -1              # аркуш записника; -1 = найсвіжіший
+var desk_intro: Label                # інтро столу — гасне при першому ховері
+var dust_quad: MeshInstance3D        # пил на дні ніші (справа 2)
+var c2_intro1: Label                 # вступ справи 2 — гасне з першим банером
+var c2_intro2: Label
 var hands_glass_btn: Button          # «взяти скло» просто в руках
 var set_down_btn: Button
 var loupe_held := false
@@ -477,6 +481,8 @@ func _build_loupe() -> void:
 	add_child(hand_tool_ui)
 	add_child(loupe_ui)
 	set_down_btn = _txtbtn(self, "◦ set the glass down  (right-click)", Vector2(W*0.655, H*0.045), func(): _drop_loupe(), 0.026)
+	set_down_btn.add_theme_color_override("font_outline_color", Color(0.05,0.04,0.03,0.9))
+	set_down_btn.add_theme_constant_override("outline_size", 10)
 	set_down_btn.visible = false
 
 func _pickup_loupe() -> void:
@@ -816,6 +822,30 @@ func _dbg_walk() -> void:
 		_show("BOOK_REG"); await _shot(dir+"p3_register.png", 3)
 		_show("BOOK_SCREWS"); await _shot(dir+"p4_screws.png", 3)
 		print("WALK_P_OK notebook_rows=", notebook_rows)
+	elif "s2" in args:
+		# добірка станів справи 2 для аудиту текстів: свіжий білд, усі написи
+		_goto("case2")
+		for _i in 8: await RenderingServer.frame_post_draw
+		await _shot(dir+"s2_furn_intro.png", 4)
+		_show("C2DOCS"); await _shot(dir+"s2_docs.png", 3)
+		_show("BOOK_WOOD"); await _shot(dir+"s2_wood.png", 3)
+		_show("CERT"); await _shot(dir+"s2_cert_locked.png", 3)
+		for fq in (CASE_DATA[2] as Object).get("FACTS"): add_fact(String(fq))
+		_show("CERT"); await _shot(dir+"s2_cert_open.png", 3)
+		_choose(0, &"o.vienna_1820s"); await _shot(dir+"s2_cert_slot1.png", 3)
+		active_slot = 1; _refresh_cert(); await _shot(dir+"s2_cert_number.png", 3)
+		assert(_commit_number(1, 19))
+		_choose(2, &"o.private_later"); _choose(3, &"o.within_fortnight")
+		_choose(4, &"o.our_locksmith")
+		_toggle_basis(5, &"f.dust_rectangle"); _toggle_basis(5, &"f.slot_burr")
+		_refresh_cert(); await _shot(dir+"s2_cert_full.png", 3)
+		_do_verdict()
+		var guard2 := 0
+		while not (screens.has("MORNING") and screens["MORNING"].visible) and guard2 < 500:
+			await RenderingServer.frame_post_draw; guard2 += 1
+		for _i in 8: await RenderingServer.frame_post_draw
+		await _shot(dir+"s2_morning.png", 2)
+		print("WALK_S2_OK outcome=", last_outcome_id)
 	elif "q" in args:
 		# гортання записника: 15 фактів справи 2 → 2 розвороти, стрілки працюють
 		_goto("case2")
@@ -1402,7 +1432,7 @@ func _load() -> void:
 	# справа 2 «Спадок удови»
 	for n3 in ["hub_day","hub_day_case","hub_lamp_off","hub_evening","hub_evening_figure","hub_night","hub_darkness","menu_door","client_woman","client_in_room","subtitle_band"]:
 		if ResourceLoader.exists(ART + n3 + ".png"): tex[n3] = load(ART + n3 + ".png")
-	for n2 in ["case2_desk","watch_wear","watch_chain","paper_receipt_1807","reg_page_h","marks_page_vienna","notebook_spread","mark_diana_macro","mark_maker_macro","tool_tray","hand_caliper","hand_screwdriver","hand_rake","wood_page"]:
+	for n2 in ["case2_desk","watch_wear","watch_chain","paper_receipt_1807","reg_page_h","marks_page_vienna","notebook_spread","mark_diana_macro","mark_maker_macro","tool_tray","hand_caliper","hand_screwdriver","hand_rake","wood_page","plain_book_page","dust_floor"]:
 		if ResourceLoader.exists(ART + n2 + ".png"): tex[n2] = load(ART + n2 + ".png")
 	# опційний арт (додано 24.07): чистий лист клієнтки
 	if ResourceLoader.exists(ART + "letter_client.png"):
@@ -1412,6 +1442,9 @@ func _load() -> void:
 	fh = load("res://fonts/MarckScript.ttf")
 	for n in ["stamp_seal","door_bell","page_turn","goblet_set","pen_write","ui_soft"]:
 		var p := AudioStreamPlayer.new(); p.stream = load(AUD + n + ".mp3"); add_child(p); aud[n] = p
+	# звук-докази (wav, синтез): стук — ядро загадки справи 2, він МУСИТЬ звучати
+	if ResourceLoader.exists(AUD + "knock.wav"):
+		var pk := AudioStreamPlayer.new(); pk.stream = load(AUD + "knock.wav"); add_child(pk); aud["knock"] = pk
 	amb = AudioStreamPlayer.new()
 	var a: AudioStreamMP3 = load(AUD + "ambient_bureau.mp3")
 	a.loop = true; amb.stream = a; amb.volume_db = -13.0; add_child(amb)
@@ -1465,9 +1498,14 @@ func _show(name: String) -> void:
 	# свій факт просто тому, що відкрився. Гравець отримував знання за гортання.
 	# Тепер факт здобувається лише дією по зоні (єдиний ловець — _paper_catcher).
 
+func _kill_c2_intro() -> void:
+	if c2_intro1: c2_intro1.visible = false
+	if c2_intro2: c2_intro2.visible = false
+
 func _set_hint(t: String) -> void:
 	if hint_label: hint_label.text = t
 	if hint_band: hint_band.visible = t != ""
+	if t != "": _kill_c2_intro()   # банер і вступ не живуть в одній смузі (аудит 27.07)
 
 # ── ЄДИНИЙ ЛОВЕЦЬ 2D-ЗОН (крок 5b) ───────────────────────────────────────────
 # До 5b було ДВІ системи зон: PAPER_ZONES (кнопки в частках аркуша, свій хіт-тест
@@ -1543,7 +1581,8 @@ func _apply_zone(zone_id: String, tool: StringName = &"*") -> void:
 			var rt := StringName(rr.get("tool", &"*"))
 			if rt != tool and rt != &"*" and tool != &"*": continue
 			if RuleEngine.applicable(rr, facts, _flags()):
-				_play("ui_soft"); _set_hint(String(rr.get("say", ""))); return
+				_play(String(rr["sfx"]) if rr.has("sfx") and aud.has(String(rr.get("sfx",""))) else "ui_soft")
+				_set_hint(String(rr.get("say", ""))); return
 		return
 	_apply_rule(rule)
 
@@ -1564,6 +1603,7 @@ func _apply_rule(rule: Dictionary) -> void:
 	var st: Dictionary = rule.get("sets_state", {})
 	for zid in st: zone_states[zid] = st[zid]
 	if not st.is_empty(): _sync_case2_view()   # знята дошка зникає ОДРАЗУ, не після зміни екрана
+	if st.get(&"z.well.back_board", &"") == &"open": _reveal_recess()
 	var sfl: Dictionary = rule.get("sets_flag", {})
 	for k in sfl:
 		if case_flags.get(k, null) != sfl[k]: got_new = true
@@ -1573,7 +1613,8 @@ func _apply_rule(rule: Dictionary) -> void:
 		if not unlocked_tools.has(tl):
 			unlocked_tools[tl] = true
 			_refresh_tool_row()
-	_play("page_turn" if got_new else "ui_soft")
+	if rule.has("sfx") and aud.has(String(rule["sfx"])): _play(String(rule["sfx"]))
+	else: _play("page_turn" if got_new else "ui_soft")
 	_set_hint(String(rule.get("say", "")))
 	if got_new: _save_game()
 
@@ -1683,6 +1724,7 @@ func _mag_hotspot(parent: Control) -> Button:
 	parent.add_child(b); return b
 
 func _hover_in(b: TextureButton, hint: String) -> void:
+	if desk_intro and desk_intro.modulate.a < 1.0: desk_intro.visible = false
 	create_tween().tween_property(b, "modulate", Color(1.7,1.7,1.7,1), 0.12)
 	_set_hint(hint)
 
@@ -2085,7 +2127,9 @@ func _build_desk() -> void:
 	var s := _screen("DESK")
 	desk_bg = _bg(s, tex["case_desk_loupe"])   # стіл із ВБУДОВАНОЮ лупою (перспектива+тінь у сцені)
 	gob_btn = _object(s, "goblet", tex["ov_goblet"], "The silver goblet — take it in hand", func(): _show("HANDS"), true, tex["ov_goblet_click"])
-	_txtbtn(s, "✎  the notebook", Vector2(W*0.855, H*0.185), func(): _show_notebook(), 0.026)
+	var nb_btn := _txtbtn(s, "✎  the notebook", Vector2(W*0.855, H*0.185), func(): _show_notebook(), 0.026)
+	nb_btn.add_theme_color_override("font_outline_color", Color(0.05,0.04,0.03,0.9))
+	nb_btn.add_theme_constant_override("outline_size", 8)
 	tool_row = Control.new(); tool_row.position = Vector2(W*0.04, H*0.055)
 	tool_row.size = Vector2(W*0.5, H*0.05); s.add_child(tool_row)
 	_refresh_tool_row()
@@ -2095,6 +2139,7 @@ func _build_desk() -> void:
 	_txtbtn(s, "Write the certificate  →", Vector2(W*0.72, H*0.9), func(): _show("CERT"))
 	# рамка задачі (діегетична, без відповіді): три графи атестата = твоя мета
 	var intro := Label.new(); intro.label_settings = _ls(fr, int(H*0.028), Color(0.92,0.88,0.78))
+	desk_intro = intro
 	intro.text = "A goblet, and a story that does not sit right.\nExamine it, then write the attribution — and set your name to it."
 	intro.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	intro.size = Vector2(W*0.64, H*0.12); intro.position = Vector2(W*0.18, H*0.06)
@@ -2289,7 +2334,7 @@ func _show_notebook() -> void:
 func _refresh_notebook() -> void:
 	if not screens.has("NOTEBOOK"):
 		var s0 := _screen("NOTEBOOK")
-		_paper_backdrop(s0, 0.14)
+		_paper_backdrop(s0, 0.18)   # та сама підкладка-стіл, що в паперів (аудит: «сіра пустка»)
 		s0.set_meta("built", true)
 	var s: Control = screens["NOTEBOOK"]
 	for c in s.get_children():
@@ -2734,7 +2779,7 @@ func _refresh_cert() -> void:
 		line.size = Vector2(pw*0.66, 1.5); line.position = Vector2(pw*0.17, ph*(yyi+0.052)); line.mouse_filter = Control.MOUSE_FILTER_IGNORE; opt_layer.add_child(line)
 		var val := Label.new()
 		var small: bool = String(sl["kind"]) == "FACTS"
-		val.label_settings = _ls(fh, int(ph*(0.019 if small else 0.027)), Color(0.16,0.11,0.08))
+		val.label_settings = _ls(fh, int(ph*(0.019 if small else 0.024)), Color(0.16,0.11,0.08))
 		val.position = Vector2(pw*0.195, ph*(yyi+0.016))
 		val.size = Vector2(pw*0.62, ph*0.05); val.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		val.text = _slot_display(i); val.mouse_filter = Control.MOUSE_FILTER_IGNORE; opt_layer.add_child(val)
@@ -2778,7 +2823,7 @@ func _refresh_cert() -> void:
 		# заклик стоїть ПІД вмістом панелі: коли графа ще редагується (список фактів —
 		# до 8 рядків, ~0.5H), фіксовані 0.42H друкувались ПОВЕРХ списку — спіймано
 		# оком на кадрі 18_cert_full і підтверджено думкою про layoutcheck у гейті
-		seal_note.position = Vector2(0, H*0.68 if active_slot >= 0 else H*0.30)
+		seal_note.position = Vector2(0, H*0.72 if active_slot >= 0 else H*0.30)
 		seal_note.text = "The attribution is written.\nPress the wax seal to close the case — once set, it cannot be lifted."
 		cert_panel.add_child(seal_note)
 
@@ -2879,26 +2924,30 @@ func _panel_number(i: int, sl: Dictionary) -> void:
 func _panel_facts(i: int, sl: Dictionary) -> void:
 	var picked: Array = cvals[i] if cvals[i] is Array else []
 	var ft := _case_facts_table()
-	var y := H*0.11
+	# дві колонки по 8: 15 фактів однією колонкою тікали за низ екрана і
+	# билися з закликом печатки (аудит 27.07, s2_cert_full)
+	var idx := 0
 	for fid_s in facts:
 		var fid := StringName(fid_s)
 		if not ft.has(fid): continue
 		var cite := String((ft[fid] as Dictionary).get("cite", fid_s))
 		var chosen: bool = fid in picked
-		var bo := Button.new(); bo.flat = true; bo.text = ("☑  " if chosen else "☐  ") + cite
-		bo.add_theme_font_override("font", fr); bo.add_theme_font_size_override("font_size", int(H*0.022))
+		var bo := Button.new(); bo.flat = true; bo.text = ("☑ " if chosen else "☐ ") + cite
+		bo.add_theme_font_override("font", fr); bo.add_theme_font_size_override("font_size", int(H*0.019))
 		bo.add_theme_color_override("font_color", Color(0.92,0.44,0.36) if chosen else Color(0.90,0.85,0.74))
 		bo.add_theme_color_override("font_hover_color", Color(0.99,0.72,0.42))
 		bo.alignment = HORIZONTAL_ALIGNMENT_LEFT; bo.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-		bo.position = Vector2(0, y); bo.size = Vector2(cert_panel.size.x, H*0.042)
+		bo.clip_text = true
+		bo.position = Vector2(cert_panel.size.x*0.52*float(idx / 8), H*(0.11 + 0.052*float(idx % 8)))
+		bo.size = Vector2(cert_panel.size.x*0.50, H*0.046)
 		var ii := i
 		bo.pressed.connect(func(): _toggle_basis(ii, fid))
 		cert_panel.add_child(bo)
-		y += H*0.048
+		idx += 1
 	var note := Label.new(); note.label_settings = _ls(fr, int(H*0.017), Color(0.64,0.57,0.47))
-	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART; note.size = Vector2(cert_panel.size.x, H*0.12)
+	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART; note.size = Vector2(cert_panel.size.x, H*0.10)
 	note.text = "Two to four citations. Name the proof that would still stand if the client's story did not."
-	note.position = Vector2(0, y + H*0.02); cert_panel.add_child(note)
+	note.position = Vector2(0, H*0.56); cert_panel.add_child(note)
 
 # наслідок вироку — ПОДІЯ наступного ранку. Матчер по OUTCOMES даних: перший збіг.
 func _outcome_text() -> String:
@@ -3015,6 +3064,21 @@ func _build_case2() -> void:
 	bb.position = Vector3(oa.get_center().x, oa.get_center().y + oa.size.y*0.075, oa.get_center().z - oa.size.z*0.16)
 	sv.add_child(bb); mesh_nodes[&"sec_backboard"] = bb
 	sec_backboard = bb; sec_drawer = drawer
+	# дно ніші: пил і ЧИСТИЙ прямокутник — головний доказ віддано оку, не тексту
+	if tex.has("dust_floor"):
+		var dq := MeshInstance3D.new()
+		var qm := QuadMesh.new(); qm.size = Vector2(0.21, 0.16)
+		dq.mesh = qm
+		var dm2 := StandardMaterial3D.new()
+		dm2.albedo_texture = tex["dust_floor"]
+		dm2.roughness = 1.0
+		dq.material_override = dm2
+		# ніша дивиться на камеру: квад майже вертикальний, на місці знятої дошки,
+		# трохи глибше — власна рамка текстури грає глибину
+		dq.position = Vector3(0.0, 0.192, -0.068)
+		dq.rotation_degrees = Vector3(-14, 0, 0)
+		dq.visible = false
+		sv.add_child(dq); dust_quad = dq
 	# тавро столярні на споді шухляди: випалений штамп текстом (шрифт — виняток
 	# правила 1) + крейдяний номер. ЛОКАЛЬНИЙ AABB меша: глобальний тут брехав би
 	# (batьків scale/зсув), і перша посадка полетіла геть із геометрії.
@@ -3081,6 +3145,7 @@ func _build_case2() -> void:
 	i1.size = Vector2(W*0.72, H*0.15); i1.position = Vector2(W*0.14, H*0.055)
 	i1.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	screens["FURN"].add_child(i1)
+	c2_intro1 = i1
 	var i2 := Label.new()
 	i2.label_settings = _ls(fh, int(H*0.026), Color(0.85,0.72,0.48))
 	i2.label_settings.shadow_color = Color(0,0,0,0.85); i2.label_settings.shadow_offset = Vector2(1.5,1.5)
@@ -3089,6 +3154,7 @@ func _build_case2() -> void:
 	i2.size = Vector2(W, H*0.05); i2.position = Vector2(0, H*0.205)
 	i2.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	screens["FURN"].add_child(i2)
+	c2_intro2 = i2
 	var itw2 := create_tween(); itw2.tween_interval(14.0)
 	itw2.tween_property(i1, "modulate:a", 0.0, 2.0)
 	itw2.parallel().tween_property(i2, "modulate:a", 0.0, 2.0)
@@ -3103,16 +3169,20 @@ func _build_case2() -> void:
 		if zone_states.get(&"z.sec.drawer_front", &"default") == &"out": _show("DRAWER")
 		else: _apply_zone("z.sec.drawer_front", &"tool.hand"))
 	_txtbtn(screens["FURN"], "the papers  →", Vector2(W*0.05, H*0.92), func(): _show("C2DOCS"))
-	_txtbtn(screens["FURN"], "Write the certificate  →", Vector2(W*0.84, H*0.92), func(): _show("CERT"))
+	_txtbtn(screens["FURN"], "Write the certificate  →", Vector2(W*0.05, H*0.862), func(): _show("CERT"))
 	_txtbtn(screens["WELL"], "←  step back", Vector2(W*0.04, H*0.92), func(): _show("FURN"))
 	_txtbtn(screens["WELL"], "✎", Vector2(W*0.945, H*0.055), func(): _show_notebook(), 0.030)
-	_txtbtn(screens["DRAWER"], "←  slide it back", Vector2(W*0.04, H*0.92), func(): _show("FURN"))
-	_txtbtn(screens["DRAWER"], "⟲  turn it over", Vector2(W*0.42, H*0.92), func():
+	var sb_btn := _txtbtn(screens["DRAWER"], "←  slide it back", Vector2(W*0.04, H*0.92), func(): _show("FURN"))
+	sb_btn.add_theme_color_override("font_outline_color", Color(0.05,0.04,0.03,0.9))
+	sb_btn.add_theme_constant_override("outline_size", 8)
+	var to_btn := _txtbtn(screens["DRAWER"], "⟲  turn it over", Vector2(W*0.42, H*0.92), func():
 		# перевернути шухляду: спід (тавро столярні) — догори
 		var tw2 := create_tween()
 		var target: float = 0.0 if absf(sec_drawer.rotation.x) > 1.5 else PI
 		tw2.tween_property(sec_drawer, "rotation:x", target, 0.55).set_trans(Tween.TRANS_QUAD)
 		_play("goblet_set"))
+	to_btn.add_theme_color_override("font_outline_color", Color(0.05,0.04,0.03,0.9))
+	to_btn.add_theme_constant_override("outline_size", 8)
 	# папери справи 2 (гросбух + реєстр на одному аркуші) і довідник шурупів
 	var d2 := _screen("C2DOCS")
 	_paper_backdrop(d2)
@@ -3150,12 +3220,18 @@ func _build_case2() -> void:
 	_ptext(bw, "joiner\u2019s \u00abfleck\u00bb. Close, pale.", 0.635, 0.685, 0.014)
 	_ptext(bw, "Cheap, strong; a wood for", 0.635, 0.715, 0.014)
 	_ptext(bw, "work that is not meant to show.", 0.635, 0.745, 0.014)
-	var bs := _paper_screen("BOOK_SCREWS", "reg_page_h", "C2DOCS", "←  back to the papers")
-	_ptext(bs, "OF SCREWS AND THEIR MAKING", 0.22, 0.055, 0.020)
-	var li_b := _lined_text(bs["s"], bs["pg"], 0.1246, 0.0446, 1, 0.16, 0.64,
-		"Before 1846: blunt end, hand-filed thread, uneven pitch, the slot off centre; a hole must first be bored.", fr, 0.50)
-	_lined_text(bs["s"], bs["pg"], 0.1246, 0.0446, li_b + 1, 0.16, 0.64,
-		"Patented 1846: the pointed screw that cuts its own way; made in quantity at Birmingham from 1854.", fr, 0.50)
+	# аудит 27.07: проза на бухгалтерській сітці = «перекреслений текст»; сторінка
+	# довідника — ЧИСТИЙ аркуш (plain_book_page), верстка вільна
+	var bs := _paper_screen("BOOK_SCREWS", "plain_book_page", "C2DOCS", "←  back to the papers")
+	_ptext(bs, "OF SCREWS AND THEIR MAKING", 0.24, 0.085, 0.022)
+	_ptext(bs, "Before 1846: blunt end, hand-filed thread,", 0.16, 0.20, 0.021)
+	_ptext(bs, "uneven pitch, the slot off centre;", 0.16, 0.245, 0.021)
+	_ptext(bs, "a hole must first be bored.", 0.16, 0.29, 0.021)
+	_ptext(bs, "Patented 1846: the pointed screw", 0.16, 0.40, 0.021)
+	_ptext(bs, "that cuts its own way; made in quantity", 0.16, 0.445, 0.021)
+	_ptext(bs, "at Birmingham from 1854.", 0.16, 0.49, 0.021)
+	_ptext(bs, "Old blunt stock lived on for decades:", 0.16, 0.60, 0.019, Color(0.38,0.30,0.22))
+	_ptext(bs, "a pointed screw says \u00abnot before\u00bb \u2014 never \u00abthen\u00bb.", 0.16, 0.64, 0.019, Color(0.38,0.30,0.22))
 	_paper_catcher("BOOK_SCREWS", bs["s"], bs["pg"])
 
 var sec_vp: SubViewport
@@ -3210,6 +3286,18 @@ func _refresh_tray_marks() -> void:
 		for tl in (tray_marks[scr] as Dictionary):
 			((tray_marks[scr] as Dictionary)[tl] as ColorRect).visible = (active_tool == tl)
 
+# МОМЕНТ ВІДКРИТТЯ (правило 14): дошка знята — камера повільно входить у зазор,
+# тримає подих на чистому прямокутнику в пилюці, відступає. Без жодного тексту.
+func _reveal_recess() -> void:
+	if not sec_cams.has("WELL"): return
+	var cw2: Camera3D = sec_cams["WELL"]
+	var p0: Vector3 = cw2.position
+	var fwd: Vector3 = -cw2.global_transform.basis.z
+	var tw3 := create_tween()
+	tw3.tween_property(cw2, "position", p0 + fwd*0.34, 1.1).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
+	tw3.tween_interval(1.3)
+	tw3.tween_property(cw2, "position", p0, 0.8).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
+
 func _sync_case2_view() -> void:
 	if sec_vp == null: return
 	var scr := _shown()
@@ -3240,6 +3328,8 @@ func _sync_case2_view() -> void:
 	# знімна дощечка живе в нутрі open-стану; відкручена — зникає, ніша відкрита
 	if sec_backboard:
 		sec_backboard.visible = in_well and zone_states.get(&"z.well.back_board", &"default") != &"open"
+	if dust_quad:
+		dust_quad.visible = in_well and zone_states.get(&"z.well.back_board", &"default") == &"open"
 	if sec_drawer:
 		# шухляда «в руках» існує лише на своєму плані; на FURN вона левітувала
 		# поверх зачиненого корпусу (плейтест 27.07)

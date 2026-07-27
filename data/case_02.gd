@@ -87,7 +87,7 @@ const ZONES := {
 		"hint": "The register of workshops",
 	},
 	&"z.doc.ref_screws": {
-		"kind": &"img", "screen": &"BOOK_SCREWS", "surface": &"reg_page_h",
+		"kind": &"img", "screen": &"BOOK_SCREWS", "surface": &"plain_book_page",
 		"u": Vector2(0.50, 0.45), "shape": &"rect", "half": Vector2(0.36, 0.30),
 		"hint": "The chapter on screws",
 	},
@@ -102,7 +102,7 @@ const ZONES := {
 
 const RULES := [
 	# простукати шухляду: прапорець справи, не факт — «глуха середина» ще нічого не доводить
-	{"zone": &"z.sec.drawer_front", "tool": &"tool.hand",
+	{"zone": &"z.sec.drawer_front", "tool": &"tool.hand", "sfx": "knock",
 	 "sets_flag": {&"knock_heard": true},
 	 "say": "Rapped along the front, the drawer answers with a tone at the left and at the right, and flat in the middle third."},
 	{"zone": &"z.sec.drawer_front", "tool": &"tool.hand", "requires_flag": {&"knock_heard": true},

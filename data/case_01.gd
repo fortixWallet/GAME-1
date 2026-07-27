@@ -296,7 +296,7 @@ const SLOTS := [
 	 "opts": [
 		[&"o.on_the_flat", "on the flat metal, before the vessel was raised"],
 		[&"o.by_office_later", "on the finished vessel, at the assay office"],
-		[&"o.after_the_fact", "on the finished vessel, by a hand not the office's"],
+		[&"o.after_the_fact", "later, by a hand not the office's"],
 	]},
 	{"id": &"s.provenance", "pre": "The piece reached the bearer", "kind": &"CHOICE",
 	 "needs_slot": [&"s.marks"],
