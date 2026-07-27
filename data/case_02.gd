@@ -136,12 +136,12 @@ const RULES := [
 	 "facts": [&"f.back_thickness"],
 	 "say": "The back board, measured at its exposed edge: 12.0 mm."},
 	{"zone": &"z.well.back_board", "tool": &"tool.caliper", "requires": [&"f.outer_depth"],
-	 "req_say": "The inside depth wants its outside brother first — lay the caliper on the front edge of the side.",
+	 "req_say": "The inside depth wants its outside brother first — step back and lay the caliper on the front edge of the side, outside.",
 	 "facts": [&"f.inner_depth"],
 	 "say": "Fixed jaw on the same front edge, sliding jaw on the face of the well's back board: 455.0 mm."},
 	# друга дорога до inner_depth: дно вийнятої шухляди + упор
 	{"zone": &"z.drawer.underside", "tool": &"tool.caliper", "requires": [&"f.outer_depth"],
-	 "req_say": "The drawer's number proves nothing by itself. Take the depth of the carcass first — front edge of the side, outside.",
+	 "req_say": "The drawer's number proves nothing by itself. Step back to the piece seen whole — the caliper first takes the outside depth, on the front edge of the side.",
 	 "facts": [&"f.inner_depth"],
 	 "say": "The drawer bottom runs 443.0 mm, and the drawer rides on a 12 mm stop: the well is 455.0 from the front edge."},
 

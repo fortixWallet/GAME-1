@@ -1489,12 +1489,24 @@ func _screen(name: String) -> Control:
 	var c := Control.new(); c.set_anchors_preset(Control.PRESET_FULL_RECT); c.visible = false
 	add_child(c); screens[name] = c; return c
 
+# довідникові екрани: відкриття сторінки і Є читанням — правила tool="*"
+# застосовуються самі (закриті чесно відповідають req_say)
+const AUTO_READ := ["BOOK_MARKS", "BOOK_SCREWS", "BOOK_REG", "BOOK_WOOD"]
+func _auto_read(scr: String) -> void:
+	if scr not in AUTO_READ: return
+	for id in _case_zones():
+		var z: Dictionary = _case_zones()[id]
+		if String(z.get("screen", &"")) != scr: continue
+		if String(z.get("kind", &"")) != "img": continue
+		_apply_zone(String(id), &"*")
+
 func _show(name: String) -> void:
 	# папери на весь екран — скло кладеться саме (воно інструмент столу і рук)
 	if loupe_held and name != "DESK" and name != "HANDS":
 		_drop_loupe()
 	_set_hint("")   # старий банер не їде через екрани (say нового правила ляже ПІСЛЯ _show)
 	if hand_tool_ui: call_deferred("_refresh_hand_sprite")
+	call_deferred("_auto_read", name)
 	cup_dragging = false   # не тягнемо чашу крізь зміну екрана (інакше лупа завмирає)
 	for k in screens: screens[k].visible = (k == name)
 	_sync_case2_view()
@@ -2233,7 +2245,7 @@ func _build_docs() -> void:
 	t.position = paper.position + Vector2(lw*0.13, lh*0.15); t.mouse_filter = Control.MOUSE_FILTER_IGNORE; s.add_child(t)
 	_paper_catcher("DOCS", s, paper)
 	# навігація — нижній ряд на притемненому столі (геть з паперу), тепла і читабельна
-	_txtbtn(s, "←  back to the desk", Vector2(W*0.04, H*0.92), func(): _show("DESK"))
+	_txtbtn(s, "←  put the pen down", Vector2(W*0.04, H*0.92), func(): _show("FURN" if case_id == 2 else "DESK"))
 	_txtbtn(s, "✎", Vector2(W*0.945, H*0.055), func(): _show_notebook(), 0.030)
 	_txtbtn(s, "Open the newspaper  →", Vector2(W*0.34, H*0.92), func(): _show("NEWS"))
 	_txtbtn(s, "The paper with the cup  →", Vector2(W*0.60, H*0.92), func(): _show("DOCS_RECEIPT"))
@@ -2656,7 +2668,7 @@ func _build_cert() -> void:
 	cert_panel = Control.new(); cert_panel.position = Vector2(panx, H*0.16)
 	cert_panel.size = Vector2(W - panx - W*0.03, H*0.7); cert_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	s.add_child(cert_panel)
-	_txtbtn(s, "←  back to the desk", Vector2(W*0.04, H*0.94), func(): _show("HUB" if case_done else "DESK"))
+	_txtbtn(s, "←  back to the desk", Vector2(W*0.04, H*0.94), func(): _show("HUB" if case_done else ("FURN" if case_id == 2 else "DESK")))
 
 # ---- БЛАНК-РЕЧЕННЯ: гравець реконструює історію; графа «на підставі чого» вимагає доказу ----
 # ---- КОЛОДА СПРАВ: нова справа = НОВИЙ ЗАПИС, не новий код ----
@@ -3212,7 +3224,7 @@ func _build_case2() -> void:
 	paper.position = Vector2((W-lw)*0.5, (H-lh)*0.5 - H*0.02); paper.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	d2.add_child(paper)
 	var t2 := Label.new(); t2.label_settings = _ls(fr, int(lh*0.026), Color(0.20,0.14,0.09))
-	t2.text = "THE CLIENT — Frau Anna Vogl\n«He willed it to me. My son sails on Thursday;\nthe ticket is forty-one gulden and I have nineteen.\nI am not asking a good price — a quick one.»\n\nDAY-BOOK — the 3rd\nSecretaire, walnut, estate of Herr F.\nOpened on arrival by Krenn, our locksmith\n— lock seized. House keys surrendered with the piece.\n\nREGISTER OF WORKSHOPS (Möbeltischler, Wien)\nDANHAUSER, Josef — Wien — stamp 1804–1838\nGRUBER, Michael — Gumpendorf — stamp 1822–1841\nSCHMIDT & SOHN — Leopoldstadt — stamp 1835–1867\nHALBERT, J. — Wien I — dealer, no stamp, from 1861"
+	t2.text = "THE CLIENT — Frau Anna Vogl\n«He willed it to me. My son sails on Thursday;\nthe ticket is forty-one gulden and I have nineteen.\nI am not asking a good price — a quick one.»\n\nDAY-BOOK — the 3rd\nSecretaire, walnut, estate of Herr F.\nOpened on arrival by Krenn, our locksmith\n— lock seized. House keys surrendered with the piece.\n\nREGISTER OF WORKSHOPS (Möbeltischler, Wien)\nDANHAUSER, Josef — Wien — stamp 1804–1838\nGRUBER, Michael — Wien-Gumpendorf — stamp 1822–1841\nSCHMIDT & SOHN — Leopoldstadt — stamp 1835–1867\nHALBERT, J. — Wien I — dealer, no stamp, from 1861"
 	t2.position = paper.position + Vector2(lw*0.12, lh*0.10); t2.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	d2.add_child(t2)
 	_paper_catcher("C2DOCS", d2, paper)
