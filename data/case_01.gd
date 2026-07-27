@@ -61,6 +61,7 @@ const ZONES := {
 		"kind": &"mesh", "screen": &"HANDS", "node": &"goblet_pivot",
 		"at": Vector3(0, -0.86, 0.28), "facing": Vector3(0, 0.80, 0.60),
 		"r": 0.20, "facing_min": 0.10,
+		"hint": "The slope of the foot — a short stroke of the finger, not a turn",
 		"tools": [&"tool.hand", &"tool.rake", &"tool.loupe"],
 	},
 	# ⚠ КООРДИНАТА ВЗЯТА З МОДЕЛІ, НЕ ЗІ СПЕЦИФІКАЦІЇ. У case_01.md стоїть y = −0.96

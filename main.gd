@@ -2519,6 +2519,22 @@ func _panel_number(i: int, sl: Dictionary) -> void:
 	back.pressed.connect(func():
 		if num_buf.length() > 0: num_buf = num_buf.substr(0, num_buf.length()-1); _refresh_cert())
 	cert_panel.add_child(back)
+	# ДОРЕЧНІ НОТАТКИ ПІД ПОЛЕМ (Віктор: «не розумію що вписувати від handbook»):
+	# графа показує ТІ записи нотатника, яких сама вимагає (needs) — зіставлення
+	# клейма з таблицею перед очима, а число гравець виводить сам (правило 6:
+	# це його ж нотатки, не відповідь)
+	var ny := y + H*0.16
+	var ft2 := _case_facts_table()
+	for nf in sl.get("needs", []):
+		if not facts.has(String(nf)): continue
+		var fd2: Dictionary = ft2.get(StringName(nf), {})
+		if not fd2.has("text"): continue
+		var note2 := Label.new(); note2.label_settings = _ls(fh, int(H*0.019), Color(0.80,0.75,0.64))
+		note2.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		note2.size = Vector2(cert_panel.size.x, H*0.11)
+		note2.text = "— " + String(fd2["text"])
+		note2.position = Vector2(0, ny); cert_panel.add_child(note2)
+		ny += H*0.115
 	if num_buf.length() == digits:
 		var v := int(num_buf)
 		if v >= int(sl.get("min", 0)) and v <= int(sl.get("max", 9999)):
@@ -2858,6 +2874,16 @@ func _unhandled_input(event: InputEvent) -> void:
 				if drag_travel >= 8.0 and _pick_3d_at(drag_press_pos, &"tool.hand") != "":
 					goblet_pivot.basis = drag_press_basis
 				_click_zone_3d(drag_press_pos)
+			elif _pick_3d_at(drag_press_pos, &"tool.hand") != "":
+				# почав на зоні, але потягнув далеко — це вже оберт; підкажемо жест
+				_set_hint("A shorter stroke — just across the slope, and let go.")
+	elif event is InputEventMouseMotion and not cup_dragging and not loupe_held:
+		# діегетична підказка жесту: наведення на hand-зону чаші називає дію
+		# (Віктор і плейтестер незалежно не зрозуміли «run a finger» без неї)
+		var hz := _pick_3d_at((event as InputEventMouseMotion).position, &"tool.hand")
+		if hz != "":
+			var hzz: Dictionary = _case_zones().get(StringName(hz), {})
+			if hzz.has("hint"): _set_hint(String(hzz["hint"]))
 	elif event is InputEventMouseMotion and cup_dragging:
 		var mm := event as InputEventMouseMotion
 		# БУЛО: rotation.y — оберт навколо СВІТОВОЇ вертикалі. Коли чашу перевернуто
