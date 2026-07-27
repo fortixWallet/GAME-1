@@ -125,7 +125,7 @@
 | `z.cup.whole` | `tool.hand` | — | — | → перехід на екран HANDS | `screen = HANDS` |
 | `z.bowl.inner` | `tool.eye` \| `tool.loupe` | — | `f.bowl_gilt` | "The inside of the bowl is gilded. The gilding is thin in a crescent under one side of the lip." | — |
 | `z.stem.knop` | `tool.eye` \| `tool.rake` | — | `f.knop_form` | "The stem swells into a knop the size of a walnut, cast in two shells and soldered round the girdle." | — |
-| `z.foot.underside` | `tool.loupe` (`dwell 0.5`) | — | `f.mark_maker`, `f.mark_diana` | "Two punches, one under the other. A shield, and within it a winged monogram set between two letters. Beside it a woman's head in profile — a numeral 3 stands before the chin, and the letter A stands **inside the same outline**, under the throat." *(приведено до арту 26.07)* | — |
+| `z.foot.underside` | `tool.loupe` (`dwell 0.5`) | — | `f.mark_maker`, `f.mark_diana` | "Two punches, one under the other. A shield, and within it a winged monogram set between two letters. Beside it a woman's head in profile — a numeral 3 stands before the chin, and the letter A stands **inside the same outline**." *(приведено до арту 26.07)* | — |
 | `z.foot.underside` | `tool.loupe` (`dwell 1.2`) | `f.hb_vienna_marks` | `f.marks_alone` | "The rest of the underside is bare. No third punch, no figures, and no bright patch where one had been taken off." | — |
 | `z.foot.top` | `tool.hand` (`on_click`) | `f.mark_diana` | `f.domes` | "A finger run across the slope of the foot catches on two small domes in the metal — one behind each punch." | `z.foot.top → raised` |
 | `z.foot.top` | `tool.loupe` \| `tool.rake` | `f.domes` | `f.domes_alike` | "Both domes rise to the same height and break at the same sharp shoulder." | — |

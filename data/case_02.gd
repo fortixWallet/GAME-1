@@ -10,8 +10,8 @@ extends RefCounted
 
 # Інструменти справи 2 доступні З ПОЧАТКУ (специфікація: викрутка — нове в поясі,
 # решта успадкована зі справи 1). Ряд на екранах FURN/WELL/DRAWER.
-const START_TOOLS := [&"tool.eye", &"tool.hand", &"tool.loupe", &"tool.rake",
-					  &"tool.caliper", &"tool.screwdriver"]
+# лише ФІЗИЧНІ предмети: рука й око — це сам гравець, їх не «беруть»
+const START_TOOLS := [&"tool.loupe", &"tool.rake", &"tool.caliper", &"tool.screwdriver"]
 
 const ZONES := {
 	# --- корпус: екран FURN ---

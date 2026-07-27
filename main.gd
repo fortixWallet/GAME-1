@@ -81,6 +81,7 @@ var seals_set := 0           # скільки печаток гравець по
 var screens := {}
 var goblet_pivot: Node3D
 var hint_label: Label
+var hint_band: TextureRect
 
 # --- клеймо на нозі чаші (виміряно з моделі) ---
 const MARK_P := Vector3(-0.0573, -0.6053, 0.4636)
@@ -115,6 +116,7 @@ var loupe_vp_tex: TextureRect    # показує 3D-в'юпорт у склі
 var key_light: DirectionalLight3D    # основне тепле світло (косе світло змінює його кут)
 var maker_mat: StandardMaterial3D    # матеріал клейма майстра (під косим світлом приглушується)
 var rake_btn: Button                 # кнопка «косе світло» в руках
+var hand_tool_ui: TextureRect        # активний інструмент «у руці» — йде за курсором
 var hands_glass_btn: Button          # «взяти скло» просто в руках
 var set_down_btn: Button
 var loupe_held := false
@@ -147,6 +149,7 @@ func _ready() -> void:
 	_build_docs()
 	_build_news()
 	_build_catalog()
+	_build_marks_macro()
 	_build_receipt()
 	_build_books()
 	_build_cert()
@@ -154,6 +157,17 @@ func _ready() -> void:
 	_build_case2()
 	_load_case(1)          # один вхід у стан замість ручного присвоєння CSLOTS
 	# верхня підказка (діегетична — на мальованій стрічці нема, тож тонкий текст)
+	# мальована стрічка під верхнім рядком: текст на строкатому кадрі без підложки
+	# нечитабельний (Віктор, 27.07). Та сама стрічка, що в субтитрів клієнтки.
+	hint_band = TextureRect.new()
+	if tex.has("subtitle_band"): hint_band.texture = tex["subtitle_band"]
+	hint_band.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	hint_band.stretch_mode = TextureRect.STRETCH_SCALE
+	hint_band.size = Vector2(W, H*0.115); hint_band.position = Vector2(0, 0)
+	hint_band.modulate = Color(1, 1, 1, 0.88)
+	hint_band.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hint_band.visible = false
+	add_child(hint_band)
 	hint_label = Label.new()
 	hint_label.label_settings = _ls(fr, int(H*0.028), Color(0.95,0.91,0.80))
 	hint_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -161,6 +175,9 @@ func _ready() -> void:
 	# запобіжник: задовгий рядок мусить переноситись, а не зрізатися по краях екрана.
 	# Спіймано на кроці 3 — репліка про крадіжку вилазила за обидва краї кадру.
 	hint_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	# тінь: читабельність на будь-якому кадрі
+	hint_label.label_settings.shadow_color = Color(0, 0, 0, 0.85)
+	hint_label.label_settings.shadow_offset = Vector2(1.5, 1.5)
 	hint_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(hint_label)
 	_build_loupe()
@@ -448,6 +465,15 @@ func _build_loupe() -> void:
 	var spr := TextureRect.new(); spr.texture = tex_loupe; spr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	spr.size = Vector2(loupe_lw, loupe_lh); spr.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	loupe_ui.add_child(spr)
+	# інструмент «у руці» (Віктор, 27.07: «коли інструмент вибирається, він має
+	# ставати в руці»). Мальований спрайт, робочий кінець — у точці курсора.
+	hand_tool_ui = TextureRect.new()
+	hand_tool_ui.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	hand_tool_ui.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT
+	hand_tool_ui.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hand_tool_ui.visible = false
+	hand_tool_ui.rotation = 0.14      # легкий нахил — тримана річ, не курсор
+	add_child(hand_tool_ui)
 	add_child(loupe_ui)
 	set_down_btn = _txtbtn(self, "◦ set the glass down  (right-click)", Vector2(W*0.655, H*0.045), func(): _drop_loupe(), 0.026)
 	set_down_btn.visible = false
@@ -470,6 +496,8 @@ func _input(event: InputEvent) -> void:
 		_edit_toggle(); get_viewport().set_input_as_handled(); return
 	if edit_mode:
 		_edit_input(event); return
+	if event is InputEventMouseMotion and hand_tool_ui and hand_tool_ui.visible:
+		hand_tool_ui.position = (event as InputEventMouseMotion).position - hand_tool_ui.pivot_offset
 	if event is InputEventMouseButton:
 		var mb := event as InputEventMouseButton
 		if mb.button_index == MOUSE_BUTTON_RIGHT and mb.pressed:
@@ -676,11 +704,46 @@ func _hover_zone_3d(gc: Vector2) -> void:
 func _click_zone_3d(gc: Vector2) -> void:
 	if not goblet_pivot or not main_cam3: return
 	var zid := _pick_3d_at(gc, &"tool.hand")
-	if zid == "": return
+	if zid == "":
+		# дотик повз зони: гра ПІДТВЕРДЖУЄ, що дотик працює (мовчання читалося
+		# як «не працює» — Віктор і плейтестер незалежно)
+		if _shown() == "HANDS":
+			_set_hint("Smooth, cold silver under the finger.")
+		return
 	var rule := RuleEngine.find(_case_rules(), StringName(zid), &"tool.hand", facts, _flags(), zone_states)
 	if not rule.is_empty(): _apply_rule(rule)
+	else:
+		# зона є, але передумови правила ще не виконані (напр. клейма ще не
+		# роздивився) — тиша тут читалась як «не працює»
+		_set_hint("The finger asks what the eye has not yet answered — look the piece over first.")
+
+# діегетична драбина справи 2: щабель показується після паузи бездіяльності;
+# кожен — спостереження-місток, НЕ відповідь (правило 6)
+var idle_t := 0.0
+var last_fact_count := -1
+
+func _c2_ladder() -> String:
+	if not facts.has("f.daybook_locksmith") and not case_flags.get(&"knock_heard", false):
+		return "Everything in this trade begins the same way: rap the wood, and listen."
+	if not case_flags.get(&"knock_heard", false):
+		return "The long drawer has not been sounded yet."
+	if not facts.has("f.outer_depth"):
+		return "A drawer that answers flat wants measuring. The caliper lies in the tray."
+	if not facts.has("f.inner_depth") or not facts.has("f.back_thickness"):
+		return "One measurement is a number. Three are an argument."
+	if not facts.has("f.board_screwed"):
+		return "The well at the back — look closely at how its board is held."
+	return ""
 
 func _process(_delta: float) -> void:
+	if _shown() in ["FURN", "WELL", "DRAWER"] and not dbg_mode:
+		if facts.size() != last_fact_count:
+			last_fact_count = facts.size(); idle_t = 0.0
+		idle_t += _delta
+		if idle_t > 25.0:
+			idle_t = 0.0
+			var step := _c2_ladder()
+			if step != "": _set_hint(step)
 	if loupe_held and loupe_ui and not dbg_mode:
 		_loupe_frame()
 
@@ -732,6 +795,14 @@ func _dbg_walk() -> void:
 		_show("NEWS"); _click_zone("z.news.robbery"); await _shot(dir+"08_news.png")
 		_show("CATALOG"); _cat_miss(); await _shot(dir+"09_catalog_gated.png")
 		print("WALK_A_OK read_news=", read_news)
+	elif "p" in args:
+		for f0 in ["f.mark_maker","f.mark_diana","f.news_robbery","f.church_mark","f.letter_read",
+				"f.hb_vienna_marks","f.domes","f.domes_alike"]: add_fact(f0)
+		_show_notebook(); await _shot(dir+"p1_notebook.png", 8)
+		_show("DOCS_RECEIPT"); await _shot(dir+"p2_receipt.png", 3)
+		_show("BOOK_REG"); await _shot(dir+"p3_register.png", 3)
+		_show("BOOK_SCREWS"); await _shot(dir+"p4_screws.png", 3)
+		print("WALK_P_OK notebook_rows=", notebook_rows)
 	elif "e" in args:
 		# КРОК 6: інформаційний ланцюг. Спершу НЕГАТИВ: довідники до клейм мовчать.
 		_apply_zone("z.book.register")
@@ -1280,7 +1351,7 @@ func _load() -> void:
 	# справа 2 «Спадок удови»
 	for n3 in ["hub_day","hub_day_case","hub_lamp_off","hub_evening","hub_evening_figure","hub_night","hub_darkness","menu_door","client_woman","client_in_room","subtitle_band"]:
 		if ResourceLoader.exists(ART + n3 + ".png"): tex[n3] = load(ART + n3 + ".png")
-	for n2 in ["case2_desk","watch_wear","watch_chain","paper_receipt_1807","reg_page_h","marks_page_vienna","notebook_spread"]:
+	for n2 in ["case2_desk","watch_wear","watch_chain","paper_receipt_1807","reg_page_h","marks_page_vienna","notebook_spread","mark_diana_macro","mark_maker_macro","tool_tray","hand_caliper","hand_screwdriver","hand_rake"]:
 		if ResourceLoader.exists(ART + n2 + ".png"): tex[n2] = load(ART + n2 + ".png")
 	# опційний арт (додано 24.07): чистий лист клієнтки
 	if ResourceLoader.exists(ART + "letter_client.png"):
@@ -1343,6 +1414,7 @@ func _show(name: String) -> void:
 
 func _set_hint(t: String) -> void:
 	if hint_label: hint_label.text = t
+	if hint_band: hint_band.visible = t != ""
 
 # ── ЄДИНИЙ ЛОВЕЦЬ 2D-ЗОН (крок 5b) ───────────────────────────────────────────
 # До 5b було ДВІ системи зон: PAPER_ZONES (кнопки в частках аркуша, свій хіт-тест
@@ -1475,14 +1547,12 @@ func _refresh_tool_row() -> void:
 	for c in tool_row.get_children(): c.queue_free()
 	if unlocked_tools.is_empty(): return
 	var names := {
-		&"tool.eye": "◉  the eye", &"tool.hand": "✋  the hand",
 		&"tool.loupe": "◌  the loupe", &"tool.rake": "⟋  raking light",
 		&"tool.caliper": "⊂  the caliper", &"tool.scales": "⚖  the scales",
 		&"tool.screwdriver": "⌁  the screwdriver",
 	}
 	var x := 0.0
-	for tl in [&"tool.eye", &"tool.hand", &"tool.loupe", &"tool.rake",
-			   &"tool.caliper", &"tool.scales", &"tool.screwdriver"]:
+	for tl in [&"tool.loupe", &"tool.rake", &"tool.caliper", &"tool.scales", &"tool.screwdriver"]:
 		if not unlocked_tools.has(tl): continue
 		var b := Button.new(); b.flat = true
 		b.text = ("● " if active_tool == tl else "") + String(names[tl])
@@ -1494,9 +1564,37 @@ func _refresh_tool_row() -> void:
 
 func _pick_tool(tl: StringName) -> void:
 	active_tool = (&"*" if active_tool == tl else tl)   # повторний клік — відкласти
-	_play("ui_soft"); _refresh_tool_row()
-	_set_hint("The caliper is in hand — touch it to the cup, or to the receipt." if active_tool == &"tool.caliper"
-		else ("The scales stand ready — set the cup on them." if active_tool == &"tool.scales" else ""))
+	_play("ui_soft"); _refresh_tool_row(); _refresh_tray_marks()
+	if active_tool == &"*": _set_hint("Set down. The bare hand again.")
+	else:
+		match tl:
+			&"tool.caliper": _set_hint("The caliper in hand — touch it to an edge worth measuring.")
+			&"tool.screwdriver": _set_hint("The screwdriver in hand — for screws, if you dare.")
+			&"tool.loupe": _set_hint("The loupe in hand — hold it to a detail.")
+			&"tool.rake": _set_hint("The lamp in hand — low light finds what polish hides.")
+			&"tool.scales": _set_hint("The scales stand ready — set the cup on them.")
+	_refresh_hand_sprite()
+
+# спрайт інструмента в руці: видимий, коли взято НЕ лупу (лупа має власне скло)
+func _refresh_hand_sprite() -> void:
+	if hand_tool_ui == null: return
+	var names := {&"tool.caliper": "hand_caliper", &"tool.screwdriver": "hand_screwdriver",
+		&"tool.rake": "hand_rake"}
+	if not names.has(active_tool) or not tex.has(names[active_tool]):
+		hand_tool_ui.visible = false
+		return
+	move_child(hand_tool_ui, get_child_count()-1)
+	move_child(loupe_ui, get_child_count()-1)
+	if hint_band: move_child(hint_band, get_child_count()-1)
+	if hint_label: move_child(hint_label, get_child_count()-1)
+	var t2: Texture2D = tex[names[active_tool]]
+	var hh: float = H * (0.26 if active_tool == &"tool.rake" else 0.30)
+	var hw: float = hh * float(t2.get_width()) / float(t2.get_height())
+	hand_tool_ui.texture = t2
+	hand_tool_ui.size = Vector2(hw, hh)
+	hand_tool_ui.pivot_offset = Vector2(hw*0.5, hh*0.04)   # робочий кінець угорі
+	hand_tool_ui.position = get_viewport().get_mouse_position() - hand_tool_ui.pivot_offset
+	hand_tool_ui.visible = true
 
 func _mag_hotspot(parent: Control) -> Button:
 	var b := Button.new(); b.flat = true; b.modulate.a = 0
@@ -1549,6 +1647,12 @@ func _txtbtn(parent: Control, txt: String, pos: Vector2, action: Callable, sz :=
 	b.add_theme_color_override("font_color", col)
 	b.add_theme_color_override("font_hover_color", Color(0.98,0.83,0.4))
 	b.add_theme_color_override("font_focus_color", col)
+	# ЧИТАБЕЛЬНІСТЬ НА БУДЬ-ЯКОМУ КАДРІ (Віктор, 27.07): глибока тінь тексту —
+	# кнопки лежать просто на фото/3D без плашок, і без тіні тонули
+	b.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.9))
+	b.add_theme_constant_override("shadow_offset_x", 2)
+	b.add_theme_constant_override("shadow_offset_y", 2)
+	b.add_theme_constant_override("shadow_outline_size", 4)
 	b.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	b.position = pos; b.pressed.connect(func(): _play("ui_soft"); action.call())
 	parent.add_child(b); return b
@@ -1705,22 +1809,51 @@ func _goto(key: String) -> void:
 			_show("MENU")
 
 func _build_chapters() -> void:
+	# ТИМЧАСОВИЙ режим вибору сцен (F1) — але за правилом 9 і тимчасове робимо
+	# охайно: групи по справах, чисті колонки, жорсткий bind ключа (жодних
+	# сюрпризів замикань — Віктор упіймав вибір «12», що вів у справу 1).
 	var sc := _screen("CHAPTERS")
 	if tex.has("hub_darkness"):
-		var b := _bg(sc, tex["hub_darkness"]); b.modulate = Color(0.55,0.55,0.58)
-	var h := Label.new(); h.label_settings = _ls(fb, int(H*0.040), Color(0.92,0.86,0.72))
-	h.text = "Where would you like to begin?"; h.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	h.size = Vector2(W, H*0.07); h.position = Vector2(0, H*0.055)
+		var b := _bg(sc, tex["hub_darkness"]); b.modulate = Color(0.42, 0.42, 0.46)
+	var h := Label.new(); h.label_settings = _ls(fb, int(H*0.042), Color(0.92,0.86,0.72))
+	h.text = "Where would you like to begin?"
+	h.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	h.size = Vector2(W, H*0.07); h.position = Vector2(0, H*0.05)
 	h.mouse_filter = Control.MOUSE_FILTER_IGNORE; sc.add_child(h)
-	var col := 0; var row := 0
-	for chp in CHAPTERS:
-		var lbl: String = chp[0]; var key: String = chp[1]
-		var bx := W*0.09 + col*W*0.45
-		var by := H*0.16 + row*H*0.098
-		_txtbtn(sc, lbl, Vector2(bx, by), func(): _goto(key), 0.029)
-		row += 1
-		if row >= 6: row = 0; col += 1
-	_txtbtn(sc, "←  back", Vector2(W*0.09, H*0.90), func(): _show("MENU"), 0.028)
+	var groups := [
+		["CASE 1 · THE SILVER GOBLET", 0.075, [
+			["Morning — the door", "door"], ["The client at the counter", "client"],
+			["The desk — fresh case", "desk"], ["The goblet in your hands", "hands"],
+			["The papers and the press", "docs"], ["The mark register", "catalog"],
+			["The certificate — filled", "cert"], ["The next morning", "morning"],
+			["Evening — the room", "evening"], ["Darkness", "dark"], ["The ledger", "ledger"],
+		]],
+		["CASE 2 · THE SECRETAIRE", 0.565, [
+			["The piece, floor to cornice", "case2"],
+		]],
+	]
+	for g in groups:
+		var gx := W*float(g[1])
+		var cap := Label.new(); cap.label_settings = _ls(fb, int(H*0.026), Color(0.66,0.55,0.38))
+		cap.text = String(g[0]); cap.position = Vector2(gx, H*0.155)
+		cap.mouse_filter = Control.MOUSE_FILTER_IGNORE; sc.add_child(cap)
+		var rule := ColorRect.new(); rule.color = Color(0.66, 0.55, 0.38, 0.45)
+		rule.size = Vector2(W*0.36, 1.0); rule.position = Vector2(gx, H*0.198)
+		rule.mouse_filter = Control.MOUSE_FILTER_IGNORE; sc.add_child(rule)
+		var i := 0
+		for it in (g[2] as Array):
+			var col := 0 if i < 6 else 1
+			var bx := gx + float(col)*W*0.235
+			var by := H*0.235 + float(i % 6)*H*0.088
+			var num := str(i + 1) + " · " if String(g[0]).begins_with("CASE 1") else "· "
+			_txtbtn(sc, num + String((it as Array)[0]), Vector2(bx, by),
+					Callable(self, "_goto").bind(String((it as Array)[1])), 0.027)
+			i += 1
+	var foot := Label.new(); foot.label_settings = _ls(fr, int(H*0.019), Color(0.55,0.52,0.46))
+	foot.text = "A workbench shortcut — it will not ship.  F1 opens it anywhere."
+	foot.position = Vector2(W*0.075, H*0.845)
+	foot.mouse_filter = Control.MOUSE_FILTER_IGNORE; sc.add_child(foot)
+	_txtbtn(sc, "←  back", Vector2(W*0.075, H*0.90), func(): _show("MENU"), 0.028)
 
 func _build_menu() -> void:
 	var s0 := _screen("MENU")
@@ -1924,7 +2057,8 @@ func _build_hands() -> void:
 	# діегетична вказівка (не відповідь): перевернути чашу
 	var tip := Label.new(); tip.label_settings = _ls(fr, int(H*0.026), Color(0.82,0.78,0.68))
 	tip.text = "Drag to turn it — silver is marked underneath.  Rake the light to read a worn mark."
-	tip.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; tip.size = Vector2(W, H*0.05); tip.position = Vector2(0, H*0.835)
+	tip.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; tip.size = Vector2(W, H*0.05)
+	tip.position = Vector2(0, H*0.945)   # під рядом кнопок 0.9 — не лягати на «✋» (0.835)
 	tip.mouse_filter = Control.MOUSE_FILTER_IGNORE; s.add_child(tip)
 	var tw := create_tween(); tw.tween_interval(6.0); tw.tween_property(tip, "modulate:a", 0.0, 1.5)
 	_txtbtn(s, "←  set it down", Vector2(W*0.04, H*0.9), func(): _show("DESK"))
@@ -1932,6 +2066,15 @@ func _build_hands() -> void:
 	rake_btn = _txtbtn(s, "⟋  rake the light across the silver", Vector2(W*0.60, H*0.9), func(): _toggle_raking())
 	# скло можна взяти ПРЯМО В РУКАХ — не треба вертатись на стіл по нього
 	hands_glass_btn = _txtbtn(s, "◦  take up the glass", Vector2(W*0.29, H*0.9), func(): _pickup_loupe())
+	# ДІЯ ЯК КНОПКА (Віктор, 27.07: «це не працює, незрозуміло» — жест-у-точку
+	# провалився і в плейтестера, і в нього; кнопка чесніша для миші, як rake)
+	_txtbtn(s, "✋  run a finger over the foot", Vector2(W*0.55, H*0.835),
+		func(): _apply_zone("z.foot.top", &"tool.hand"), 0.026)
+	# макро доступне, щойно клейма знайдені (дрібні гліфи — тільки тут)
+	var macro_btn := _txtbtn(s, "◉  study the marks up close", Vector2(W*0.55, H*0.78),
+		func():
+			if found_marks: _show("MARKS_MACRO")
+			else: _set_hint("Nothing yet worth the strong glass — find the marks first."), 0.026)
 
 func _toggle_raking() -> void:
 	raking = not raking          # СТАН
@@ -1968,7 +2111,10 @@ func _build_news() -> void:
 	var nh := H*0.94; var nw := nh*float(nt.get_width())/float(nt.get_height())
 	var np := TextureRect.new(); np.texture = nt; np.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	np.stretch_mode = TextureRect.STRETCH_SCALE; np.size = Vector2(nw, nh)
-	np.position = Vector2((W-nw)*0.5, (H-nh)*0.5); np.mouse_filter = Control.MOUSE_FILTER_IGNORE; s.add_child(np)
+	np.position = Vector2((W-nw)*0.5, (H-nh)*0.5); np.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# газетний папір 1900-х не білий: теплий пожовклий тон (Віктор: «білий фон — тупо»)
+	np.modulate = Color(0.86, 0.80, 0.68)
+	s.add_child(np)
 	_paper_catcher("NEWS", s, np)
 	_txtbtn(s, "←  back", Vector2(W*0.04, H*0.92), func(): _show("DOCS"))
 
@@ -2081,40 +2227,48 @@ func _refresh_notebook() -> void:
 	var pg := TextureRect.new(); pg.texture = t; pg.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	pg.stretch_mode = TextureRect.STRETCH_SCALE; pg.size = Vector2(nw, nh)
 	pg.position = Vector2((W-nw)*0.5, (H-nh)*0.5); pg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	pg.modulate = Color(0.88, 0.83, 0.72)   # той самий закон: папір теплий, не білий
 	s.add_child(pg)
 	var ft := _case_facts_table()
-	# дві сторінки розвороту: x-межі у частках аркуша
-	var cols := [[0.075, 0.315], [0.560, 0.315]]
-	var row_h := 0.105
+	# сітка виміряна з текстури; пишемо ЧЕРЕЗ лінію (крок 2×0.0169), інакше кегль
+	# нечитабельний. Колонки — дві сторінки розвороту.
+	const NB_FIRST := 0.140
+	const NB_STEP := 0.0338
+	const NB_LINES := 21          # рядків «через лінію» на сторінці
+	var cols := [0.075, 0.560]
+	var col_w := 0.315
 	notebook_rows = 0
-	var idx := 0
+	var col := 0
+	var li := 0
 	for fid_s in facts:
 		var fid := StringName(fid_s)
 		if not ft.has(fid): continue
 		var fd: Dictionary = ft[fid]
-		var col: int = 0 if idx < 8 else 1
-		var yy: float = 0.075 + row_h*float(idx - (0 if col == 0 else 8))
-		if yy > 0.86: break   # розворот повний — далі майбутня друга сторінка (справа 8+)
-		var x0: float = (cols[col] as Array)[0]
-		var cw: float = (cols[col] as Array)[1]
 		var has_crop: bool = fd.has("crop")
-		var l := Label.new(); l.label_settings = _ls(fh, int(nh*0.0205), Color(0.21,0.15,0.10))
-		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		l.size = Vector2(nw*(cw - (0.085 if has_crop else 0.0)), nh*(row_h - 0.012))
-		l.position = pg.position + Vector2(nw*x0, nh*yy)
-		l.text = "— " + String(fd.get("text", fd.get("cite", fid_s)))
-		l.clip_text = true
-		l.mouse_filter = Control.MOUSE_FILTER_IGNORE; s.add_child(l)
+		var tw := col_w - (0.085 if has_crop else 0.0)
+		# скільки ліній займе — наперед не вгадати;
+		# консервативно: якщо лишилось <5 ліній — наступна колонка
+		if li > NB_LINES - 5 and col == 0:
+			col = 1; li = 0
+		if col == 1 and li > NB_LINES - 5:
+			break   # розворот повний — далі друга сторінка (справа 8+)
+		var start_li := li
+		li = _lined_text(s, pg, NB_FIRST, NB_STEP, li, cols[col],
+						 tw, "— " + String(fd.get("text", fd.get("cite", fid_s))),
+						 fh, 0.60, Color(0.21,0.15,0.10))
 		if has_crop:
 			var cr: Dictionary = fd["crop"]
 			var at := AtlasTexture.new(); at.atlas = tex[String(cr["tex"])]; at.region = cr["region"]
-			var im := TextureRect.new(); im.texture = at; im.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-			im.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-			im.size = Vector2(nw*0.078, nh*(row_h - 0.018))
-			im.position = pg.position + Vector2(nw*(x0 + cw - 0.078), nh*(yy + 0.004))
-			im.mouse_filter = Control.MOUSE_FILTER_IGNORE; s.add_child(im)
+			var imv := TextureRect.new(); imv.texture = at; imv.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			imv.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			var crop_h: float = pg.size.y * NB_STEP * 3.0
+			imv.size = Vector2(pg.size.x*0.078, crop_h)
+			imv.position = pg.position + Vector2(pg.size.x*(cols[col] + col_w - 0.078),
+				pg.size.y*(NB_FIRST + NB_STEP*float(start_li)) - pg.size.y*NB_STEP*0.7)
+			imv.mouse_filter = Control.MOUSE_FILTER_IGNORE; s.add_child(imv)
+			li = maxi(li, start_li + 3)
+		li += 1          # порожня лінія між записами
 		notebook_rows += 1
-		idx += 1
 	if notebook_rows == 0:
 		var e := Label.new(); e.label_settings = _ls(fh, int(nh*0.024), Color(0.44,0.36,0.28))
 		e.text = "Nothing set down yet."
@@ -2122,15 +2276,83 @@ func _refresh_notebook() -> void:
 		e.mouse_filter = Control.MOUSE_FILTER_IGNORE; s.add_child(e)
 	_txtbtn(s, "←  put it away", Vector2(W*0.04, H*0.92), func(): _show(notebook_prev))
 
+# МАКРО-ПЛАН КЛЕЙМ (Віктор, 27.07: «на клеймі Діани не видно букви — в цьому і
+# складність»). Правило 14: загальний · середній · деталь · МАКРО. Лупа — середній;
+# для «літери всередині контуру» детектив перемальовує клеймо під сильним склом.
+# Картки — з ОРИГІНАЛУ арту (не з пластини), там гліфи читаються ідеально.
+func _build_marks_macro() -> void:
+	var s := _screen("MARKS_MACRO")
+	_paper_backdrop(s, 0.10)
+	var head := Label.new(); head.label_settings = _ls(fr, int(H*0.032), Color(0.90,0.86,0.77))
+	head.text = "Under the strong glass, drawn into the notebook."
+	head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	head.size = Vector2(W, H*0.06); head.position = Vector2(0, H*0.045)
+	head.mouse_filter = Control.MOUSE_FILTER_IGNORE; s.add_child(head)
+	var cards := [
+		["mark_maker_macro", "the maker's shield", 0.235],
+		["mark_diana_macro", "the assay head — a numeral before the chin,\na letter INSIDE the outline", 0.625],
+	]
+	for c in cards:
+		var t: Texture2D = tex[String(c[0])]
+		var chh := H*0.62; var cw := chh*float(t.get_width())/float(t.get_height())
+		var im := TextureRect.new(); im.texture = t
+		im.expand_mode = TextureRect.EXPAND_IGNORE_SIZE; im.stretch_mode = TextureRect.STRETCH_SCALE
+		im.size = Vector2(cw, chh); im.position = Vector2(W*float(c[2]) - cw*0.5, H*0.14)
+		im.mouse_filter = Control.MOUSE_FILTER_IGNORE; s.add_child(im)
+		var lb := Label.new(); lb.label_settings = _ls(fr, int(H*0.024), Color(0.86,0.80,0.66))
+		lb.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		lb.text = String(c[1]); lb.size = Vector2(W*0.36, H*0.09)
+		lb.position = Vector2(W*float(c[2]) - W*0.18, H*0.785)
+		lb.mouse_filter = Control.MOUSE_FILTER_IGNORE; s.add_child(lb)
+	_txtbtn(s, "←  back to the piece", Vector2(W*0.04, H*0.92), func(): _show("HANDS"))
+	_txtbtn(s, "Mark catalogue  →", Vector2(W*0.70, H*0.92), func(): _show("CATALOG"))
+
+# ТЕКСТ НА ЛІНІЙОВАНОМУ ПАПЕРІ — ЄДИНИЙ дозволений спосіб (закон 27.07,
+# Віктор: «текст не в лінійках... лінії ріжуть текст»). Кожен рядок — окремий
+# Label, посаджений БАЗОВОЮ ЛІНІЄЮ (ascent з métrик шрифту) на лінію сітки
+# аркуша; перенос — фактичною шириною рядка, не на око. Сітки виміряні з
+# текстур: notebook 0.140+0.0169·h · reg_page 0.1025+0.0183·h · receipt
+# 0.3113+0.0158·h. Пишемо «через лінію» — дрібний крок дає нечитабельний кегль.
+func _lined_text(sc: Control, pg: Control, grid_first: float, grid_step: float,
+				 line_idx: int, x_frac: float, w_frac: float, txt: String,
+				 font: FontFile, size_ratio := 0.62, col := Color(0.24,0.17,0.10)) -> int:
+	var step_px: float = pg.size.y * grid_step
+	var fsize: int = maxi(int(step_px * size_ratio), 8)
+	var ascent: float = font.get_ascent(fsize)
+	var max_w: float = pg.size.x * w_frac
+	var lines: Array[String] = []
+	var cur := ""
+	for word in txt.split(" "):
+		var trial := (cur + " " + word).strip_edges()
+		if cur == "" or font.get_string_size(trial, HORIZONTAL_ALIGNMENT_LEFT, -1, fsize).x <= max_w:
+			cur = trial
+		else:
+			lines.append(cur); cur = word
+	if cur != "": lines.append(cur)
+	for l in lines:
+		var y_line: float = pg.size.y * (grid_first + grid_step * float(line_idx))
+		var lb := Label.new(); lb.label_settings = _ls(font, fsize, col)
+		lb.text = l
+		lb.position = pg.position + Vector2(pg.size.x * x_frac, y_line - ascent)
+		lb.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		sc.add_child(lb)
+		line_idx += 1
+	return line_idx
+
 func _build_receipt() -> void:
 	var sc := _paper_screen("DOCS_RECEIPT", "paper_receipt_1807", "DOCS", "←  back to the papers")
 	# текст квитанції — ДОСЛІВНО з case_01.md §3 (f.receipt_1807)
 	_ptext(sc, "R E C E I P T", 0.385, 0.155, 0.030)
 	_ptext(sc, "duty paid on the re-marking of plate", 0.300, 0.195, 0.019)
-	_ptext(sc, "Vienna, the 12th of March 1807", 0.290, 0.360, 0.023, Color(0.16,0.12,0.22), true)
-	_ptext(sc, "one becher, silver, 13 löthig", 0.290, 0.425, 0.023, Color(0.16,0.12,0.22), true)
-	_ptext(sc, "weight 14 loth  ·  height 8 zoll 4 linien", 0.290, 0.490, 0.023, Color(0.16,0.12,0.22), true)
-	_ptext(sc, "for Anna Reithofer", 0.290, 0.555, 0.023, Color(0.16,0.12,0.22), true)
+	# лінії бланка виміряні профілем темності: нерівномірні, тому кожен рядок —
+	# на свою лінію поіменно (а не first+step·k)
+	var q_lines := [0.4192, 0.4758, 0.5325, 0.5792]
+	var q_rows := ["Vienna, the 12th of March 1807", "one becher, silver, 13 löthig",
+			"weight 14 loth  ·  height 8 zoll 4 linien", "for Anna Reithofer"]
+	var q_sizes := [0.55, 0.55, 0.42, 0.55]   # довгий рядок — дрібнішим письмом, без переносу
+	for qi in q_rows.size():
+		_lined_text(sc["s"], sc["pg"], q_lines[qi], 0.0566, 0, 0.290, 0.58,
+			String(q_rows[qi]), fh, q_sizes[qi], Color(0.16,0.12,0.22))
 	_paper_catcher("DOCS_RECEIPT", sc["s"], sc["pg"])
 
 func _build_books() -> void:
@@ -2144,13 +2366,14 @@ func _build_books() -> void:
 		["HUBER, Anton", "silversmith", "1863", "—"],
 		["HORVATH, Emmerich", "goldsmith", "1866", "1870"],
 	]
+	# кожен запис — у СВОЮ графу, базовою лінією на її нижню лінію; всі колонки разом
 	for i in rows.size():
 		var r: Array = rows[i]
-		var uy := 0.165 + 0.0805*float(i)
-		_ptext(rg, String(r[0]), 0.205, uy, 0.0195, Color(0.20,0.15,0.20), true)
-		_ptext(rg, String(r[1]), 0.520, uy, 0.0185, Color(0.24,0.19,0.24), true)
-		_ptext(rg, String(r[2]), 0.705, uy, 0.0195, Color(0.20,0.15,0.20), true)
-		_ptext(rg, String(r[3]), 0.800, uy, 0.0195, Color(0.20,0.15,0.20), true)
+		var li_r := 1 + i
+		_lined_text(rg["s"], rg["pg"], 0.1246, 0.0446, li_r, 0.205, 0.30, String(r[0]), fh, 0.50, Color(0.20,0.15,0.20))
+		_lined_text(rg["s"], rg["pg"], 0.1246, 0.0446, li_r, 0.520, 0.17, String(r[1]), fh, 0.46, Color(0.24,0.19,0.24))
+		_lined_text(rg["s"], rg["pg"], 0.1246, 0.0446, li_r, 0.705, 0.09, String(r[2]), fh, 0.50, Color(0.20,0.15,0.20))
+		_lined_text(rg["s"], rg["pg"], 0.1246, 0.0446, li_r, 0.800, 0.09, String(r[3]), fh, 0.50, Color(0.20,0.15,0.20))
 	_paper_catcher("BOOK_REG", rg["s"], rg["pg"])
 
 	# довідник знаків: гравюри вже на аркуші, підписи — шрифтом
@@ -2734,10 +2957,35 @@ func _build_case2() -> void:
 		sc.set_meta("wants_sv", true)
 		var catcher := Control.new(); catcher.name = "catch3d"
 		catcher.size = Vector2(W, H); catcher.mouse_filter = Control.MOUSE_FILTER_STOP
+		catcher.mouse_default_cursor_shape = Control.CURSOR_ARROW
 		catcher.gui_input.connect(_case2_input)
 		sc.add_child(catcher)
 		screen_cams[scr] = sec_cams[scr]
 	sec_vp = sv
+	for scr3 in ["FURN", "WELL", "DRAWER"]:
+		_build_tool_tray(scr3)
+	# ВСТУП: хто прийшов, чого хоче, з чого почати. Без цього гравець стоїть
+	# перед шафою з шістьма інструментами і нулем контексту (Віктор, 27.07).
+	var i1 := Label.new(); i1.name = "c2_intro"
+	i1.label_settings = _ls(fr, int(H*0.028), Color(0.92,0.88,0.78))
+	i1.label_settings.shadow_color = Color(0,0,0,0.85); i1.label_settings.shadow_offset = Vector2(1.5,1.5)
+	i1.text = "Frau Vogl, housekeeper twenty-two years to the late Herr F.\nThe secretaire is hers by his will, and she means to sell it.\n«My son sails on Thursday. I am not asking a good price — I am asking a quick one.»"
+	i1.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	i1.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	i1.size = Vector2(W*0.72, H*0.15); i1.position = Vector2(W*0.14, H*0.055)
+	i1.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	screens["FURN"].add_child(i1)
+	var i2 := Label.new()
+	i2.label_settings = _ls(fh, int(H*0.026), Color(0.85,0.72,0.48))
+	i2.label_settings.shadow_color = Color(0,0,0,0.85); i2.label_settings.shadow_offset = Vector2(1.5,1.5)
+	i2.text = "Value the piece before it sells. Begin as the trade begins — rap the long drawer, and listen."
+	i2.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	i2.size = Vector2(W, H*0.05); i2.position = Vector2(0, H*0.205)
+	i2.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	screens["FURN"].add_child(i2)
+	var itw2 := create_tween(); itw2.tween_interval(14.0)
+	itw2.tween_property(i1, "modulate:a", 0.0, 2.0)
+	itw2.parallel().tween_property(i2, "modulate:a", 0.0, 2.0)
 	# навігація: план → деталь і назад (режисура: без стрибків повз середній план)
 	# ряд інструментів — на всіх трьох планах предмета; ОДИН вузол tool_row
 	# переїжджає між екранами при _sync_case2_view (як контейнер вьюпорта)
@@ -2764,7 +3012,7 @@ func _build_case2() -> void:
 	paper.position = Vector2((W-lw)*0.5, (H-lh)*0.5 - H*0.02); paper.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	d2.add_child(paper)
 	var t2 := Label.new(); t2.label_settings = _ls(fr, int(lh*0.026), Color(0.20,0.14,0.09))
-	t2.text = "DAY-BOOK — the 3rd\n\nSecretaire, walnut, estate of Herr F.\nOpened on arrival by Krenn, our locksmith\n— lock seized. House keys surrendered\nwith the piece.\n\n\nREGISTER OF WORKSHOPS\n\nGRUBER, Michael. Möbeltischler,\nWien, Gumpendorf.\nWorkshop stamp in use 1822–1841.\nNumbered his carcasses in chalk."
+	t2.text = "THE CLIENT — Frau Anna Vogl\n«He willed it to me. My son sails on Thursday;\nthe ticket is forty-one gulden and I have nineteen.\nI am not asking a good price — a quick one.»\n\nDAY-BOOK — the 3rd\nSecretaire, walnut, estate of Herr F.\nOpened on arrival by Krenn, our locksmith\n— lock seized. House keys surrendered with the piece.\n\nREGISTER OF WORKSHOPS\nGRUBER, Michael. Möbeltischler, Wien, Gumpendorf.\nWorkshop stamp in use 1822–1841.\nNumbered his carcasses in chalk."
 	t2.position = paper.position + Vector2(lw*0.12, lh*0.10); t2.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	d2.add_child(t2)
 	_paper_catcher("C2DOCS", d2, paper)
@@ -2772,15 +3020,14 @@ func _build_case2() -> void:
 	_txtbtn(d2, "the chapter on screws  →", Vector2(W*0.60, H*0.92), func(): _show("BOOK_SCREWS"))
 	var bs := _paper_screen("BOOK_SCREWS", "reg_page_h", "C2DOCS", "←  back to the papers")
 	_ptext(bs, "OF SCREWS AND THEIR MAKING", 0.22, 0.055, 0.020)
-	_ptext(bs, "Before 1846: blunt end, hand-filed thread,", 0.16, 0.20, 0.019)
-	_ptext(bs, "uneven pitch, the slot off centre; a hole", 0.16, 0.245, 0.019)
-	_ptext(bs, "must first be bored.", 0.16, 0.29, 0.019)
-	_ptext(bs, "Patented 1846: the pointed screw that cuts", 0.16, 0.38, 0.019)
-	_ptext(bs, "its own way; made in quantity at Birmingham", 0.16, 0.425, 0.019)
-	_ptext(bs, "from 1854.", 0.16, 0.47, 0.019)
+	var li_b := _lined_text(bs["s"], bs["pg"], 0.1246, 0.0446, 1, 0.16, 0.64,
+		"Before 1846: blunt end, hand-filed thread, uneven pitch, the slot off centre; a hole must first be bored.", fr, 0.50)
+	_lined_text(bs["s"], bs["pg"], 0.1246, 0.0446, li_b + 1, 0.16, 0.64,
+		"Patented 1846: the pointed screw that cuts its own way; made in quantity at Birmingham from 1854.", fr, 0.50)
 	_paper_catcher("BOOK_SCREWS", bs["s"], bs["pg"])
 
 var sec_vp: SubViewport
+var tray_marks := {}     # screen → {tool: ColorRect} підсвітки взятого предмета
 var sec_cams := {}
 var sec_backboard: Node3D
 var sec_drawer: Node3D
@@ -2788,6 +3035,49 @@ var sec_body_closed: Node3D
 var sec_body_open: Node3D
 
 # вигляд сцени секретера ВИВОДИТЬСЯ зі стану (закон кроку 2)
+# Лоток бюро: ОДНА мальована таця з чотирма предметами; хотспоти по місцях
+# (як лупа, запечена в стіл справи 1). Взятий предмет — тепла підсвітка,
+# як активний рядок атестата. Рука й око — це сам гравець, їх у лотку нема.
+const TRAY_SPOTS := [
+	[&"tool.caliper",     0.055, 0.290, "the caliper"],
+	[&"tool.screwdriver", 0.320, 0.480, "the screwdriver"],
+	[&"tool.loupe",       0.495, 0.705, "the loupe"],
+	[&"tool.rake",        0.715, 0.960, "the inspection lamp"],
+]
+
+func _build_tool_tray(scr: String) -> void:
+	var host: Control = screens[scr]
+	var t: Texture2D = tex["tool_tray"]
+	var th := H*0.205
+	var twd := th*float(t.get_width())/float(t.get_height())
+	var tray := TextureRect.new(); tray.texture = t
+	tray.expand_mode = TextureRect.EXPAND_IGNORE_SIZE; tray.stretch_mode = TextureRect.STRETCH_SCALE
+	tray.size = Vector2(twd, th); tray.position = Vector2(W - twd - W*0.015, H - th - H*0.015)
+	tray.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	host.add_child(tray)
+	tray_marks[scr] = {}
+	for spot in TRAY_SPOTS:
+		var tl: StringName = spot[0]
+		var x0 := tray.position.x + twd*float(spot[1])
+		var x1 := tray.position.x + twd*float(spot[2])
+		var hl := ColorRect.new(); hl.color = Color(0.99, 0.78, 0.42, 0.16)
+		hl.size = Vector2(x1 - x0, th*0.86); hl.position = Vector2(x0, tray.position.y + th*0.07)
+		hl.mouse_filter = Control.MOUSE_FILTER_IGNORE; hl.visible = false
+		host.add_child(hl)
+		(tray_marks[scr] as Dictionary)[tl] = hl
+		var b := Button.new(); b.flat = true; b.modulate.a = 0
+		b.position = Vector2(x0, tray.position.y); b.size = Vector2(x1 - x0, th)
+		b.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+		b.mouse_entered.connect(_set_hint.bind(String(spot[3])))
+		b.mouse_exited.connect(_set_hint.bind(""))
+		b.pressed.connect(_pick_tool.bind(tl))
+		host.add_child(b)
+
+func _refresh_tray_marks() -> void:
+	for scr in tray_marks:
+		for tl in (tray_marks[scr] as Dictionary):
+			((tray_marks[scr] as Dictionary)[tl] as ColorRect).visible = (active_tool == tl)
+
 func _sync_case2_view() -> void:
 	if sec_vp == null: return
 	var scr := _shown()
@@ -2811,15 +3101,6 @@ func _sync_case2_view() -> void:
 			(have as SubViewportContainer).remove_child(sec_vp)
 			add_child(sec_vp)
 			have.queue_free()
-	# ряд інструментів слідує за активним екраном справи 2
-	if tool_row and on_c2 and tool_row.get_parent() != screens[scr]:
-		if tool_row.get_parent(): tool_row.get_parent().remove_child(tool_row)
-		screens[scr].add_child(tool_row)
-		_refresh_tool_row()
-	elif tool_row and not on_c2 and scr == "DESK" and tool_row.get_parent() != screens["DESK"]:
-		if tool_row.get_parent(): tool_row.get_parent().remove_child(tool_row)
-		screens["DESK"].add_child(tool_row)
-		_refresh_tool_row()
 	# два стани корпуса: WELL бачить відкинуту дошку з нутром
 	var in_well: bool = scr == "WELL"
 	if sec_body_closed: sec_body_closed.visible = on_c2 and not in_well
@@ -2831,20 +3112,35 @@ func _sync_case2_view() -> void:
 		sec_drawer.visible = zone_states.get(&"z.sec.drawer_front", &"default") == &"out"
 
 func _case2_input(ev: InputEvent) -> void:
+	# РУКА Й ОКО — НЕ ІНСТРУМЕНТИ (Віктор: «набір нелогічний»). Вони і є гравець:
+	# клік = торкнутись/роздивитись; у лоток беруться лише ФІЗИЧНІ предмети.
 	if ev is InputEventMouseButton and (ev as InputEventMouseButton).pressed \
 			and (ev as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT:
 		var pos: Vector2 = (ev as InputEventMouseButton).position
-		var zid := _pick_3d_at(pos, active_tool if active_tool != &"*" else &"tool.hand")
-		if zid == "":
-			# другий шанс: зона могла вимагати саме активний інструмент «око»
-			zid = _pick_3d_at(pos, &"tool.eye")
-		if zid != "": _apply_zone(zid, active_tool if active_tool != &"*" else &"tool.hand")
+		if active_tool != &"*":
+			var zt := _pick_3d_at(pos, active_tool)
+			if zt != "": _apply_zone(zt, active_tool); return
+			# інструмент у руці, але зоні він не потрібен: чесна відповідь, не тиша
+			var zn := _pick_3d_at(pos, &"tool.hand")
+			if zn == "": zn = _pick_3d_at(pos, &"tool.eye")
+			if zn != "":
+				_set_hint("Not the tool for this — set it down, or try it elsewhere.")
+				return
+		var zid := _pick_3d_at(pos, &"tool.hand")
+		if zid != "": _apply_zone(zid, &"tool.hand"); return
+		zid = _pick_3d_at(pos, &"tool.eye")
+		if zid != "": _apply_zone(zid, &"tool.eye")
 	elif ev is InputEventMouseMotion:
 		var zid2 := _pick_3d_at((ev as InputEventMouseMotion).position, &"tool.eye")
 		if zid2 == "":
 			zid2 = _pick_3d_at((ev as InputEventMouseMotion).position, &"tool.hand")
 		var z: Dictionary = _case_zones().get(StringName(zid2), {})
 		_set_hint(String(z.get("hint", "")) if zid2 != "" else "")
+		# курсор — чесна мова: рука ЛИШЕ там, де є що робити (Віктор: «не розумію,
+		# що із шафою робити» — рука-всюди знецінювала єдиний сигнал інтерактивності)
+		var sc2: Node = screens[_shown()].get_node_or_null("catch3d")
+		if sc2: (sc2 as Control).mouse_default_cursor_shape = \
+			Control.CURSOR_POINTING_HAND if zid2 != "" else Control.CURSOR_ARROW
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -2875,8 +3171,8 @@ func _unhandled_input(event: InputEvent) -> void:
 					goblet_pivot.basis = drag_press_basis
 				_click_zone_3d(drag_press_pos)
 			elif _pick_3d_at(drag_press_pos, &"tool.hand") != "":
-				# почав на зоні, але потягнув далеко — це вже оберт; підкажемо жест
-				_set_hint("A shorter stroke — just across the slope, and let go.")
+				# почав на зоні, але потягнув — це оберт; палець — це ДОТИК
+				_set_hint("Just press the finger there — no need to rub.")
 	elif event is InputEventMouseMotion and not cup_dragging and not loupe_held:
 		# діегетична підказка жесту: наведення на hand-зону чаші називає дію
 		# (Віктор і плейтестер незалежно не зрозуміли «run a finger» без неї)

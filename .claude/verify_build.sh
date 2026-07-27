@@ -46,7 +46,7 @@ fi
 export G3_SHOTDIR="/tmp/g3_verify/"
 rm -rf "$G3_SHOTDIR"; mkdir -p "$G3_SHOTDIR"
 FAIL=""
-for t in "walk a" "walk b" "walk c" "walk e" "chapters" "outcomes" "layoutcheck" "case2" "savetest"; do
+for t in "walk a" "walk b" "walk c" "walk e" "walk p" "chapters" "outcomes" "layoutcheck" "case2" "savetest"; do
   OUT=$(godot --path . --rendering-driver opengl3 -- $t 2>&1 | grep -v specular)
   echo "--- $t ---" >>"$LOG"; echo "$OUT" >>"$LOG"
   case "$t" in
@@ -81,6 +81,8 @@ for t in "walk a" "walk b" "walk c" "walk e" "chapters" "outcomes" "layoutcheck"
     # виглядають як покриття, а насправді одна з них не перевіряється ніколи
     "outcomes") echo "$OUT" | grep -q "OUTCOMES_OK cases=5 unique_ids=4" || FAIL="$FAIL outcomes" ;;
     # жоден текст не має налазити на інший (вимога Віктора, 26.07)
+    # walk p: усі лінійовані папери будуються з живими фактами без падінь
+    "walk p")   echo "$OUT" | grep -q "WALK_P_OK notebook_rows=8" || FAIL="$FAIL walk-p" ;;
     "layoutcheck") echo "$OUT" | grep -q "накладань= 0" || echo "$OUT" | grep -q "накладань=0" || FAIL="$FAIL layout" ;;
   esac
   echo "$OUT" | grep -q "OUTCOMES_FAIL" && FAIL="$FAIL outcomes-dup"

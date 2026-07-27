@@ -60,7 +60,7 @@ const ZONES := {
 	&"z.foot.top": {
 		"kind": &"mesh", "screen": &"HANDS", "node": &"goblet_pivot",
 		"at": Vector3(0, -0.86, 0.28), "facing": Vector3(0, 0.80, 0.60),
-		"r": 0.20, "facing_min": 0.10,
+		"r": 0.30, "facing_min": 0.02,
 		"hint": "The slope of the foot — a short stroke of the finger, not a turn",
 		"tools": [&"tool.hand", &"tool.rake", &"tool.loupe"],
 	},
@@ -92,7 +92,8 @@ const ZONES := {
 	# screen позначено майбутнім ім'ям, щоб ловець DOCS не пропонував зону без поверхні.
 	&"z.papers.receipt": {
 		"kind": &"img", "screen": &"DOCS_RECEIPT", "surface": &"paper_receipt_1807",
-		"u": Vector2(0.500, 0.430), "r": 0.190, "tools": [], "on_click": true,
+		"u": Vector2(0.500, 0.480), "shape": &"rect", "half": Vector2(0.440, 0.450),
+		"tools": [], "on_click": true,
 	},
 	# --- ЗОНИ З ГРИ, ЩЕ НЕ ВНЕСЕНІ В case_01.md (аудит 26.07, знахідки 1 і 24):
 	# лист клієнтки і газета. Вносити в §2–§4 специфікації разом із квитанцією (крок 6).
@@ -128,12 +129,12 @@ const ZONES := {
 	},
 	&"z.book.register": {
 		"kind": &"img", "screen": &"BOOK_REG", "surface": &"reg_page_h",
-		"u": Vector2(0.315, 0.560), "shape": &"rect", "half": Vector2(0.280, 0.045),
+		"u": Vector2(0.500, 0.500), "shape": &"rect", "half": Vector2(0.470, 0.470),
 		"tools": [], "on_click": true,
 	},
 	&"z.book.marks": {
 		"kind": &"img", "screen": &"BOOK_MARKS", "surface": &"marks_page_vienna",
-		"u": Vector2(0.660, 0.480), "shape": &"rect", "half": Vector2(0.300, 0.230),
+		"u": Vector2(0.500, 0.500), "shape": &"rect", "half": Vector2(0.470, 0.470),
 		"tools": [], "on_click": true,
 	},
 }
@@ -236,7 +237,7 @@ const FACTS := {
 		"text": "A punch struck into the underside of the foot: a shield, and within it a winged monogram set between two letters.",
 		"crop": {"tex": &"foot_plate_maker", "region": Rect2(180, 435, 160, 170)}},
 	&"f.mark_diana":      {"cite": "the letter set inside the head", "tag": &"marks", "weight": 2,
-		"text": "Beside it, a woman's head in profile. A numeral 3 stands before the chin. The letter A stands inside the same outline, under the throat.",
+		"text": "Beside it, a woman's head in profile. A numeral 3 stands before the chin. The letter A stands inside the same outline.",
 		"crop": {"tex": &"foot_plate_maker", "region": Rect2(208, 588, 168, 185)}},
 	&"f.marks_alone":     {"cite": "no earlier assay punch on the piece", "tag": &"marks", "weight": 2,
 		"text": "The rest of the underside is bare. No third punch, no figures, no bright patch where one had been taken off."},
