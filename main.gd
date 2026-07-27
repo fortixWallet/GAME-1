@@ -498,6 +498,9 @@ func _input(event: InputEvent) -> void:
 		_edit_input(event); return
 	if event is InputEventMouseMotion and hand_tool_ui and hand_tool_ui.visible:
 		hand_tool_ui.position = (event as InputEventMouseMotion).position - hand_tool_ui.pivot_offset
+	if event is InputEventMouseButton and hand_tool_ui and hand_tool_ui.visible:
+		# клік без руху миші (пілот, планшет): спрайт теж стрибає в точку дії
+		hand_tool_ui.position = (event as InputEventMouseButton).position - hand_tool_ui.pivot_offset
 	if event is InputEventMouseButton:
 		var mb := event as InputEventMouseButton
 		if mb.button_index == MOUSE_BUTTON_RIGHT and mb.pressed:
@@ -664,6 +667,8 @@ func _dt() -> float:
 func _pick_3d_at(gc: Vector2, tool: StringName) -> String:
 	var scr := _shown()
 	var cam: Camera3D = screen_cams.get(scr, main_cam3)
+	var best_id := ""
+	var best_r := 99.0
 	for id in _case_zones():
 		var z: Dictionary = _case_zones()[id]
 		if String(z.get("kind", &"")) != "mesh": continue
@@ -673,8 +678,13 @@ func _pick_3d_at(gc: Vector2, tool: StringName) -> String:
 		if not tools.is_empty() and not (tool in tools): continue
 		var node: Node3D = mesh_nodes.get(StringName(z.get("node", &"goblet_pivot")), goblet_pivot)
 		if node == null or cam == null: continue
-		if ZoneHit.inside_3d(gc, z, node, cam): return String(id)
-	return ""
+		if ZoneHit.inside_3d(gc, z, node, cam):
+			# НЕ повертати першу-ліпшу: перекриті зони обирає МЕНША (як у pick_2d),
+			# інакше дрібна деталь усередині широкої площини недосяжна назавжди
+			# (обшивка ніші програвала дошці колодязя — плейтест 27.07)
+			if best_id == "" or float(z.get("r", 0.1)) < best_r:
+				best_id = String(id); best_r = float(z.get("r", 0.1))
+	return best_id
 
 # наведення лупи: акумулює витримку правила під прицілом
 func _hover_zone_3d(gc: Vector2) -> void:
@@ -728,6 +738,8 @@ func _c2_ladder() -> String:
 	if not case_flags.get(&"knock_heard", false):
 		return "The long drawer has not been sounded yet."
 	if not facts.has("f.outer_depth"):
+		if active_tool == &"tool.caliper":
+			return "The caliper is in hand — lay it on the front edge of the side, and take the depth outside."
 		return "A drawer that answers flat wants measuring. The caliper lies in the tray."
 	if not facts.has("f.inner_depth") or not facts.has("f.back_thickness"):
 		return "One measurement is a number. Three are an argument."
@@ -1054,6 +1066,32 @@ func _dbg_furnprobe() -> void:
 		print("  MESH ", mi.get_path(), " vis=", mi.is_visible_in_tree(), " aabb=", mi.get_aabb().size)
 		n += 1
 	print("FURNPROBE meshes=", n, " shown=", _shown())
+	# екранні позиції всіх mesh-зон з кожної камери справи (правило 17: скільки бачив)
+	var zc := 0
+	var zfail := 0
+	for scr_z in ["FURN", "WELL", "DRAWER"]:
+		var cz: Camera3D = sec_cams[scr_z]
+		for id in _case_zones():
+			var z: Dictionary = _case_zones()[id]
+			if String(z.get("kind", &"")) != "mesh": continue
+			if String(z.get("screen", &"")) != scr_z: continue
+			var nd: Node3D = mesh_nodes.get(StringName(z.get("node", &"")), null)
+			if nd == null: continue
+			var wp: Vector3 = nd.to_global(z.get("at", Vector3.ZERO))
+			var sp: Vector2 = cz.unproject_position(wp)
+			var behind := cz.is_position_behind(wp)
+			var fdot := 9.9
+			if z.has("facing"):
+				var wn: Vector3 = (nd.global_transform.basis * (z.get("facing") as Vector3)).normalized()
+				fdot = wn.dot((cz.global_position - wp).normalized())
+			print("ZONESCREEN %s %s px=(%.0f, %.0f) behind=%s r=%.2f fdot=%.2f fmin=%.2f" % [scr_z, id, sp.x, sp.y, behind, float(z.get("r", 0.0)), fdot, float(z.get("facing_min", 0.0))])
+			zc += 1
+			# зона, чию нормаль камера її ж екрана не бачить, — недосяжна НІКОЛИ
+			# (упіймано 27.07: боковина fdot=-0.37 — агент 50 дій шукав, куди
+			# прикласти циркуль). ВИНЯТОК: спід шухляди — його показує переворот.
+			if fdot <= float(z.get("facing_min", 0.0)) and String(id) != "z.drawer.underside":
+				zfail += 1
+	print("ZONESCREEN_TOTAL ", zc, " fails=", zfail)
 	await _shot(dir + "furnprobe.png", 3)
 	# бінарний пошук «вази»: ховаємо по одному
 	(mesh_nodes[&"sec_backboard"] as Node3D).visible = false
@@ -1351,7 +1389,7 @@ func _load() -> void:
 	# справа 2 «Спадок удови»
 	for n3 in ["hub_day","hub_day_case","hub_lamp_off","hub_evening","hub_evening_figure","hub_night","hub_darkness","menu_door","client_woman","client_in_room","subtitle_band"]:
 		if ResourceLoader.exists(ART + n3 + ".png"): tex[n3] = load(ART + n3 + ".png")
-	for n2 in ["case2_desk","watch_wear","watch_chain","paper_receipt_1807","reg_page_h","marks_page_vienna","notebook_spread","mark_diana_macro","mark_maker_macro","tool_tray","hand_caliper","hand_screwdriver","hand_rake"]:
+	for n2 in ["case2_desk","watch_wear","watch_chain","paper_receipt_1807","reg_page_h","marks_page_vienna","notebook_spread","mark_diana_macro","mark_maker_macro","tool_tray","hand_caliper","hand_screwdriver","hand_rake","wood_page"]:
 		if ResourceLoader.exists(ART + n2 + ".png"): tex[n2] = load(ART + n2 + ".png")
 	# опційний арт (додано 24.07): чистий лист клієнтки
 	if ResourceLoader.exists(ART + "letter_client.png"):
@@ -1396,6 +1434,8 @@ func _show(name: String) -> void:
 	# папери на весь екран — скло кладеться саме (воно інструмент столу і рук)
 	if loupe_held and name != "DESK" and name != "HANDS":
 		_drop_loupe()
+	_set_hint("")   # старий банер не їде через екрани (say нового правила ляже ПІСЛЯ _show)
+	if hand_tool_ui: call_deferred("_refresh_hand_sprite")
 	cup_dragging = false   # не тягнемо чашу крізь зміну екрана (інакше лупа завмирає)
 	for k in screens: screens[k].visible = (k == name)
 	_sync_case2_view()
@@ -1471,11 +1511,25 @@ func _apply_zone(zone_id: String, tool: StringName = &"*") -> void:
 		return
 	var rule := RuleEngine.find(_case_rules(), StringName(zone_id), tool, facts, _flags(), zone_states)
 	if rule.is_empty():
-		# правило вже віддало все — повторити say останнього придатного (2.5: перечитати можна)
+		# СПОЧАТКУ: чи є правило цієї зони й ЦЬОГО інструмента, замкнене на requires?
+		# Тоді відповісти голосом (req_say), а не тишею — плейтест 27.07: агент 10
+		# разів тикав циркулем у шухляду і чув НІЧОГО; мовчазний гейт = зламаний екран
+		for r0 in _case_rules():
+			var g: Dictionary = r0
+			if StringName(g.get("zone", &"")) != StringName(zone_id): continue
+			if StringName(g.get("tool", &"*")) != tool and StringName(g.get("tool", &"*")) != &"*": continue
+			if RuleEngine.applicable(g, facts, _flags()): continue
+			_play("ui_soft")
+			_set_hint(String(g.get("req_say", "Not yet — something else must be seen first.")))
+			return
+		# правило вже віддало все — повторити say останнього придатного, але лише
+		# якщо воно про ЦЕЙ інструмент (повтор тексту стуку на клік циркулем збивав з ніг)
 		for r in _case_rules():
 			var rr: Dictionary = r
-			if StringName(rr.get("zone", &"")) == StringName(zone_id) \
-					and RuleEngine.applicable(rr, facts, _flags()):
+			if StringName(rr.get("zone", &"")) != StringName(zone_id): continue
+			var rt := StringName(rr.get("tool", &"*"))
+			if rt != tool and rt != &"*" and tool != &"*": continue
+			if RuleEngine.applicable(rr, facts, _flags()):
 				_play("ui_soft"); _set_hint(String(rr.get("say", ""))); return
 		return
 	_apply_rule(rule)
@@ -1496,6 +1550,7 @@ func _apply_rule(rule: Dictionary) -> void:
 		if add_fact(String(f)): got_new = true
 	var st: Dictionary = rule.get("sets_state", {})
 	for zid in st: zone_states[zid] = st[zid]
+	if not st.is_empty(): _sync_case2_view()   # знята дошка зникає ОДРАЗУ, не після зміни екрана
 	var sfl: Dictionary = rule.get("sets_flag", {})
 	for k in sfl:
 		if case_flags.get(k, null) != sfl[k]: got_new = true
@@ -1580,7 +1635,10 @@ func _refresh_hand_sprite() -> void:
 	if hand_tool_ui == null: return
 	var names := {&"tool.caliper": "hand_caliper", &"tool.screwdriver": "hand_screwdriver",
 		&"tool.rake": "hand_rake"}
-	if not names.has(active_tool) or not tex.has(names[active_tool]):
+	if not names.has(active_tool) or not tex.has(names[active_tool]) \
+			or _shown() not in ["FURN", "WELL", "DRAWER", "DESK", "HANDS"]:
+		# поза предметними екранами інструмент лишається в руці ЛОГІЧНО, але спрайт
+		# не висить привидом над паперами і атестатом (плейтест 27.07)
 		hand_tool_ui.visible = false
 		return
 	move_child(hand_tool_ui, get_child_count()-1)
@@ -1724,6 +1782,7 @@ func _load_case(n: int) -> void:
 	raking = false
 	lamp_on = true
 	tod = "day"
+	if sec_drawer: sec_drawer.rotation = Vector3.ZERO   # не перевернута з минулого разу
 	_clear_run_nodes()
 	_sync_view()
 
@@ -2563,15 +2622,13 @@ func _slot_display(i: int) -> String:
 
 # діегетична підказка закритої графи — чого БРАКУЄ, не що вписати
 func _slot_hint(sl: Dictionary) -> String:
+	if sl.has("hint"): return String(sl["hint"])   # підказка живе в ДАНИХ справи
 	match StringName(sl["id"]):
 		&"s.origin": return "( match the mark, then the register )"
 		&"s.fineness", &"s.not_before": return "( the handbook of marks will speak to this )"
 		&"s.marks": return "( run a finger over the top of the foot )"
 		&"s.provenance": return "( set down how the marks were struck, first )"
-		&"s.basis", &"s.c2.basis": return "( name the ruling above, first )"
-		&"s.c2.winder": return "( look closer at the winding crown )"
-		&"s.c2.chain": return "( look closer at the bow and chain )"
-		&"s.c2.belongs": return "( the statements, and both details, first )"
+		&"s.basis": return "( name the ruling above, first )"
 	return "( … )"
 
 func _clear_dependents(changed: StringName) -> void:
@@ -2704,10 +2761,11 @@ func _panel_choice(i: int, sl: Dictionary) -> void:
 		bo.add_theme_color_override("font_color", Color(0.92,0.44,0.36) if chosen else Color(0.90,0.85,0.74))
 		bo.add_theme_color_override("font_hover_color", Color(0.99,0.72,0.42))
 		bo.alignment = HORIZONTAL_ALIGNMENT_LEFT; bo.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-		bo.position = Vector2(0, y); bo.size = Vector2(cert_panel.size.x, H*0.05)
+		bo.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART   # довга опція переноситься, не тікає за екран
+		bo.position = Vector2(0, y); bo.size = Vector2(cert_panel.size.x, H*0.075)
 		var ii := i; bo.pressed.connect(func(): _choose(ii, oid))
 		cert_panel.add_child(bo)
-		y += H*0.062
+		y += H*0.082   # крок під двохрядкові опції (autowrap)
 
 # цифри вписуються рукою: клавіатура з мальованого стилю UI (текстові пункти)
 func _panel_number(i: int, sl: Dictionary) -> void:
@@ -2990,7 +3048,12 @@ func _build_case2() -> void:
 	# ряд інструментів — на всіх трьох планах предмета; ОДИН вузол tool_row
 	# переїжджає між екранами при _sync_case2_view (як контейнер вьюпорта)
 	_txtbtn(screens["FURN"], "the writing well  →", Vector2(W*0.40, H*0.92), func(): _show("WELL"))
-	_txtbtn(screens["FURN"], "take the drawer out  →", Vector2(W*0.64, H*0.92), func(): _apply_zone("z.sec.drawer_front", &"tool.hand"))
+	_txtbtn(screens["FURN"], "take the drawer out  →", Vector2(W*0.64, H*0.92), func():
+		# шухляда вже висунута (стан out) — кнопка ВЕДЕ до неї, а не мовчить
+		# (плейтест 27.07: після «slide it back» правило вже віддане, і клік
+		# повторював текст стуку — агент 6 команд вважав навігацію мертвою)
+		if zone_states.get(&"z.sec.drawer_front", &"default") == &"out": _show("DRAWER")
+		else: _apply_zone("z.sec.drawer_front", &"tool.hand"))
 	_txtbtn(screens["FURN"], "the papers  →", Vector2(W*0.05, H*0.92), func(): _show("C2DOCS"))
 	_txtbtn(screens["FURN"], "Write the certificate  →", Vector2(W*0.84, H*0.92), func(): _show("CERT"))
 	_txtbtn(screens["WELL"], "←  step back", Vector2(W*0.04, H*0.92), func(): _show("FURN"))
@@ -3012,12 +3075,33 @@ func _build_case2() -> void:
 	paper.position = Vector2((W-lw)*0.5, (H-lh)*0.5 - H*0.02); paper.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	d2.add_child(paper)
 	var t2 := Label.new(); t2.label_settings = _ls(fr, int(lh*0.026), Color(0.20,0.14,0.09))
-	t2.text = "THE CLIENT — Frau Anna Vogl\n«He willed it to me. My son sails on Thursday;\nthe ticket is forty-one gulden and I have nineteen.\nI am not asking a good price — a quick one.»\n\nDAY-BOOK — the 3rd\nSecretaire, walnut, estate of Herr F.\nOpened on arrival by Krenn, our locksmith\n— lock seized. House keys surrendered with the piece.\n\nREGISTER OF WORKSHOPS\nGRUBER, Michael. Möbeltischler, Wien, Gumpendorf.\nWorkshop stamp in use 1822–1841.\nNumbered his carcasses in chalk."
+	t2.text = "THE CLIENT — Frau Anna Vogl\n«He willed it to me. My son sails on Thursday;\nthe ticket is forty-one gulden and I have nineteen.\nI am not asking a good price — a quick one.»\n\nDAY-BOOK — the 3rd\nSecretaire, walnut, estate of Herr F.\nOpened on arrival by Krenn, our locksmith\n— lock seized. House keys surrendered with the piece.\n\nREGISTER OF WORKSHOPS (Möbeltischler, Wien)\nDANHAUSER, Josef — Wien — stamp 1804–1838\nGRUBER, Michael — Gumpendorf — stamp 1822–1841\nSCHMIDT & SOHN — Leopoldstadt — stamp 1835–1867\nHALBERT, J. — Wien I — dealer, no stamp, from 1861"
 	t2.position = paper.position + Vector2(lw*0.12, lh*0.10); t2.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	d2.add_child(t2)
 	_paper_catcher("C2DOCS", d2, paper)
 	_txtbtn(d2, "←  back", Vector2(W*0.04, H*0.92), func(): _show("FURN"))
 	_txtbtn(d2, "the chapter on screws  →", Vector2(W*0.60, H*0.92), func(): _show("BOOK_SCREWS"))
+	_txtbtn(d2, "the timber page  →", Vector2(W*0.38, H*0.92), func(): _show("BOOK_WOOD"))
+	# записка попередника (case_02.md §11, двері 2): смужка його почерком, без пояснень
+	var slip := Label.new(); slip.label_settings = _ls(fh, int(lh*0.030), Color(0.30,0.22,0.30))
+	slip.text = "A joiner is paid for wood, and hides air."
+	slip.rotation = -0.02
+	slip.position = paper.position + Vector2(lw*0.14, lh*0.88)
+	slip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	d2.add_child(slip)
+	var bw := _paper_screen("BOOK_WOOD", "wood_page", "C2DOCS", "←  back to the papers")
+	_ptext(bw, "OF TIMBER, BY THE END GRAIN", 0.28, 0.030, 0.020)
+	_ptext(bw, "SPRUCE — the carcass wood", 0.635, 0.115, 0.017)
+	_ptext(bw, "abrupt rings, resin channels;", 0.635, 0.155, 0.014)
+	_ptext(bw, "no rays across the grain.", 0.635, 0.185, 0.014)
+	_ptext(bw, "Coarse, resinous. The stock", 0.635, 0.215, 0.014)
+	_ptext(bw, "of every Vienna carcass.", 0.635, 0.245, 0.014)
+	_ptext(bw, "BEECH", 0.635, 0.585, 0.017)
+	_ptext(bw, "fine even pores, crossed by", 0.635, 0.625, 0.014)
+	_ptext(bw, "broad bright rays — the", 0.635, 0.655, 0.014)
+	_ptext(bw, "joiner\u2019s \u00abfleck\u00bb. Close, pale.", 0.635, 0.685, 0.014)
+	_ptext(bw, "Cheap, strong; a wood for", 0.635, 0.715, 0.014)
+	_ptext(bw, "work that is not meant to show.", 0.635, 0.745, 0.014)
 	var bs := _paper_screen("BOOK_SCREWS", "reg_page_h", "C2DOCS", "←  back to the papers")
 	_ptext(bs, "OF SCREWS AND THEIR MAKING", 0.22, 0.055, 0.020)
 	var li_b := _lined_text(bs["s"], bs["pg"], 0.1246, 0.0446, 1, 0.16, 0.64,
@@ -3109,7 +3193,9 @@ func _sync_case2_view() -> void:
 	if sec_backboard:
 		sec_backboard.visible = in_well and zone_states.get(&"z.well.back_board", &"default") != &"open"
 	if sec_drawer:
-		sec_drawer.visible = zone_states.get(&"z.sec.drawer_front", &"default") == &"out"
+		# шухляда «в руках» існує лише на своєму плані; на FURN вона левітувала
+		# поверх зачиненого корпусу (плейтест 27.07)
+		sec_drawer.visible = scr == "DRAWER" and zone_states.get(&"z.sec.drawer_front", &"default") == &"out"
 
 func _case2_input(ev: InputEvent) -> void:
 	# РУКА Й ОКО — НЕ ІНСТРУМЕНТИ (Віктор: «набір нелогічний»). Вони і є гравець:

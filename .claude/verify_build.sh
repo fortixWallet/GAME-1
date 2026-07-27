@@ -12,7 +12,8 @@ command -v godot >/dev/null 2>&1 || exit 0          # нема Godot — мов�
 #    Ловить: висновок у варіанті бланка · число, переписане з предмета · висячі id ·
 #    відхід від канонічної схеми. Деталі — _src/ENGINE_SPEC_ADDENDUM.md.
 if command -v python3 >/dev/null 2>&1; then
-  SPEC=$(python3 tools/validate_cases.py 2>&1)
+  SPEC=$(python3 tools/validate_cases.py || exit 2
+python3 tools/check_gd_rules.py 2>&1)
   echo "--- validate_cases ---" >>"$LOG"; echo "$SPEC" >>"$LOG"
   if ! echo "$SPEC" | grep -q "ERROR: 0"; then
     echo "СПЕЦИФІКАЦІЇ СПРАВ ЗЛАМАНІ:"
@@ -46,7 +47,7 @@ fi
 export G3_SHOTDIR="/tmp/g3_verify/"
 rm -rf "$G3_SHOTDIR"; mkdir -p "$G3_SHOTDIR"
 FAIL=""
-for t in "walk a" "walk b" "walk c" "walk e" "walk p" "chapters" "outcomes" "layoutcheck" "case2" "savetest"; do
+for t in "walk a" "walk b" "walk c" "walk e" "walk p" "chapters" "outcomes" "layoutcheck" "case2" "savetest" "furnprobe"; do
   OUT=$(godot --path . --rendering-driver opengl3 -- $t 2>&1 | grep -v specular)
   echo "--- $t ---" >>"$LOG"; echo "$OUT" >>"$LOG"
   case "$t" in
@@ -81,6 +82,8 @@ for t in "walk a" "walk b" "walk c" "walk e" "walk p" "chapters" "outcomes" "lay
     # виглядають як покриття, а насправді одна з них не перевіряється ніколи
     "outcomes") echo "$OUT" | grep -q "OUTCOMES_OK cases=5 unique_ids=4" || FAIL="$FAIL outcomes" ;;
     # жоден текст не має налазити на інший (вимога Віктора, 26.07)
+    # furnprobe: жодна зона не сміє дивитись нормаллю від своєї камери
+    "furnprobe") echo "$OUT" | grep -q "fails= 0" || echo "$OUT" | grep -q "fails=0" || FAIL="$FAIL zone-facing" ;;
     # walk p: усі лінійовані папери будуються з живими фактами без падінь
     "walk p")   echo "$OUT" | grep -q "WALK_P_OK notebook_rows=8" || FAIL="$FAIL walk-p" ;;
     "layoutcheck") echo "$OUT" | grep -q "накладань= 0" || echo "$OUT" | grep -q "накладань=0" || FAIL="$FAIL layout" ;;
