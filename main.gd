@@ -721,10 +721,13 @@ func _hover_zone_3d(gc: Vector2) -> void:
 func _click_zone_3d(gc: Vector2) -> void:
 	if not goblet_pivot or not main_cam3: return
 	if loupe_held:
+		# скло споживає клік ЛИШЕ коли його правило готове віддати (інакше клік
+		# падає в руку: домах-тест — рука мусить дати f.domes раніше за скло)
 		var zl := _pick_3d_at(gc, &"tool.loupe")
 		if zl != "":
-			_apply_zone(zl, &"tool.loupe")   # find → apply / req_say / повтор say
-			return
+			var rl := RuleEngine.find(_case_rules(), StringName(zl), &"tool.loupe", facts, _flags(), zone_states)
+			if not rl.is_empty():
+				_apply_rule(rl); return
 	var zid := _pick_3d_at(gc, &"tool.hand")
 	if zid == "":
 		# дотик повз зони: гра ПІДТВЕРДЖУЄ, що дотик працює (мовчання читалося
