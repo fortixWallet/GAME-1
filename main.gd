@@ -175,6 +175,7 @@ func _ready() -> void:
 	_build_cert()
 	_build_ledger()
 	_build_case2()
+	_build_section()
 	_load_case(1)          # один вхід у стан замість ручного присвоєння CSLOTS
 	# верхня підказка (діегетична — на мальованій стрічці нема, тож тонкий текст)
 	# мальована стрічка під верхнім рядком: текст на строкатому кадрі без підложки
@@ -771,9 +772,9 @@ func _c2_ladder() -> String:
 	if not case_flags.get(&"knock_heard", false):
 		return "The long drawer has not been sounded yet."
 	if not facts.has("f.outer_depth"):
-		if active_tool == &"tool.caliper":
-			return "The caliper is in hand — lay it on the front edge of the side, and take the depth outside."
-		return "A drawer that answers flat wants measuring. The caliper lies in the tray."
+		return "A drawer that answers flat wants measuring — open «measure the depth» and take the readings in section."
+	if not facts.has("f.inner_depth") or not facts.has("f.back_thickness"):
+		return "One depth is a number. Outside, inside, and the board — three readings make the hollow show."
 	if not facts.has("f.inner_depth") or not facts.has("f.back_thickness"):
 		return "One measurement is a number. Three are an argument."
 	if not facts.has("f.board_screwed"):
@@ -1464,7 +1465,7 @@ func _load() -> void:
 	# справа 2 «Спадок удови»
 	for n3 in ["hub_day","hub_day_case","hub_lamp_off","hub_evening","hub_evening_figure","hub_night","hub_darkness","menu_door","client_woman","client_in_room","subtitle_band"]:
 		if ResourceLoader.exists(ART + n3 + ".png"): tex[n3] = load(ART + n3 + ".png")
-	for n2 in ["case2_desk","watch_wear","watch_chain","paper_receipt_1807","reg_page_h","marks_page_vienna","notebook_spread","mark_diana_macro","mark_maker_macro","tool_tray","hand_caliper","hand_screwdriver","hand_rake","wood_page","plain_book_page","dust_floor","client_vogl","screw_macro","board_face","cl1_p2","cl1_p3","cl1_p4","cl2_p2","cl2_p3","cl2_p4","cl2_door"]:
+	for n2 in ["case2_desk","watch_wear","watch_chain","paper_receipt_1807","reg_page_h","marks_page_vienna","notebook_spread","mark_diana_macro","mark_maker_macro","tool_tray","hand_caliper","hand_screwdriver","hand_rake","wood_page","plain_book_page","dust_floor","client_vogl","screw_macro","board_face","cl1_p2","cl1_p3","cl1_p4","cl2_p2","cl2_p3","cl2_p4","cl2_door","sec_section"]:
 		if ResourceLoader.exists(ART + n2 + ".png"): tex[n2] = load(ART + n2 + ".png")
 	# опційний арт (додано 24.07): чистий лист клієнтки
 	if ResourceLoader.exists(ART + "letter_client.png"):
@@ -1672,7 +1673,9 @@ func _apply_rule(rule: Dictionary) -> void:
 		if not unlocked_tools.has(tl):
 			unlocked_tools[tl] = true
 			_refresh_tool_row()
-	if got_new and case_id == 2: _sync_case2_view()   # кнопки/стани, що відмикаються фактами
+	if got_new and case_id == 2:
+		_sync_case2_view()   # кнопки/стани, що відмикаються фактами
+		if section_ov: _refresh_section()   # виміри проступають на кресленні
 	if rule.has("sfx") and aud.has(String(rule["sfx"])): _play(String(rule["sfx"]))
 	else: _play("page_turn" if got_new else "ui_soft")
 	_set_hint(String(rule.get("say", "")))
@@ -3229,6 +3232,107 @@ func _start_case2() -> void:
 	_play("door_bell")
 	_show("CLIENT2")
 
+# РОЗРІЗ СЕКРЕТЕРА (Віктор 28.07: «не бачу ні числа, ні що міряю; клікання в
+# тупу»). Кожен вимір ЛЯГАЄ виносною лінією з числом на бічне креслення, а
+# порожнина проступає як зазор між внутрішньою і зовнішньою глибиною. Клік по
+# самій лінії і Є вимірюванням — не треба полювати на схований торець.
+const SEC_FRONT := 0.435      # частка ширини креслення: перед корпусу (звідки міряють)
+const SEC_INNER := 0.635      # задня дощечка колодязя
+const SEC_OUTER := 0.868      # зовнішня задня стінка
+var section_img: TextureRect
+var section_ov: Control
+
+func _build_section() -> void:
+	var s := _screen("SECTION")
+	_paper_backdrop(s, 0.10)
+	var head := Label.new(); head.label_settings = _ls(fr, int(H*0.030), Color(0.90,0.86,0.77))
+	head.label_settings.shadow_color = Color(0,0,0,0.8); head.label_settings.shadow_offset = Vector2(1.5,1.5)
+	head.text = _t("The piece in section — take its depths, and see what they leave.")
+	head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	head.size = Vector2(W*0.78, H*0.05); head.position = Vector2(W*0.11, H*0.03); head.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	head.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	s.add_child(head)
+	var t: Texture2D = tex.get("sec_section", null)
+	if t:
+		var ih := H*0.72; var iw := ih*float(t.get_width())/float(t.get_height())
+		section_img = TextureRect.new(); section_img.texture = t
+		section_img.expand_mode = TextureRect.EXPAND_IGNORE_SIZE; section_img.stretch_mode = TextureRect.STRETCH_SCALE
+		section_img.size = Vector2(iw, ih); section_img.position = Vector2((W-iw)*0.5, H*0.13)
+		section_img.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		s.add_child(section_img)
+	section_ov = Control.new(); section_ov.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	section_ov.set_anchors_preset(Control.PRESET_FULL_RECT); s.add_child(section_ov)
+	_txtbtn(s, "←  step back", Vector2(W*0.04, H*0.92), func(): _show("FURN"))
+	_txtbtn(s, "✎", Vector2(W*0.945, H*0.055), func(): _show_notebook(), 0.030)
+	_refresh_section()
+
+# виносна лінія: горизонтальна планка з засічками + число; або пунктир-кнопка,
+# якщо вимір ще не взято (клік = взяти цей вимір саме тут)
+func _dim_line(y_frac: float, x0f: float, x1f: float, taken: bool, val: String,
+			   zone: String, label: String) -> void:
+	if section_img == null or section_ov == null: return
+	var r := Rect2(section_img.position, section_img.size)
+	var y := r.position.y + r.size.y * y_frac
+	var x0 := r.position.x + r.size.x * x0f
+	var x1 := r.position.x + r.size.x * x1f
+	var col := Color(0.62,0.11,0.10) if taken else Color(0.46,0.40,0.32)
+	var bar := ColorRect.new(); bar.color = Color(col.r, col.g, col.b, 1.0 if taken else 0.55)
+	bar.size = Vector2(x1-x0, maxf(2.0, H*0.004 if taken else H*0.002)); bar.position = Vector2(x0, y)
+	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE; section_ov.add_child(bar)
+	for xx in [x0, x1]:   # засічки
+		var tick := ColorRect.new(); tick.color = col
+		tick.size = Vector2(maxf(2.0,H*0.003), H*0.028); tick.position = Vector2(xx-1, y-H*0.014)
+		tick.mouse_filter = Control.MOUSE_FILTER_IGNORE; section_ov.add_child(tick)
+	var lb := Label.new()
+	lb.label_settings = _ls(fb, int(H*0.030), col)
+	lb.label_settings.shadow_color = Color(0.97,0.94,0.86,0.95); lb.label_settings.shadow_offset = Vector2(1.5,1.5)
+	lb.text = (val if taken else "?")   # інструкція — у смузі підказки, не на кресленні
+	lb.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lb.size = Vector2(x1-x0, H*0.04); lb.position = Vector2(x0, y - H*0.05)
+	lb.mouse_filter = Control.MOUSE_FILTER_IGNORE; section_ov.add_child(lb)
+	if not taken and zone != "":
+		var b := Button.new(); b.flat = true; b.modulate.a = 0
+		b.position = Vector2(x0, y - H*0.055); b.size = Vector2(x1-x0, H*0.075)
+		b.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+		b.mouse_entered.connect(_set_hint.bind(_t(label)))
+		b.mouse_exited.connect(_set_hint.bind(""))
+		b.pressed.connect(func(): _apply_zone(zone, &"tool.caliper"); _refresh_section())
+		section_ov.add_child(b)
+
+func _refresh_section() -> void:
+	if section_ov == null: return
+	for c in section_ov.get_children(): c.queue_free()
+	var out_done: bool = facts.has("f.outer_depth")
+	var in_done: bool = facts.has("f.inner_depth")
+	var th_done: bool = facts.has("f.back_thickness")
+	# 1) зовнішня глибина — від переду до зовнішньої стінки
+	_dim_line(0.20, SEC_FRONT, SEC_OUTER, out_done, "486 mm",
+		"z.sec.carcass_side", "measure the whole depth, front to the outer back — click here")
+	# 2) внутрішня глибина — від переду до дощечки колодязя (лише після зовнішньої)
+	if out_done:
+		_dim_line(0.40, SEC_FRONT, SEC_INNER, in_done, "455 mm",
+			"z.well.back_board", "now the inside depth, front to the well's board — click here")
+	# 3) товщина дощечки — маленька, при внутрішній стінці
+	if out_done:
+		_dim_line(0.58, SEC_INNER, SEC_INNER+0.035, th_done, "12 mm",
+			"z.sec.back_edge", "and the board's own thickness — click here")
+	# 4) ЗАЗОР — проступає, коли відомі обидві глибини: зафарбована порожнина + число
+	if out_done and in_done and th_done:
+		var r := Rect2(section_img.position, section_img.size)
+		var gx0 := r.position.x + r.size.x * (SEC_INNER + 0.035)
+		var gx1 := r.position.x + r.size.x * SEC_OUTER
+		var gy := r.position.y + r.size.y * 0.20
+		var gh := r.size.y * 0.42
+		var shade := ColorRect.new(); shade.color = Color(0.62,0.11,0.10,0.22)
+		shade.position = Vector2(gx0, gy); shade.size = Vector2(gx1-gx0, gh)
+		shade.mouse_filter = Control.MOUSE_FILTER_IGNORE; section_ov.add_child(shade)
+		var gl := Label.new(); gl.label_settings = _ls(fb, int(H*0.026), Color(0.62,0.11,0.10))
+		gl.label_settings.shadow_color = Color(0.97,0.94,0.86,0.9); gl.label_settings.shadow_offset = Vector2(1,1)
+		gl.text = "486 − 12 − 455 = 19 mm\n" + _t("a hollow that should not be here")
+		gl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; gl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		gl.size = Vector2(r.size.x*0.34, H*0.14); gl.position = Vector2(gx1 + W*0.01, gy + gh*0.2)
+		gl.mouse_filter = Control.MOUSE_FILTER_IGNORE; section_ov.add_child(gl)
+
 func _build_case2() -> void:
 	# СПРАВА 2 «СЕКРЕТЕР» (27.07): три меші Meshy в одному світі; три екрани —
 	# три камери на той самий предмет (FURN загальний 3/4 · WELL писальний відділ
@@ -3397,6 +3501,8 @@ func _build_case2() -> void:
 	# ряд інструментів — на всіх трьох планах предмета; ОДИН вузол tool_row
 	# переїжджає між екранами при _sync_case2_view (як контейнер вьюпорта)
 	_txtbtn(screens["FURN"], "the writing well  →", Vector2(W*0.40, H*0.92), func(): _show("WELL"))
+	_txtbtn(screens["FURN"], "◇  measure the depth  →", Vector2(W*0.40, H*0.86), func():
+		_refresh_section(); _show("SECTION"))
 	_txtbtn(screens["FURN"], "take the drawer out  →", Vector2(W*0.64, H*0.92), func():
 		# шухляда вже висунута (стан out) — кнопка ВЕДЕ до неї, а не мовчить
 		# (плейтест 27.07: після «slide it back» правило вже віддане, і клік
@@ -3407,6 +3513,8 @@ func _build_case2() -> void:
 	_txtbtn(screens["FURN"], "Write the certificate  →", Vector2(W*0.05, H*0.862), func(): _show("CERT"))
 	_txtbtn(screens["WELL"], "←  step back", Vector2(W*0.04, H*0.92), func(): _show("FURN"))
 	_txtbtn(screens["WELL"], "✎", Vector2(W*0.945, H*0.055), func(): _show_notebook(), 0.030)
+	_txtbtn(screens["WELL"], "◇  the depth in section  →", Vector2(W*0.36, H*0.86), func():
+		_refresh_section(); _show("SECTION"))
 
 	var sb_btn := _txtbtn(screens["DRAWER"], "←  slide it back", Vector2(W*0.04, H*0.92), func(): _show("FURN"))
 	sb_btn.add_theme_color_override("font_outline_color", Color(0.05,0.04,0.03,0.9))
