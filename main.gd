@@ -11,6 +11,8 @@ extends Control
 const ART := "res://art/"
 const AUD := "res://audio/"
 var tex := {}
+var lang := "uk"                 # мова показу; "en" = база (правило 10)
+var loc_uk := {}                 # словник en→uk
 var aud := {}
 var fr: FontFile
 var fb: FontFile
@@ -1456,6 +1458,8 @@ func _load() -> void:
 	# опційний арт (додано 24.07): чистий лист клієнтки
 	if ResourceLoader.exists(ART + "letter_client.png"):
 		tex["letter_client"] = load(ART + "letter_client.png")
+	if ResourceLoader.exists("res://locale/uk.gd"):
+		loc_uk = (load("res://locale/uk.gd") as GDScript).new().T
 	fr = load("res://fonts/PlayfairDisplay.ttf")
 	fb = load("res://fonts/PlayfairDisplay-Bold.ttf")
 	fh = load("res://fonts/MarckScript.ttf")
@@ -1519,7 +1523,7 @@ func _show(name: String) -> void:
 	cup_dragging = false   # не тягнемо чашу крізь зміну екрана (інакше лупа завмирає)
 	for k in screens: screens[k].visible = (k == name)
 	_sync_case2_view()
-	if hint_label: hint_label.text = ""
+	if hint_label: hint_label.text = _t("")
 	if name == "CERT":
 		if not sealed: active_slot = _next_open_slot()
 		_refresh_cert()
@@ -1536,8 +1540,13 @@ func _kill_c2_intro() -> void:
 	if c2_intro1: c2_intro1.visible = false
 	if c2_intro2: c2_intro2.visible = false
 
+# переклад на мові показу; невідомий рядок чесно лишається англійським
+func _t(s0: String) -> String:
+	if lang == "uk" and loc_uk.has(s0): return String(loc_uk[s0])
+	return s0
+
 func _set_hint(t: String) -> void:
-	if hint_label: hint_label.text = t
+	if hint_label: hint_label.text = _t(t)
 	if hint_band: hint_band.visible = t != ""
 	if t != "": _kill_c2_intro()   # банер і вступ не живуть в одній смузі (аудит 27.07)
 
@@ -1791,7 +1800,7 @@ func _after_lift(b: TextureButton, r: Array, action: Callable) -> void:
 
 # кнопка-текст (навігація) — плаский шрифт на мальованій поверхні
 func _txtbtn(parent: Control, txt: String, pos: Vector2, action: Callable, sz := 0.03, col := Color(0.9,0.86,0.76)) -> Button:
-	var b := Button.new(); b.flat = true; b.text = txt
+	var b := Button.new(); b.flat = true; b.text = _t(txt)
 	b.add_theme_font_override("font", fr); b.add_theme_font_size_override("font_size", int(H*sz))
 	b.add_theme_color_override("font_color", col)
 	b.add_theme_color_override("font_hover_color", Color(0.98,0.83,0.4))
@@ -1914,7 +1923,7 @@ func _sync_view(animate: bool = false) -> void:
 			key_light.rotation_degrees = rot
 			key_light.light_energy = energy
 	if rake_btn:
-		rake_btn.text = "⟋  raking light — on" if raking else "⟋  rake the light across the silver"
+		rake_btn.text = _t("⟋  raking light — on") if raking else "⟋  rake the light across the silver"
 
 func _found_all() -> void:
 	for f0 in ["f.mark_maker","f.mark_diana","f.reg_hoffmann","f.news_robbery","f.church_mark",
@@ -1968,7 +1977,7 @@ func _build_chapters() -> void:
 	if tex.has("hub_darkness"):
 		var b := _bg(sc, tex["hub_darkness"]); b.modulate = Color(0.42, 0.42, 0.46)
 	var h := Label.new(); h.label_settings = _ls(fb, int(H*0.042), Color(0.92,0.86,0.72))
-	h.text = "Where would you like to begin?"
+	h.text = _t("Where would you like to begin?")
 	h.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	h.size = Vector2(W, H*0.07); h.position = Vector2(0, H*0.05)
 	h.mouse_filter = Control.MOUSE_FILTER_IGNORE; sc.add_child(h)
@@ -2003,7 +2012,7 @@ func _build_chapters() -> void:
 					Callable(self, "_goto").bind(String((it as Array)[1])), 0.027)
 			i += 1
 	var foot := Label.new(); foot.label_settings = _ls(fr, int(H*0.019), Color(0.55,0.52,0.46))
-	foot.text = "A workbench shortcut — it will not ship.  F1 opens it anywhere."
+	foot.text = _t("A workbench shortcut — it will not ship.  F1 opens it anywhere.")
 	foot.position = Vector2(W*0.075, H*0.845)
 	foot.mouse_filter = Control.MOUSE_FILTER_IGNORE; sc.add_child(foot)
 	_txtbtn(sc, "←  back", Vector2(W*0.075, H*0.90), func(): _show("MENU"), 0.028)
@@ -2012,12 +2021,12 @@ func _build_menu() -> void:
 	var s0 := _screen("MENU")
 	if tex.has("menu_door"): _bg(s0, tex["menu_door"])
 	var t := Label.new(); t.label_settings = _ls(fb, int(H*0.075), Color(0.93,0.87,0.74))
-	t.text = "BUREAU OF\nATTRIBUTION"
+	t.text = _t("BUREAU OF\nATTRIBUTION")
 	t.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	t.size = Vector2(W*0.46, H*0.12); t.position = Vector2(W*0.06, H*0.30); t.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	s0.add_child(t)
 	var sub := Label.new(); sub.label_settings = _ls(fr, int(H*0.026), Color(0.80,0.72,0.58))
-	sub.text = "your judgement is what makes a thing real"
+	sub.text = _t("your judgement is what makes a thing real")
 	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	sub.size = Vector2(W*0.46, H*0.05); sub.position = Vector2(W*0.065, H*0.50); sub.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	s0.add_child(sub)
@@ -2103,7 +2112,7 @@ func _enter_hub() -> void:
 		_hub_say("The day is done. The ledger lies open on your desk.")
 
 func _hub_say(t: String) -> void:
-	if hub_note: hub_note.text = t
+	if hub_note: hub_note.text = _t(t)
 
 func _hub_door() -> void:
 	if not client_seen: _play("door_bell"); _show("CLIENT")
@@ -2171,7 +2180,7 @@ func _client_next() -> void:
 
 func _client_show() -> void:
 	var l: Label = screens["CLIENT"].get_node("ctext")
-	l.text = CLIENT_LINES[clampi(client_line, 0, CLIENT_LINES.size()-1)]
+	l.text = _t(CLIENT_LINES[clampi(client_line, 0, CLIENT_LINES.size()-1)])
 
 # ---------- DESK (стіл-справа) ----------
 func _build_desk() -> void:
@@ -2191,7 +2200,7 @@ func _build_desk() -> void:
 	# рамка задачі (діегетична, без відповіді): три графи атестата = твоя мета
 	var intro := Label.new(); intro.label_settings = _ls(fr, int(H*0.028), Color(0.92,0.88,0.78))
 	desk_intro = intro
-	intro.text = "A goblet, and a story that does not sit right.\nExamine it, then write the attribution — and set your name to it."
+	intro.text = _t("A goblet, and a story that does not sit right.\nExamine it, then write the attribution — and set your name to it.")
 	intro.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	intro.size = Vector2(W*0.64, H*0.12); intro.position = Vector2(W*0.18, H*0.06)
 	intro.mouse_filter = Control.MOUSE_FILTER_IGNORE; s.add_child(intro)
@@ -2225,7 +2234,7 @@ func _build_hands() -> void:
 	loupe_cam.global_position = Vector3(0,-0.75,0.6); loupe_cam.look_at(Vector3(0,-0.75,0), Vector3.UP)
 	# діегетична вказівка (не відповідь): перевернути чашу
 	var tip := Label.new(); tip.label_settings = _ls(fr, int(H*0.026), Color(0.82,0.78,0.68))
-	tip.text = "Drag to turn it — silver is marked underneath.  Rake the light to read a worn mark."
+	tip.text = _t("Drag to turn it — silver is marked underneath.  Rake the light to read a worn mark.")
 	tip.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; tip.size = Vector2(W, H*0.05)
 	tip.position = Vector2(0, H*0.945)   # під рядом кнопок 0.9 — не лягати на «✋» (0.835)
 	tip.mouse_filter = Control.MOUSE_FILTER_IGNORE; s.add_child(tip)
@@ -2262,7 +2271,7 @@ func _build_docs() -> void:
 	paper.stretch_mode = TextureRect.STRETCH_SCALE; paper.size = Vector2(lw, lh)
 	paper.position = Vector2((W-lw)*0.5, (H-lh)*0.5 - H*0.03); paper.mouse_filter = Control.MOUSE_FILTER_IGNORE; s.add_child(paper)
 	var t := Label.new(); t.label_settings = _ls(fr, int(lh*0.033), Color(0.20,0.14,0.09))
-	t.text = "From the client:\n\n\"This goblet came to me\nfrom an aunt in the monastery.\nI am told it is Viennese.\nI should like to know its worth —\nand whether it is mine to sell.\"\n\nShe would not meet my eye\nas she said it."
+	t.text = _t("From the client:\n\n\"This goblet came to me\nfrom an aunt in the monastery.\nI am told it is Viennese.\nI should like to know its worth —\nand whether it is mine to sell.\"\n\nShe would not meet my eye\nas she said it.")
 	t.position = paper.position + Vector2(lw*0.13, lh*0.15); t.mouse_filter = Control.MOUSE_FILTER_IGNORE; s.add_child(t)
 	_paper_catcher("DOCS", s, paper)
 	# навігація — нижній ряд на притемненому столі (геть з паперу), тепла і читабельна
@@ -2307,7 +2316,7 @@ func _ptext(sc: Dictionary, txt: String, ux: float, uy: float, size_f: float,
 			col := Color(0.24,0.17,0.10), italic := false) -> void:
 	var pg := sc["pg"] as TextureRect
 	var l := Label.new(); l.label_settings = _ls(fb if italic else fr, int(pg.size.y*size_f), col)
-	l.text = txt; l.position = pg.position + Vector2(pg.size.x*ux, pg.size.y*uy)
+	l.text = _t(txt); l.position = pg.position + Vector2(pg.size.x*ux, pg.size.y*uy)
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE; (sc["s"] as Control).add_child(l)
 
 # ── НОТАТНИК (крок 6 плану) ──────────────────────────────────────────────────
@@ -2442,7 +2451,7 @@ func _refresh_notebook() -> void:
 			col = 1; li = 0
 		var start_li := li
 		li = _lined_text(s, pg, NB_FIRST, NB_STEP, li, cols[col],
-						 tw, "— " + String(fd.get("text", fd.get("cite", String(fid)))),
+						 tw, "— " + _t(String(fd.get("text", fd.get("cite", String(fid))))),
 						 fh, 0.60, Color(0.21,0.15,0.10))
 		if has_crop:
 			var cr: Dictionary = fd["crop"]
@@ -2466,7 +2475,7 @@ func _refresh_notebook() -> void:
 			notebook_page = pcur + 1; _refresh_notebook(), 0.024)
 	if notebook_rows == 0:
 		var e := Label.new(); e.label_settings = _ls(fh, int(nh*0.024), Color(0.44,0.36,0.28))
-		e.text = "Nothing set down yet."
+		e.text = _t("Nothing set down yet.")
 		e.position = pg.position + Vector2(nw*0.10, nh*0.10)
 		e.mouse_filter = Control.MOUSE_FILTER_IGNORE; s.add_child(e)
 	_txtbtn(s, "←  put it away", Vector2(W*0.04, H*0.92), func(): _show(notebook_prev))
@@ -2479,7 +2488,7 @@ func _build_marks_macro() -> void:
 	var s := _screen("MARKS_MACRO")
 	_paper_backdrop(s, 0.10)
 	var head := Label.new(); head.label_settings = _ls(fr, int(H*0.032), Color(0.90,0.86,0.77))
-	head.text = "Under the strong glass, drawn into the notebook."
+	head.text = _t("Under the strong glass, drawn into the notebook.")
 	head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	head.size = Vector2(W, H*0.06); head.position = Vector2(0, H*0.045)
 	head.mouse_filter = Control.MOUSE_FILTER_IGNORE; s.add_child(head)
@@ -2511,6 +2520,7 @@ func _build_marks_macro() -> void:
 func _lined_text(sc: Control, pg: Control, grid_first: float, grid_step: float,
 				 line_idx: int, x_frac: float, w_frac: float, txt: String,
 				 font: FontFile, size_ratio := 0.62, col := Color(0.24,0.17,0.10)) -> int:
+	txt = _t(txt)
 	var step_px: float = pg.size.y * grid_step
 	var fsize: int = maxi(int(step_px * size_ratio), 8)
 	var ascent: float = font.get_ascent(fsize)
@@ -2610,7 +2620,7 @@ func _build_catalog() -> void:
 	var rd := H*0.19; refm.size = Vector2(rd, rd*float(tex["mark_maker"].get_height())/float(tex["mark_maker"].get_width()))
 	refm.position = Vector2(panx, H*0.12); refm.mouse_filter = Control.MOUSE_FILTER_IGNORE; s.add_child(refm)
 	var rl := Label.new(); rl.label_settings = _ls(fr, int(H*0.022), Color(0.92,0.88,0.78))
-	rl.text = "This mark is struck on the goblet's foot.\nFind the SAME shield among the marks —\nsome look alike; match it exactly."
+	rl.text = _t("This mark is struck on the goblet's foot.\nFind the SAME shield among the marks —\nsome look alike; match it exactly.")
 	rl.position = Vector2(panx, H*0.12 + refm.size.y + H*0.015)
 	rl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART; rl.size = Vector2(W-panx-W*0.02, H*0.2)
 	rl.mouse_filter = Control.MOUSE_FILTER_IGNORE; s.add_child(rl)
@@ -2646,10 +2656,10 @@ func _cat_click(s: Control, m: Vector2, mr: float) -> void:
 	if not s.has_node("matchlbl"):
 		# кільце-обвід навколо знайденої комірки (мальованого немає — тонка діегетична позначка на сторінці)
 		var ring := Label.new(); ring.name = "matchring"; ring.label_settings = _ls(fb, int(mr*1.7), Color(0.62,0.11,0.10))
-		ring.text = "◯"; ring.position = Vector2(m.x-mr*0.95, m.y-mr*1.15); ring.mouse_filter = Control.MOUSE_FILTER_IGNORE; s.add_child(ring)
+		ring.text = _t("◯"); ring.position = Vector2(m.x-mr*0.95, m.y-mr*1.15); ring.mouse_filter = Control.MOUSE_FILTER_IGNORE; s.add_child(ring)
 		# підтвердження — у правій панелі, не над сторінкою
 		var lbl := Label.new(); lbl.name = "matchlbl"; lbl.label_settings = _ls(fb, int(H*0.028), Color(0.72,0.14,0.12))
-		lbl.text = "✓ the same mark —\n   Hoffmann, Wien\n   (register: 1859–1871)"; lbl.position = Vector2(cat_screen.get_meta("panx"), H*0.46)
+		lbl.text = _t("✓ the same mark —\n   Hoffmann, Wien\n   (register: 1859–1871)"); lbl.position = Vector2(cat_screen.get_meta("panx"), H*0.46)
 		lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE; s.add_child(lbl)
 
 # ---------- CERTIFICATE ----------
@@ -2679,9 +2689,9 @@ func _build_cert() -> void:
 	paper.stretch_mode = TextureRect.STRETCH_SCALE; paper.set_anchors_preset(Control.PRESET_FULL_RECT)
 	paper.mouse_filter = Control.MOUSE_FILTER_IGNORE; root.add_child(paper)
 	var pw := root.size.x; var ph := root.size.y
-	_ctext(root, "CERTIFICATE", fb, int(ph*0.042), Color(0.15,0.10,0.07), Vector2(pw*0.5, ph*0.145))
-	_ctext(root, "b u r e a u   o f   a t t r i b u t i o n", fr, int(ph*0.017), Color(0.36,0.27,0.17), Vector2(pw*0.5, ph*0.192))
-	_ctext(root, "This bureau attributes the piece as follows —", fr, int(ph*0.016), Color(0.42,0.33,0.22), Vector2(pw*0.5, ph*0.232))
+	_ctext(root, _t("CERTIFICATE"), fb, int(ph*0.042), Color(0.15,0.10,0.07), Vector2(pw*0.5, ph*0.145))
+	_ctext(root, _t("b u r e a u   o f   a t t r i b u t i o n"), fr, int(ph*0.017), Color(0.36,0.27,0.17), Vector2(pw*0.5, ph*0.192))
+	_ctext(root, _t("This bureau attributes the piece as follows —"), fr, int(ph*0.016), Color(0.42,0.33,0.22), Vector2(pw*0.5, ph*0.232))
 	opt_layer = Control.new(); opt_layer.set_anchors_preset(Control.PRESET_FULL_RECT); root.add_child(opt_layer)
 	root.set_meta("medallion", Vector2(pw*0.492, ph*0.895))
 	# ПРАВА ПАНЕЛЬ вибору (на екрані, не на папері)
@@ -2826,7 +2836,7 @@ func _refresh_cert() -> void:
 		var yyi := y0 + step*float(i)
 		var gate_open := _slot_open(sl)
 		var pre := Label.new(); pre.label_settings = _ls(fr, int(ph*0.018), Color(0.34,0.25,0.16))
-		pre.text = String(sl["pre"]); pre.position = Vector2(pw*0.17, ph*yyi); pre.mouse_filter = Control.MOUSE_FILTER_IGNORE; opt_layer.add_child(pre)
+		pre.text = _t(String(sl["pre"])); pre.position = Vector2(pw*0.17, ph*yyi); pre.mouse_filter = Control.MOUSE_FILTER_IGNORE; opt_layer.add_child(pre)
 		var line := ColorRect.new(); line.color = Color(0.44,0.34,0.22) if (gate_open and not sealed) else Color(0.60,0.52,0.40)
 		line.size = Vector2(pw*0.66, 1.5); line.position = Vector2(pw*0.17, ph*(yyi+0.052)); line.mouse_filter = Control.MOUSE_FILTER_IGNORE; opt_layer.add_child(line)
 		var val := Label.new()
@@ -2847,7 +2857,7 @@ func _refresh_cert() -> void:
 			opt_layer.add_child(pick)
 		elif not _slot_filled(i):
 			var hnt := Label.new(); hnt.label_settings = _ls(fr, int(ph*0.015), Color(0.56,0.49,0.40))
-			hnt.text = _slot_hint(sl)
+			hnt.text = _t(_slot_hint(sl))
 			hnt.position = Vector2(pw*0.195, ph*(yyi+0.018)); hnt.mouse_filter = Control.MOUSE_FILTER_IGNORE; opt_layer.add_child(hnt)
 			# клік по зачиненій графі — підказка СПАЛАХУЄ (тиша = «зламано», плейтест 27.07)
 			var poke := Button.new(); poke.flat = true; poke.modulate.a = 0
@@ -2876,7 +2886,7 @@ func _refresh_cert() -> void:
 		# до 8 рядків, ~0.5H), фіксовані 0.42H друкувались ПОВЕРХ списку — спіймано
 		# оком на кадрі 18_cert_full і підтверджено думкою про layoutcheck у гейті
 		seal_note.position = Vector2(0, H*0.72 if active_slot >= 0 else H*0.30)
-		seal_note.text = "The attribution is written.\nPress the wax seal to close the case — once set, it cannot be lifted."
+		seal_note.text = _t("The attribution is written.\nPress the wax seal to close the case — once set, it cannot be lifted.")
 		cert_panel.add_child(seal_note)
 
 # права панель: вміст залежить від ТИПУ активної графи
@@ -2885,7 +2895,7 @@ func _build_cert_panel() -> void:
 	if i < 0 or i >= CSLOTS.size() or not _slot_open(CSLOTS[i]):
 		var d := Label.new(); d.label_settings = _ls(fr, int(H*0.024), Color(0.82,0.77,0.67))
 		d.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART; d.size = Vector2(cert_panel.size.x, H*0.3)
-		d.text = "Set down each line of the attribution.\nClick any line on the left to fill or change it."
+		d.text = _t("Set down each line of the attribution.\nClick any line on the left to fill or change it.")
 		cert_panel.add_child(d); return
 	var sl: Dictionary = CSLOTS[i]
 	var head := Label.new(); head.label_settings = _ls(fr, int(H*0.03), Color(0.72,0.61,0.43))
@@ -2901,7 +2911,7 @@ func _panel_choice(i: int, sl: Dictionary) -> void:
 	for o in sl.get("opts", []):
 		var oid := StringName((o as Array)[0]); var txt := String((o as Array)[1])
 		var chosen: bool = (cvals[i] is StringName or cvals[i] is String) and StringName(cvals[i]) == oid
-		var bo := Button.new(); bo.flat = true; bo.text = ("●   " if chosen else "○   ") + txt
+		var bo := Button.new(); bo.flat = true; bo.text = ("●   " if chosen else "○   ") + _t(txt)
 		bo.add_theme_font_override("font", fr); bo.add_theme_font_size_override("font_size", int(H*0.026))
 		bo.add_theme_color_override("font_color", Color(0.92,0.44,0.36) if chosen else Color(0.90,0.85,0.74))
 		bo.add_theme_color_override("font_hover_color", Color(0.99,0.72,0.42))
@@ -2938,7 +2948,7 @@ func _panel_number(i: int, sl: Dictionary) -> void:
 			cert_panel.add_child(b)
 			x += H*0.07
 		y += H*0.06
-	var back := Button.new(); back.flat = true; back.text = "⌫  strike it out"
+	var back := Button.new(); back.flat = true; back.text = _t("⌫  strike it out")
 	back.add_theme_font_override("font", fr); back.add_theme_font_size_override("font_size", int(H*0.024))
 	back.add_theme_color_override("font_color", Color(0.72,0.66,0.54))
 	back.position = Vector2(0, y + H*0.01); back.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
@@ -2958,13 +2968,13 @@ func _panel_number(i: int, sl: Dictionary) -> void:
 		var note2 := Label.new(); note2.label_settings = _ls(fh, int(H*0.019), Color(0.80,0.75,0.64))
 		note2.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		note2.size = Vector2(cert_panel.size.x, H*0.11)
-		note2.text = "— " + String(fd2["text"])
+		note2.text = _t("— ") + String(fd2["text"])
 		note2.position = Vector2(0, ny); cert_panel.add_child(note2)
 		ny += H*0.115
 	if num_buf.length() == digits:
 		var v := int(num_buf)
 		if v >= int(sl.get("min", 0)) and v <= int(sl.get("max", 9999)):
-			var okb := Button.new(); okb.flat = true; okb.text = "✒  set it down"
+			var okb := Button.new(); okb.flat = true; okb.text = _t("✒  set it down")
 			okb.add_theme_font_override("font", fr); okb.add_theme_font_size_override("font_size", int(H*0.028))
 			okb.add_theme_color_override("font_color", Color(0.99,0.72,0.42))
 			okb.position = Vector2(0, y + H*0.07); okb.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
@@ -2984,7 +2994,7 @@ func _panel_facts(i: int, sl: Dictionary) -> void:
 		if not ft.has(fid): continue
 		var cite := String((ft[fid] as Dictionary).get("cite", fid_s))
 		var chosen: bool = fid in picked
-		var bo := Button.new(); bo.flat = true; bo.text = ("☑ " if chosen else "☐ ") + cite
+		var bo := Button.new(); bo.flat = true; bo.text = ("☑ " if chosen else "☐ ") + _t(cite)
 		bo.add_theme_font_override("font", fr); bo.add_theme_font_size_override("font_size", int(H*0.019))
 		bo.add_theme_color_override("font_color", Color(0.92,0.44,0.36) if chosen else Color(0.90,0.85,0.74))
 		bo.add_theme_color_override("font_hover_color", Color(0.99,0.72,0.42))
@@ -2998,7 +3008,7 @@ func _panel_facts(i: int, sl: Dictionary) -> void:
 		idx += 1
 	var note := Label.new(); note.label_settings = _ls(fr, int(H*0.017), Color(0.64,0.57,0.47))
 	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART; note.size = Vector2(cert_panel.size.x, H*0.10)
-	note.text = "Two to four citations. Name the proof that would still stand if the client's story did not."
+	note.text = _t("Two to four citations. Name the proof that would still stand if the client's story did not.")
 	note.position = Vector2(0, H*0.56); cert_panel.add_child(note)
 
 # наслідок вироку — ПОДІЯ наступного ранку. Матчер по OUTCOMES даних: перший збіг.
@@ -3045,10 +3055,10 @@ func _outcome_text() -> String:
 				wsum += int((ft.get(StringName(fid), {}) as Dictionary).get("weight", 0))
 			if wsum < wmin: continue
 		last_outcome_id = String(oo.get("id", ""))
-		return String(oo.get("text", ""))
+		return _t(String(oo.get("text", "")))
 	# правило 17: промах усіх наслідків — це ПОДІЯ, її видно в логу з даними
 	print("OUTCOME_MISS case=", case_id, " cvals=", cvals, " basis=", basis)
-	return "The morning brought nothing that could be set down in the ledger."
+	return _t("The morning brought nothing that could be set down in the ledger.")
 
 var last_outcome_id := ""   # для тестів: який запис ранку зіграв
 
@@ -3072,7 +3082,7 @@ func _show_morning() -> void:
 		card.size = Vector2(W*0.6, H*0.5); card.position = Vector2(W*0.2, H*0.24)
 		card.mouse_filter = Control.MOUSE_FILTER_IGNORE; s.add_child(card)
 		var head := Label.new(); head.label_settings = _ls(fb, int(H*0.03), Color(0.72,0.60,0.40))
-		head.text = "The next morning."; head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		head.text = _t("The next morning."); head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		head.size = Vector2(W, H*0.05); head.position = Vector2(0, H*0.15); head.mouse_filter = Control.MOUSE_FILTER_IGNORE; s.add_child(head)
 		_txtbtn(s, "close the ledger  →", Vector2(W*0.62, H*0.8), func(): _evening())
 	var mt: Label = screens["MORNING"].get_node("mtext")
@@ -3123,7 +3133,7 @@ func _client2_next() -> void:
 func _client2_show() -> void:
 	if not screens.has("CLIENT2"): _build_client2()
 	var l: Label = screens["CLIENT2"].get_node("c2text")
-	l.text = CLIENT2_LINES[clampi(client2_line, 0, CLIENT2_LINES.size()-1)]
+	l.text = _t(CLIENT2_LINES[clampi(client2_line, 0, CLIENT2_LINES.size()-1)])
 
 func _start_case2() -> void:
 	_load_case(2)
@@ -3217,7 +3227,7 @@ func _build_case2() -> void:
 		dmesh = dm as MeshInstance3D; break
 	var dla: AABB = dmesh.get_aabb() if dmesh else AABB(Vector3(-1,-0.3,-0.5), Vector3(2,0.6,1))
 	var brand := Label3D.new()
-	brand.text = "M·GRUBER · WIEN"
+	brand.text = _t("M·GRUBER · WIEN")
 	brand.font = fb; brand.font_size = 48; brand.pixel_size = 0.0011
 	brand.modulate = Color(0.23, 0.13, 0.07, 0.95)
 	brand.position = Vector3(dla.get_center().x - dla.size.x*0.22,
@@ -3227,7 +3237,7 @@ func _build_case2() -> void:
 	brand.outline_size = 0
 	drawer.add_child(brand)
 	var chalk := Label3D.new()
-	chalk.text = "367"
+	chalk.text = _t("367")
 	chalk.font = fh; chalk.font_size = 66; chalk.pixel_size = 0.0011
 	chalk.modulate = Color(0.92, 0.90, 0.84, 0.85)
 	chalk.position = brand.position + Vector3(dla.size.x*0.30, 0, -dla.size.z*0.04)
@@ -3269,7 +3279,7 @@ func _build_case2() -> void:
 	var i1 := Label.new(); i1.name = "c2_intro"
 	i1.label_settings = _ls(fr, int(H*0.028), Color(0.92,0.88,0.78))
 	i1.label_settings.shadow_color = Color(0,0,0,0.85); i1.label_settings.shadow_offset = Vector2(1.5,1.5)
-	i1.text = "Frau Vogl, housekeeper twenty-two years to the late Herr F.\nThe secretaire is hers by his will, and she means to sell it.\n«My son sails on Thursday. I am not asking a good price — I am asking a quick one.»"
+	i1.text = _t("Frau Vogl, housekeeper twenty-two years to the late Herr F.\nThe secretaire is hers by his will, and she means to sell it.\n«My son sails on Thursday. I am not asking a good price — I am asking a quick one.»")
 	i1.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	i1.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	i1.size = Vector2(W*0.72, H*0.15); i1.position = Vector2(W*0.14, H*0.055)
@@ -3279,7 +3289,7 @@ func _build_case2() -> void:
 	var i2 := Label.new()
 	i2.label_settings = _ls(fh, int(H*0.026), Color(0.85,0.72,0.48))
 	i2.label_settings.shadow_color = Color(0,0,0,0.85); i2.label_settings.shadow_offset = Vector2(1.5,1.5)
-	i2.text = "Value the piece before it sells. Begin as the trade begins — rap the long drawer, and listen."
+	i2.text = _t("Value the piece before it sells. Begin as the trade begins — rap the long drawer, and listen.")
 	i2.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	i2.size = Vector2(W, H*0.05); i2.position = Vector2(0, H*0.205)
 	i2.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -3324,7 +3334,7 @@ func _build_case2() -> void:
 	paper.position = Vector2((W-lw)*0.5, (H-lh)*0.5 - H*0.02); paper.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	d2.add_child(paper)
 	var t2 := Label.new(); t2.label_settings = _ls(fr, int(lh*0.026), Color(0.20,0.14,0.09))
-	t2.text = "THE CLIENT — Frau Anna Vogl\n«He willed it to me. My son sails on Thursday;\nthe ticket is forty-one gulden and I have nineteen.\nI am not asking a good price — a quick one.»\n\nDAY-BOOK — the 3rd\nSecretaire, walnut, estate of Herr F.\nOpened on arrival by Krenn, our locksmith\n— lock seized. House keys surrendered with the piece.\n\nREGISTER OF WORKSHOPS (Möbeltischler, Wien)\nDANHAUSER, Josef — Wien — stamp 1804–1838\nGRUBER, Michael — Wien-Gumpendorf — stamp 1822–1841\nSCHMIDT & SOHN — Leopoldstadt — stamp 1835–1867\nHALBERT, J. — Wien I — dealer, no stamp, from 1861"
+	t2.text = _t("THE CLIENT — Frau Anna Vogl\n«He willed it to me. My son sails on Thursday;\nthe ticket is forty-one gulden and I have nineteen.\nI am not asking a good price — a quick one.»\n\nDAY-BOOK — the 3rd\nSecretaire, walnut, estate of Herr F.\nOpened on arrival by Krenn, our locksmith\n— lock seized. House keys surrendered with the piece.\n\nREGISTER OF WORKSHOPS (Möbeltischler, Wien)\nDANHAUSER, Josef — Wien — stamp 1804–1838\nGRUBER, Michael — Wien-Gumpendorf — stamp 1822–1841\nSCHMIDT & SOHN — Leopoldstadt — stamp 1835–1867\nHALBERT, J. — Wien I — dealer, no stamp, from 1861")
 	t2.position = paper.position + Vector2(lw*0.12, lh*0.10); t2.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	d2.add_child(t2)
 	_paper_catcher("C2DOCS", d2, paper)
@@ -3333,7 +3343,7 @@ func _build_case2() -> void:
 	_txtbtn(d2, "the timber page  →", Vector2(W*0.38, H*0.92), func(): _show("BOOK_WOOD"))
 	# записка попередника (case_02.md §11, двері 2): смужка його почерком, без пояснень
 	var slip := Label.new(); slip.label_settings = _ls(fh, int(lh*0.030), Color(0.30,0.22,0.30))
-	slip.text = "A joiner is paid for wood, and hides air."
+	slip.text = _t("A joiner is paid for wood, and hides air.")
 	slip.rotation = -0.02
 	slip.position = paper.position + Vector2(lw*0.14, lh*0.88)
 	slip.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -3584,7 +3594,7 @@ func _build_ledger() -> void:
 	var s := _screen("LEDGER")
 	_paper_backdrop(s, 0.13)
 	var head := Label.new(); head.label_settings = _ls(fb, int(H*0.032), Color(0.74,0.62,0.42))
-	head.text = "The day's ledger"; head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	head.text = _t("The day's ledger"); head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	head.size = Vector2(W, H*0.06); head.position = Vector2(0, H*0.16)
 	head.mouse_filter = Control.MOUSE_FILTER_IGNORE; s.add_child(head)
 	var body := Label.new(); body.name = "ltext"; body.label_settings = _ls(fr, int(H*0.030), Color(0.90,0.86,0.77))
@@ -3599,9 +3609,9 @@ func _build_ledger() -> void:
 
 func _show_ledger() -> void:
 	var b: Label = screens["LEDGER"].get_node("ltext")
-	b.text = "Case the first — a silver goblet, brought in by a woman who would not meet your eye.\n\nThe attribution is written, the wax is set. It cannot be lifted.\n\nThe bureau's door will open again tomorrow."
+	b.text = _t("Case the first — a silver goblet, brought in by a woman who would not meet your eye.\n\nThe attribution is written, the wax is set. It cannot be lifted.\n\nThe bureau's door will open again tomorrow.")
 	var sc: Label = screens["LEDGER"].get_node("sealcount")
-	sc.text = "Seals set this week:  %d" % seals_set
+	sc.text = _t("Seals set this week:  %d") % seals_set
 	var nx: Button = screens["LEDGER"].get_node_or_null("nextcase")
 	if nx: nx.queue_free()
 	var nb := _txtbtn(screens["LEDGER"], "←  back to the room", Vector2(W*0.62, H*0.80), func(): _enter_hub())
@@ -3638,7 +3648,7 @@ func _verdict_anim() -> void:
 
 func _case_closed() -> void:
 	var lab := Label.new(); lab.label_settings = _ls(fb, int(cert_layer.size.y*0.05), Color(0.60,0.12,0.12))
-	lab.text = "CASE CLOSED"; lab.rotation = deg_to_rad(-9); lab.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	lab.text = _t("CASE CLOSED"); lab.rotation = deg_to_rad(-9); lab.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	lab.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; lab.size = Vector2(cert_layer.size.x*0.6, cert_layer.size.y*0.08)
 	lab.position = Vector2(cert_layer.size.x*0.2, cert_layer.size.y*0.71); lab.pivot_offset = lab.size*0.5; lab.scale = Vector2(0.4,0.4)
 	cert_layer.add_child(lab)
