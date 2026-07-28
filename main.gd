@@ -1453,7 +1453,7 @@ func _load() -> void:
 	# справа 2 «Спадок удови»
 	for n3 in ["hub_day","hub_day_case","hub_lamp_off","hub_evening","hub_evening_figure","hub_night","hub_darkness","menu_door","client_woman","client_in_room","subtitle_band"]:
 		if ResourceLoader.exists(ART + n3 + ".png"): tex[n3] = load(ART + n3 + ".png")
-	for n2 in ["case2_desk","watch_wear","watch_chain","paper_receipt_1807","reg_page_h","marks_page_vienna","notebook_spread","mark_diana_macro","mark_maker_macro","tool_tray","hand_caliper","hand_screwdriver","hand_rake","wood_page","plain_book_page","dust_floor","client_vogl","screw_macro","board_face","cl1_p2","cl1_p3","cl1_p4","cl2_p2","cl2_p3","cl2_p4"]:
+	for n2 in ["case2_desk","watch_wear","watch_chain","paper_receipt_1807","reg_page_h","marks_page_vienna","notebook_spread","mark_diana_macro","mark_maker_macro","tool_tray","hand_caliper","hand_screwdriver","hand_rake","wood_page","plain_book_page","dust_floor","client_vogl","screw_macro","board_face","cl1_p2","cl1_p3","cl1_p4","cl2_p2","cl2_p3","cl2_p4","cl2_door"]:
 		if ResourceLoader.exists(ART + n2 + ".png"): tex[n2] = load(ART + n2 + ".png")
 	# опційний арт (додано 24.07): чистий лист клієнтки
 	if ResourceLoader.exists(ART + "letter_client.png"):
@@ -3105,6 +3105,7 @@ const CLIENT2_LINES := [
 	"The bell. A woman in a dark shawl comes in alone; what she brings stands on a cart outside, wrapped in blankets.\n\n\u00abFrau Vogl. I kept house for Herr F. Twenty-two years.\u00bb",
 	"\u00abThe secretaire is mine, by his will. I mean to sell it, and the bureau is to say what it is worth.\u00bb",
 	"\u00abMy son sails on Thursday. The ticket is forty-one gulden and I have nineteen. I am not asking you for a good price. I am asking you for a quick one.\u00bb",
+	"She holds the door wide. The porters walk the wrapped bulk through on its corner \u2014 a hand's breadth clear of either jamb.",
 	"The porters carry it in and set it by the window. She watches the way one watches a room being emptied \u2014 and keeps her right hand inside the shawl.",
 ]
 var client2_line := 0
@@ -3153,7 +3154,8 @@ func _build_client2() -> void:
 		_comic_panel(s2, "client_vogl", Rect2(W*0.055, H*0.07, W*0.315, H*0.68)),
 		_comic_panel(s2, "cl2_p2",     Rect2(W*0.415, H*0.07, W*0.255, H*0.315)),
 		_comic_panel(s2, "cl2_p3",     Rect2(W*0.695, H*0.07, W*0.255, H*0.315)),
-		_comic_panel(s2, "cl2_p4",     Rect2(W*0.415, H*0.435, W*0.535, H*0.315)),
+		_comic_panel(s2, "cl2_door",   Rect2(W*0.415, H*0.435, W*0.255, H*0.315)),
+		_comic_panel(s2, "cl2_p4",     Rect2(W*0.695, H*0.435, W*0.255, H*0.315)),
 	]
 	_band(s2)
 	var l := Label.new(); l.name = "c2text"; l.label_settings = _ls(fr, int(H*0.028), Color(0.95,0.91,0.82))
