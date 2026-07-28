@@ -3457,7 +3457,7 @@ func _sync_case2_view() -> void:
 	if screw_macro_btn:
 		screw_macro_btn.visible = in_well and facts.has("f.board_screwed")
 	if screens.has("SCREW_MACRO"):
-		var scap := screens["SCREW_MACRO"].get_node_or_null("screwcap")
+		var scap: Node = screens["SCREW_MACRO"].get_node_or_null("screwcap")
 		if scap: (scap as Label).visible = facts.has("f.screw_points")
 	if sec_drawer:
 		# шухляда «в руках» існує лише на своєму плані; на FURN вона левітувала
