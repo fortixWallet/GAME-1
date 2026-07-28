@@ -91,11 +91,6 @@ const ZONES := {
 		"u": Vector2(0.50, 0.45), "shape": &"rect", "half": Vector2(0.36, 0.30),
 		"hint": "The chapter on screws",
 	},
-	&"z.doc.screw_macro": {
-		"kind": &"img", "screen": &"SCREW_MACRO", "surface": &"screw_macro",
-		"u": Vector2(0.5, 0.5), "shape": &"rect", "half": Vector2(0.45, 0.45),
-		"hint": "The screw head under the strong glass",
-	},
 	&"z.doc.label_pigeonhole": {
 		"kind": &"mesh", "screen": &"WELL", "node": &"sec_body",
 		"at": Vector3(0.34, 0.30, 0.02), "facing": Vector3(0, 0.2, 1),
@@ -179,10 +174,6 @@ const RULES := [
 	{"zone": &"z.void.floor", "tool": &"tool.rake", "dwell": 1.0,
 	 "facts": [&"f.dust_rectangle"],
 	 "say": "Under a low light the floor is grey with settled dust, except one rectangle, 148 × 96 mm, clean to the wood. Its edges are sharp."},
-	{"zone": &"z.doc.screw_macro", "tool": &"*", "requires": [&"f.screw_points"],
-	 "req_say": "The screws themselves first \u2014 what points, what thread?",
-	 "facts": [&"f.slot_burr"],
-	 "say": "Three slots are bright and torn along one edge; the wax around those three heads is cracked in a ring. The fourth head stands a hair proud of the board."},
 	{"zone": &"z.doc.label_pigeonhole", "tool": &"tool.loupe", "dwell": 0.5,
 	 "facts": [&"f.trade_label"],
 	 "say": "A paper label, lifted at one corner: 'J. HALBERT — Möbel & Antiquitäten, Wien I. Repaired and fitted, 1867.'"},

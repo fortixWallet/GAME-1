@@ -122,7 +122,9 @@ var desk_intro: Label                # інтро столу — гасне пр
 var dust_quad: MeshInstance3D        # пил на дні ніші (справа 2)
 var c2_intro1: Label                 # вступ справи 2 — гасне з першим банером
 var c2_intro2: Label
-var screw_macro_btn: Button          # макро шурупів — після того, як дошку роздивились
+var goblet_world: World3D            # світ чаші (справа 1) для лупи
+var sec_world: World3D               # світ секретера (справа 2) для лупи
+var c2_loupe := false                # скло активне на екранах справи 2
 var hands_glass_btn: Button          # «взяти скло» просто в руках
 var set_down_btn: Button
 var loupe_held := false
@@ -187,7 +189,7 @@ func _ready() -> void:
 	hint_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(hint_label)
 	_build_loupe()
-	_build_menu(); _build_hub(); _build_client(); _build_client2(); _build_screw_macro(); _build_chapters()
+	_build_menu(); _build_hub(); _build_client(); _build_client2(); _build_chapters()
 	move_child(hint_label, get_child_count()-1)   # підказки завжди поверх сцен
 	_show("MENU")
 	amb.play()
@@ -632,12 +634,15 @@ func _aim_loupe(gc: Vector2) -> void:
 	# — і це стискання МОВЧКИ ділило будь-який оптичний зум на ~2.7. Саме тому
 	# «збільшення не бачив ніколи»: стара схема давала ефективні ~1.6×.
 	# Умова чесних LOUPE_MAG×: (glass_px/2)/tan(fov_l/2) = MAG·(H/2)/tan(fov_m/2).
-	var ro: Vector3 = main_cam3.global_position
-	var rn: Vector3 = main_cam3.project_ray_normal(gc)
+	var cam: Camera3D = main_cam3
+	if _shown() in ["FURN", "WELL", "DRAWER"] and screen_cams.has(_shown()):
+		cam = screen_cams[_shown()]
+	var ro: Vector3 = cam.global_position
+	var rn: Vector3 = cam.project_ray_normal(gc)
 	loupe_cam.global_position = ro
 	loupe_cam.look_at(ro + rn, Vector3.UP)
 	var glass_px: float = GLASS_R*loupe_lw*2.0
-	loupe_cam.fov = rad_to_deg(2.0*atan((glass_px/H)*tan(deg_to_rad(main_cam3.fov)*0.5)/LOUPE_MAG))
+	loupe_cam.fov = rad_to_deg(2.0*atan((glass_px/H)*tan(deg_to_rad(cam.fov)*0.5)/LOUPE_MAG))
 
 # ── ТІНЬОВИЙ ПРОГІН РУШІЯ ЗОН (крок 4, доказова частина) ─────────────────────
 # Новий рушій рахує ту саму зону поруч зі старим кодом і НЕ впливає на гру.
@@ -1446,7 +1451,7 @@ func _load() -> void:
 	# справа 2 «Спадок удови»
 	for n3 in ["hub_day","hub_day_case","hub_lamp_off","hub_evening","hub_evening_figure","hub_night","hub_darkness","menu_door","client_woman","client_in_room","subtitle_band"]:
 		if ResourceLoader.exists(ART + n3 + ".png"): tex[n3] = load(ART + n3 + ".png")
-	for n2 in ["case2_desk","watch_wear","watch_chain","paper_receipt_1807","reg_page_h","marks_page_vienna","notebook_spread","mark_diana_macro","mark_maker_macro","tool_tray","hand_caliper","hand_screwdriver","hand_rake","wood_page","plain_book_page","dust_floor","client_vogl","screw_macro"]:
+	for n2 in ["case2_desk","watch_wear","watch_chain","paper_receipt_1807","reg_page_h","marks_page_vienna","notebook_spread","mark_diana_macro","mark_maker_macro","tool_tray","hand_caliper","hand_screwdriver","hand_rake","wood_page","plain_book_page","dust_floor","client_vogl","screw_macro","board_face"]:
 		if ResourceLoader.exists(ART + n2 + ".png"): tex[n2] = load(ART + n2 + ".png")
 	# опційний арт (додано 24.07): чистий лист клієнтки
 	if ResourceLoader.exists(ART + "letter_client.png"):
@@ -1492,7 +1497,7 @@ func _screen(name: String) -> Control:
 
 # довідникові екрани: відкриття сторінки і Є читанням — правила tool="*"
 # застосовуються самі (закриті чесно відповідають req_say)
-const AUTO_READ := ["BOOK_MARKS", "BOOK_SCREWS", "BOOK_REG", "BOOK_WOOD", "SCREW_MACRO"]
+const AUTO_READ := ["BOOK_MARKS", "BOOK_SCREWS", "BOOK_REG", "BOOK_WOOD"]
 func _auto_read(scr: String) -> void:
 	if scr not in AUTO_READ: return
 	for id in _case_zones():
@@ -1508,6 +1513,9 @@ func _show(name: String) -> void:
 	_set_hint("")   # старий банер не їде через екрани (say нового правила ляже ПІСЛЯ _show)
 	if hand_tool_ui: call_deferred("_refresh_hand_sprite")
 	call_deferred("_auto_read", name)
+	if c2_loupe and name not in ["FURN", "WELL", "DRAWER"]: _c2_loupe_set(false)
+	elif not c2_loupe and active_tool == &"tool.loupe" and name in ["FURN", "WELL", "DRAWER"]:
+		call_deferred("_c2_loupe_set", true)
 	cup_dragging = false   # не тягнемо чашу крізь зміну екрана (інакше лупа завмирає)
 	for k in screens: screens[k].visible = (k == name)
 	_sync_case2_view()
@@ -1710,6 +1718,7 @@ func _pick_tool(tl: StringName) -> void:
 			&"tool.rake": _set_hint("The lamp in hand — low light finds what polish hides.")
 			&"tool.scales": _set_hint("The scales stand ready — set the cup on them.")
 	_refresh_hand_sprite()
+	_c2_loupe_set(active_tool == &"tool.loupe" and _shown() in ["FURN", "WELL", "DRAWER"])
 
 # спрайт інструмента в руці: видимий, коли взято НЕ лупу (лупа має власне скло)
 func _refresh_hand_sprite() -> void:
@@ -2209,6 +2218,7 @@ func _build_hands() -> void:
 	# world_3d == null, і копіювання її в лупу кидало лупу в порожній root-світ —
 	# «скло прозоре, не зближує зовсім» (Віктор, 27.07; регресія фіксу «вази в шафі»)
 	loupe_vp.world_3d = sv.find_world_3d(); loupe_vp.transparent_bg = true; loupe_vp.msaa_3d = Viewport.MSAA_4X
+	goblet_world = loupe_vp.world_3d
 	loupe_vp.render_target_update_mode = SubViewport.UPDATE_DISABLED
 	add_child(loupe_vp)
 	loupe_cam = Camera3D.new(); loupe_vp.add_child(loupe_cam); loupe_cam.fov = 30.0
@@ -3081,27 +3091,6 @@ const CLIENT2_LINES := [
 ]
 var client2_line := 0
 
-func _build_screw_macro() -> void:
-	# рваний шліц + тріснуте кільце воску — доказ, відданий ОКУ (аудит 27.07);
-	# відкриття екрана і Є розгляданням (AUTO_READ → f.slot_burr)
-	var s3 := _screen("SCREW_MACRO")
-	_paper_backdrop(s3, 0.08)
-	var t: Texture2D = tex.get("screw_macro", null)
-	if t:
-		var mh := H*0.78; var mw := mh*float(t.get_width())/float(t.get_height())
-		var im := TextureRect.new(); im.texture = t; im.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		im.stretch_mode = TextureRect.STRETCH_SCALE; im.size = Vector2(mw, mh)
-		im.position = Vector2(W*0.03, (H-mh)*0.45); im.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		s3.add_child(im)
-	var cap := Label.new(); cap.name = "screwcap"
-	cap.label_settings = _ls(fr, int(H*0.026), Color(0.90,0.86,0.77))
-	cap.label_settings.shadow_color = Color(0,0,0,0.85); cap.label_settings.shadow_offset = Vector2(1.5,1.5)
-	cap.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	cap.size = Vector2(W*0.26, H*0.7); cap.position = Vector2(W*0.71, H*0.14)
-	cap.text = "Under the strong glass, one head of the four.\n\nThe slot\u2019s near edge is torn, and the metal in the tear is bright \u2014 turned days ago, not years.\n\nAround the head the old wax lies cracked in a ring, broken outward.\n\nThe thread runs even, head to tip. A machine cut this \u2014 no hand before 1846 did."
-	cap.mouse_filter = Control.MOUSE_FILTER_IGNORE; s3.add_child(cap)
-	_txtbtn(s3, "\u2190  step back", Vector2(W*0.04, H*0.92), func(): _show("WELL"))
-
 func _build_client2() -> void:
 	var s2 := _screen("CLIENT2")
 	_paper_backdrop(s2, 0.06)
@@ -3153,6 +3142,7 @@ func _build_case2() -> void:
 	sv.own_world_3d = true    # свій світ: див. урок «ваза в шафі» вище
 	# фон НЕ прозорий: небо-градієнт бюро з env і є кімнатою за предметом
 	_build_bureau_light(sv, false, Color(0.055, 0.048, 0.042))   # тепла темна кімната
+	sec_world = sv.find_world_3d()
 	var body_s: PackedScene = load("res://models/secretaire_body.glb")
 	var body := body_s.instantiate() as Node3D
 	sv.add_child(body); mesh_nodes[&"sec_body"] = body
@@ -3184,6 +3174,24 @@ func _build_case2() -> void:
 			var bmat2: StandardMaterial3D = (bmat as StandardMaterial3D).duplicate()
 			bmat2.albedo_color = Color(0.82, 0.70, 0.52)
 			bmi.material_override = bmat2
+	var bmesh: MeshInstance3D = null
+	for bm2 in bb.find_children("*", "MeshInstance3D", true, false):
+		bmesh = bm2 as MeshInstance3D; break
+	if bmesh and tex.has("board_face"):
+		# ЛИЦЕ ДОШКИ — суцільна мальована пластина (рецепт foot_plate справи 1):
+		# голим оком — та сама дошка, під склом — рваний шліц і тріснутий віск
+		var bla: AABB = bmesh.get_aabb()
+		var sq := MeshInstance3D.new()
+		var sqm := QuadMesh.new()
+		sqm.size = Vector2(bla.size.x, bla.size.y)
+		sq.mesh = sqm
+		var smat := StandardMaterial3D.new()
+		smat.albedo_texture = tex["board_face"]
+		smat.roughness = 0.95
+		sq.material_override = smat
+		sq.position = Vector3(bla.get_center().x, bla.get_center().y,
+							  bla.end.z + bla.size.z*0.10)
+		bmesh.add_child(sq)
 	sv.add_child(bb); mesh_nodes[&"sec_backboard"] = bb
 	sec_backboard = bb; sec_drawer = drawer
 	# дно ніші: пил і ЧИСТИЙ прямокутник — головний доказ віддано оку, не тексту
@@ -3294,8 +3302,7 @@ func _build_case2() -> void:
 	_txtbtn(screens["FURN"], "Write the certificate  →", Vector2(W*0.05, H*0.862), func(): _show("CERT"))
 	_txtbtn(screens["WELL"], "←  step back", Vector2(W*0.04, H*0.92), func(): _show("FURN"))
 	_txtbtn(screens["WELL"], "✎", Vector2(W*0.945, H*0.055), func(): _show_notebook(), 0.030)
-	screw_macro_btn = _txtbtn(screens["WELL"], "◉  study a screw head up close", Vector2(W*0.60, H*0.135), func(): _show("SCREW_MACRO"))
-	screw_macro_btn.visible = false
+
 	var sb_btn := _txtbtn(screens["DRAWER"], "←  slide it back", Vector2(W*0.04, H*0.92), func(): _show("FURN"))
 	sb_btn.add_theme_color_override("font_outline_color", Color(0.05,0.04,0.03,0.9))
 	sb_btn.add_theme_constant_override("outline_size", 8)
@@ -3422,6 +3429,28 @@ func _reveal_recess() -> void:
 	tw3.tween_interval(1.3)
 	tw3.tween_property(cw2, "position", p0, 0.8).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
 
+# СКЛО НА СЕКРЕТЕРІ (Віктор 28.07: «слайд шоу замість дослідження лупою») —
+# та сама чесна оптика, що в справі 1: телеоб'єктив у ЖИВИЙ світ секретера.
+func _c2_loupe_set(on: bool) -> void:
+	if loupe_vp == null or loupe_ui == null: return
+	c2_loupe = on
+	if on:
+		if sec_world: loupe_vp.world_3d = sec_world
+		loupe_vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+		if loupe_vp_tex.texture == null: loupe_vp_tex.texture = loupe_vp.get_texture()
+		loupe_glass.visible = false; loupe_vp_tex.visible = true
+		loupe_ui.visible = true
+		move_child(loupe_ui, get_child_count()-1)
+		if hint_band: move_child(hint_band, get_child_count()-1)
+		if hint_label: move_child(hint_label, get_child_count()-1)
+		var mp := get_viewport().get_mouse_position()
+		loupe_ui.position = mp - Vector2(GLASS_CX*loupe_lw, GLASS_CY*loupe_lh)
+		_aim_loupe(mp)
+	else:
+		if goblet_world: loupe_vp.world_3d = goblet_world
+		loupe_vp.render_target_update_mode = SubViewport.UPDATE_DISABLED
+		if not loupe_held: loupe_ui.visible = false
+
 func _sync_case2_view() -> void:
 	if sec_vp == null: return
 	var scr := _shown()
@@ -3454,11 +3483,7 @@ func _sync_case2_view() -> void:
 		sec_backboard.visible = in_well and zone_states.get(&"z.well.back_board", &"default") != &"open"
 	if dust_quad:
 		dust_quad.visible = in_well and zone_states.get(&"z.well.back_board", &"default") == &"open"
-	if screw_macro_btn:
-		screw_macro_btn.visible = in_well and facts.has("f.board_screwed")
-	if screens.has("SCREW_MACRO"):
-		var scap: Node = screens["SCREW_MACRO"].get_node_or_null("screwcap")
-		if scap: (scap as Label).visible = facts.has("f.screw_points")
+
 	if sec_drawer:
 		# шухляда «в руках» існує лише на своєму плані; на FURN вона левітувала
 		# поверх зачиненого корпусу (плейтест 27.07)
@@ -3484,6 +3509,10 @@ func _case2_input(ev: InputEvent) -> void:
 		zid = _pick_3d_at(pos, &"tool.eye")
 		if zid != "": _apply_zone(zid, &"tool.eye")
 	elif ev is InputEventMouseMotion:
+		if c2_loupe:
+			var mp2: Vector2 = (ev as InputEventMouseMotion).position
+			loupe_ui.position = mp2 - Vector2(GLASS_CX*loupe_lw, GLASS_CY*loupe_lh)
+			_aim_loupe(mp2)
 		var zid2 := _pick_3d_at((ev as InputEventMouseMotion).position, &"tool.eye")
 		if zid2 == "":
 			zid2 = _pick_3d_at((ev as InputEventMouseMotion).position, &"tool.hand")
