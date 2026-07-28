@@ -90,7 +90,7 @@ for t in "walk a" "walk b" "walk c" "walk e" "walk p" "walk q" "chapters" "outco
     # furnprobe: жодна зона не сміє дивитись нормаллю від своєї камери
     "furnprobe") echo "$OUT" | grep -q "fails= 0" || echo "$OUT" | grep -q "fails=0" || FAIL="$FAIL zone-facing" ;;
     # walk q: записник гортається; 15 фактів справи 2 розкладено по аркушах
-    "walk q")   echo "$OUT" | grep -q "WALK_Q_OK rows_first=12 rows_last=3 total=15" || FAIL="$FAIL walk-q" ;;
+    "walk q")   echo "$OUT" | grep -q "WALK_Q_OK rows_first=9 rows_last=6 total=15" || FAIL="$FAIL walk-q" ;;
     # walk p: усі лінійовані папери будуються з живими фактами без падінь
     "walk p")   echo "$OUT" | grep -q "WALK_P_OK notebook_rows=8" || FAIL="$FAIL walk-p" ;;
     "layoutcheck") echo "$OUT" | grep -q "накладань= 0" || echo "$OUT" | grep -q "накладань=0" || FAIL="$FAIL layout" ;;

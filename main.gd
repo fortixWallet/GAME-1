@@ -775,7 +775,7 @@ func _process(_delta: float) -> void:
 		if facts.size() != last_fact_count:
 			last_fact_count = facts.size(); idle_t = 0.0
 		idle_t += _delta
-		if idle_t > 25.0:
+		if idle_t > 12.0:
 			idle_t = 0.0
 			var step := _c2_ladder()
 			if step != "": _set_hint(step)
@@ -1518,6 +1518,9 @@ func _show(name: String) -> void:
 	if hand_tool_ui: call_deferred("_refresh_hand_sprite")
 	call_deferred("_auto_read", name)
 	if c2_loupe and name not in ["FURN", "WELL", "DRAWER"]: _c2_loupe_set(false)
+	if case_id == 2 and name in ["FURN", "WELL", "DRAWER"] and not dbg_mode:
+		var step0 := _c2_ladder()
+		if step0 != "": call_deferred("_set_hint", step0)
 	elif not c2_loupe and active_tool == &"tool.loupe" and name in ["FURN", "WELL", "DRAWER"]:
 		call_deferred("_c2_loupe_set", true)
 	cup_dragging = false   # не тягнемо чашу крізь зміну екрана (інакше лупа завмирає)
@@ -2430,9 +2433,17 @@ func _refresh_notebook() -> void:
 	var fids: Array = []
 	for fid_s in facts:
 		if ft.has(StringName(fid_s)): fids.append(StringName(fid_s))
+	# «ЩО БЮРО МУСИТЬ СКАЗАТИ» — шість граф атестата як живий список завдань
+	# (Віктор 28.07: «не розумію, як пройти» — гра не показувала, до чого йдеш)
+	var q_lines := 0
+	if CSLOTS.size() > 0:
+		q_lines = 2   # заголовок + відступ
+		for sl0 in CSLOTS:
+			q_lines += _lined_text(null, pg, NB_FIRST, NB_STEP, 0, 0.0, col_w - 0.05,
+				"x " + _t(String((sl0 as Dictionary).get("pre", ""))), fh, 0.56)
 	var pages: Array = [[]]
 	var mcol := 0
-	var mli := 0
+	var mli := q_lines
 	for fid in fids:
 		var fd0: Dictionary = ft[fid]
 		var tw0 := col_w - (0.085 if fd0.has("crop") else 0.0)
@@ -2451,6 +2462,19 @@ func _refresh_notebook() -> void:
 	notebook_page = pcur if pcur < pcount - 1 else -1   # -1 = «слідкуй за свіжим»
 	var col := 0
 	var li := 0
+	if pcur == 0 and CSLOTS.size() > 0:
+		var lih := _lined_text(s, pg, NB_FIRST, NB_STEP, 0, cols[0], col_w,
+			_t("What the bureau must say:"), fb, 0.60, Color(0.34,0.20,0.12))
+		li = lih
+		for qi in CSLOTS.size():
+			var sl1: Dictionary = CSLOTS[qi]
+			var done := _slot_filled(qi)
+			var openq := _slot_open(sl1)
+			var mark := "\u2713  " if done else ("\u25d0  " if openq else "\u25cb  ")
+			var qcol := Color(0.30,0.42,0.22) if done else (Color(0.21,0.15,0.10) if openq else Color(0.52,0.46,0.38))
+			li = _lined_text(s, pg, NB_FIRST, NB_STEP, li, cols[0], col_w - 0.05,
+				mark + _t(String(sl1.get("pre", ""))), fh, 0.56, qcol)
+		li += 1
 	for fid in (pages[pcur] as Array):
 		var fd: Dictionary = ft[fid]
 		var has_crop: bool = fd.has("crop")

@@ -351,4 +351,5 @@ const T := {
 "THE CITY HERALD": "МІСЬКИЙ ВІСНИК",
 "b u r e a u   o f   a t t r i b u t i o n": "б ю р о   а т р и б у ц і ї",
 "She holds the door wide. The porters walk the wrapped bulk through on its corner \u2014 a hand's breadth clear of either jamb.": "Вона тримає двері навстіж. Носильники заводять загорнуту брилу на ребрі — на долоню від одвірків.",
+"What the bureau must say:": "Що бюро мусить сказати:",
 }
