@@ -1453,7 +1453,7 @@ func _load() -> void:
 	# справа 2 «Спадок удови»
 	for n3 in ["hub_day","hub_day_case","hub_lamp_off","hub_evening","hub_evening_figure","hub_night","hub_darkness","menu_door","client_woman","client_in_room","subtitle_band"]:
 		if ResourceLoader.exists(ART + n3 + ".png"): tex[n3] = load(ART + n3 + ".png")
-	for n2 in ["case2_desk","watch_wear","watch_chain","paper_receipt_1807","reg_page_h","marks_page_vienna","notebook_spread","mark_diana_macro","mark_maker_macro","tool_tray","hand_caliper","hand_screwdriver","hand_rake","wood_page","plain_book_page","dust_floor","client_vogl","screw_macro","board_face"]:
+	for n2 in ["case2_desk","watch_wear","watch_chain","paper_receipt_1807","reg_page_h","marks_page_vienna","notebook_spread","mark_diana_macro","mark_maker_macro","tool_tray","hand_caliper","hand_screwdriver","hand_rake","wood_page","plain_book_page","dust_floor","client_vogl","screw_macro","board_face","cl1_p2","cl1_p3","cl1_p4","cl2_p2","cl2_p3","cl2_p4"]:
 		if ResourceLoader.exists(ART + n2 + ".png"): tex[n2] = load(ART + n2 + ".png")
 	# опційний арт (додано 24.07): чистий лист клієнтки
 	if ResourceLoader.exists(ART + "letter_client.png"):
@@ -2115,7 +2115,8 @@ func _hub_say(t: String) -> void:
 	if hub_note: hub_note.text = _t(t)
 
 func _hub_door() -> void:
-	if not client_seen: _play("door_bell"); _show("CLIENT")
+	if not client_seen:
+		_play("door_bell"); client_line = 0; _client_show(); _show("CLIENT")
 	elif case_done and case_id == 1:
 		# ранок наступного дня: друга клієнтка (міст справ 1→2)
 		tod = "day"; lamp_on = true
@@ -2145,9 +2146,14 @@ func _hub_desk() -> void:
 # --- КЛІЄНТКА ---
 func _build_client() -> void:
 	var s2 := _screen("CLIENT")
-	if tex.has("client_in_room"): _bg(s2, tex["client_in_room"])
-	elif tex.has("hub_day"): _bg(s2, tex["hub_day"])
-	else: _paper_backdrop(s2, 0.16)
+	_paper_backdrop(s2, 0.06)
+	client_panels = [
+		_comic_panel(s2, "client_woman" if tex.has("client_woman") else "client_in_room",
+			Rect2(W*0.055, H*0.07, W*0.315, H*0.68)),
+		_comic_panel(s2, "cl1_p2", Rect2(W*0.415, H*0.07, W*0.255, H*0.315)),
+		_comic_panel(s2, "cl1_p3", Rect2(W*0.695, H*0.07, W*0.255, H*0.315)),
+		_comic_panel(s2, "cl1_p4", Rect2(W*0.415, H*0.435, W*0.535, H*0.315)),
+	]
 	_band(s2)
 	var l := Label.new(); l.name = "ctext"; l.label_settings = _ls(fr, int(H*0.030), Color(0.95,0.91,0.82))
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -2180,7 +2186,9 @@ func _client_next() -> void:
 
 func _client_show() -> void:
 	var l: Label = screens["CLIENT"].get_node("ctext")
-	l.text = _t(CLIENT_LINES[clampi(client_line, 0, CLIENT_LINES.size()-1)])
+	var li := clampi(client_line, 0, CLIENT_LINES.size()-1)
+	l.text = _t(CLIENT_LINES[li])
+	_comic_show(client_panels, li)
 
 # ---------- DESK (стіл-справа) ----------
 func _build_desk() -> void:
@@ -3100,17 +3108,53 @@ const CLIENT2_LINES := [
 	"The porters carry it in and set it by the window. She watches the way one watches a room being emptied \u2014 and keeps her right hand inside the shawl.",
 ]
 var client2_line := 0
+var client_panels: Array = []        # комікс-панелі сцени клієнтки 1
+var client2_panels: Array = []       # комікс-панелі сцени клієнтки 2
+
+# КОМІКС-СЦЕНА (Віктор 28.07: «історія на одному кадрі — погано, роби коміксом»):
+# кожна репліка — своя гравюрна панель; панелі проявляються по черзі,
+# попередні пригасають. Кадри мальовані, рамка — тонке паспарту.
+func _comic_panel(parent: Control, texname: String, r: Rect2) -> Control:
+	var holder := Control.new(); holder.position = r.position; holder.size = r.size
+	holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var mat2 := ColorRect.new(); mat2.color = Color(0.82, 0.76, 0.62, 0.92)
+	mat2.position = Vector2(-4, -4); mat2.size = r.size + Vector2(8, 8)
+	mat2.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	holder.add_child(mat2)
+	if tex.has(texname):
+		var im := TextureRect.new(); im.texture = tex[texname]
+		im.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		im.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+		im.clip_contents = true
+		im.size = r.size; im.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		holder.add_child(im)
+	holder.visible = false
+	parent.add_child(holder)
+	return holder
+
+func _comic_show(panels: Array, upto: int) -> void:
+	for i in panels.size():
+		var pn: Control = panels[i]
+		if i > upto:
+			pn.visible = false
+			continue
+		var want := 1.0 if i == upto else 0.62
+		if not pn.visible:
+			pn.visible = true
+			pn.modulate = Color(1, 1, 1, 0)
+			create_tween().tween_property(pn, "modulate", Color(want, want, want, 1), 0.4)
+		else:
+			create_tween().tween_property(pn, "modulate", Color(want, want, want, 1), 0.3)
 
 func _build_client2() -> void:
 	var s2 := _screen("CLIENT2")
 	_paper_backdrop(s2, 0.06)
-	var t: Texture2D = tex.get("client_vogl", null)
-	if t:
-		var ch2 := float(H); var cw2 := ch2*float(t.get_width())/float(t.get_height())
-		var im := TextureRect.new(); im.texture = t; im.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		im.stretch_mode = TextureRect.STRETCH_SCALE; im.size = Vector2(cw2, ch2)
-		im.position = Vector2((W-cw2)*0.5, 0); im.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		s2.add_child(im)
+	client2_panels = [
+		_comic_panel(s2, "client_vogl", Rect2(W*0.055, H*0.07, W*0.315, H*0.68)),
+		_comic_panel(s2, "cl2_p2",     Rect2(W*0.415, H*0.07, W*0.255, H*0.315)),
+		_comic_panel(s2, "cl2_p3",     Rect2(W*0.695, H*0.07, W*0.255, H*0.315)),
+		_comic_panel(s2, "cl2_p4",     Rect2(W*0.415, H*0.435, W*0.535, H*0.315)),
+	]
 	_band(s2)
 	var l := Label.new(); l.name = "c2text"; l.label_settings = _ls(fr, int(H*0.028), Color(0.95,0.91,0.82))
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -3133,7 +3177,9 @@ func _client2_next() -> void:
 func _client2_show() -> void:
 	if not screens.has("CLIENT2"): _build_client2()
 	var l: Label = screens["CLIENT2"].get_node("c2text")
-	l.text = _t(CLIENT2_LINES[clampi(client2_line, 0, CLIENT2_LINES.size()-1)])
+	var li := clampi(client2_line, 0, CLIENT2_LINES.size()-1)
+	l.text = _t(CLIENT2_LINES[li])
+	_comic_show(client2_panels, li)
 
 func _start_case2() -> void:
 	_load_case(2)
