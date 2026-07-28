@@ -362,4 +362,10 @@ const T := {
 "a hollow that should not be here": "порожнина, якої тут не мало б бути",
 "A drawer that answers flat wants measuring — open «measure the depth» and take the readings in section.": "Шухляда, що відповідає глухо, хоче виміру — відкрий «зміряти глибину» і зніми покази в розрізі.",
 "One depth is a number. Outside, inside, and the board — three readings make the hollow show.": "Одна глибина — це число. Зовні, всередині і дошка — три покази, і порожнина проступить.",
+"Open the writing well and look at how the back board is held.": "Відкрий письмовий колодязь і глянь, чим тримається задня дощечка.",
+"Those screws are worth the glass. Take up the loupe and look at one closely.": "Ці шурупи варті скла. Візьми лупу і роздивись один зблизька.",
+"A screw like that has a date. The chapter on screws is among the papers.": "У такого шурупа є дата. Розділ про шурупи — серед паперів.",
+"Four screws, and the rest of the carcass dowelled. The screwdriver is in the tray.": "Чотири шурупи, а решта корпуса на шкантах. Викрутка лежить у таці.",
+"The recess is open. Low light across its floor would show what has been moved.": "Ніша відкрита. Низьке світло по її дну показало б, що звідти брали.",
+"The screwdriver in hand — four screws hold that board.": "Викрутка в руці — ту дощечку тримають чотири шурупи.",
 }

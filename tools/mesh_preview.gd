@@ -3,7 +3,7 @@
 # Знімки: /tmp/mesh_prev/<name>_{a,b}.png. Друкує AABB і кількість поверхонь (правило 17).
 extends SceneTree
 
-const MODELS := ["sec_carcass", "sec_fallfront", "sec_drawer_small"]
+const MODELS := ["sec_open_hi"]
 
 func _init() -> void:
 	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)

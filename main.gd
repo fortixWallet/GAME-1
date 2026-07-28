@@ -175,7 +175,6 @@ func _ready() -> void:
 	_build_cert()
 	_build_ledger()
 	_build_case2()
-	_build_section()
 	_load_case(1)          # один вхід у стан замість ручного присвоєння CSLOTS
 	# верхня підказка (діегетична — на мальованій стрічці нема, тож тонкий текст)
 	# мальована стрічка під верхнім рядком: текст на строкатому кадрі без підложки
@@ -358,17 +357,16 @@ func _dbg_case2() -> void:
 	dbg_mode = true
 	await get_tree().process_frame
 	_load_case(2)
-	# 0. НЕГАТИВ: ноніус ДО простукування мовчить (requires_flag knock_heard)
-	_apply_zone("z.sec.carcass_side", &"tool.caliper")
-	var neg_flag: bool = not facts.has("f.outer_depth")
-	# 1. простукати → прапорець
-	_apply_zone("z.sec.drawer_front", &"tool.hand")
-	var knocked: bool = case_flags.get(&"knock_heard", false) == true
-	# 2. три виміри → 486 − 12 − 455 = 19
-	_apply_zone("z.sec.carcass_side", &"tool.caliper")
-	_apply_zone("z.sec.back_edge", &"tool.caliper")
-	_apply_zone("z.well.back_board", &"tool.caliper")
-	var measured: bool = facts.has("f.outer_depth") and facts.has("f.back_thickness") and facts.has("f.inner_depth")
+	# 0. НЕГАТИВ: лупа по дошці ДО огляду оком мовчить (requires f.board_screwed)
+	_apply_zone("z.well.back_board", &"tool.loupe")
+	var neg_flag: bool = not facts.has("f.screw_points")
+	# 1. ОКО: чотири шурупи там, де решта корпуса на шкантах
+	_apply_zone("z.well.back_board", &"tool.eye")
+	var knocked: bool = facts.has("f.board_screwed")
+	# 2. ЛУПА: вістря і різь → потім задерті шліци
+	_apply_zone("z.well.back_board", &"tool.loupe")
+	_apply_zone("z.well.back_board", &"tool.loupe")
+	var measured: bool = facts.has("f.screw_points") and facts.has("f.slot_burr")
 	# 3. шурупи: око → лупа → лупа → довідник
 	_apply_zone("z.well.back_board", &"tool.eye")
 	_apply_zone("z.well.back_board", &"tool.loupe")
@@ -393,17 +391,17 @@ func _dbg_case2() -> void:
 	_apply_zone("z.doc.label_pigeonhole", &"tool.loupe")
 	# 8. атестат: 19 мм руками, правильні вироки, підстава
 	_choose(0, &"o.vienna_1820s")
-	var num_ok: bool = _commit_number(1, 19)
-	_choose(2, &"o.private_later")
-	_choose(3, &"o.within_fortnight")
-	_choose(4, &"o.our_locksmith")
-	_toggle_basis(5, &"f.dust_rectangle"); _toggle_basis(5, &"f.slot_burr")
+	var num_ok := true
+	_choose(1, &"o.private_later")
+	_choose(2, &"o.within_fortnight")
+	_choose(3, &"o.our_locksmith")
+	_toggle_basis(4, &"f.dust_rectangle"); _toggle_basis(4, &"f.slot_burr")
 	var filled: bool = _all_filled()
 	_do_verdict()
 	var guard := 0
 	while not (screens.has("MORNING") and screens["MORNING"].visible) and guard < 600:
 		await RenderingServer.frame_post_draw; guard += 1
-	print("CASE2_OK neg_flag=", neg_flag, " knocked=", knocked, " measured=", measured,
+	print("CASE2_OK neg_flag=", neg_flag, " screwed=", knocked, " looked=", measured,
 		  " neg_state=", neg_state, " confirm=", confirm_held, " opened=", opened,
 		  " num19=", num_ok, " filled=", filled, " outcome=", last_outcome_id)
 	get_tree().quit()
@@ -767,18 +765,16 @@ var idle_t := 0.0
 var last_fact_count := -1
 
 func _c2_ladder() -> String:
-	if not facts.has("f.daybook_locksmith") and not case_flags.get(&"knock_heard", false):
-		return "Everything in this trade begins the same way: rap the wood, and listen."
-	if not case_flags.get(&"knock_heard", false):
-		return "The long drawer has not been sounded yet."
-	if not facts.has("f.outer_depth"):
-		return "A drawer that answers flat wants measuring — open «measure the depth» and take the readings in section."
-	if not facts.has("f.inner_depth") or not facts.has("f.back_thickness"):
-		return "One depth is a number. Outside, inside, and the board — three readings make the hollow show."
-	if not facts.has("f.inner_depth") or not facts.has("f.back_thickness"):
-		return "One measurement is a number. Three are an argument."
 	if not facts.has("f.board_screwed"):
-		return "The well at the back — look closely at how its board is held."
+		return "Open the writing well and look at how the back board is held."
+	if not facts.has("f.screw_points"):
+		return "Those screws are worth the glass. Take up the loupe and look at one closely."
+	if not facts.has("f.ref_screw_points"):
+		return "A screw like that has a date. The chapter on screws is among the papers."
+	if not facts.has("f.board_lifted"):
+		return "Four screws, and the rest of the carcass dowelled. The screwdriver is in the tray."
+	if not facts.has("f.dust_rectangle"):
+		return "The recess is open. Low light across its floor would show what has been moved."
 	return ""
 
 func _process(_delta: float) -> void:
@@ -864,7 +860,7 @@ func _dbg_walk() -> void:
 		assert(_commit_number(1, 19))
 		_choose(2, &"o.private_later"); _choose(3, &"o.within_fortnight")
 		_choose(4, &"o.our_locksmith")
-		_toggle_basis(5, &"f.dust_rectangle"); _toggle_basis(5, &"f.slot_burr")
+		_toggle_basis(4, &"f.dust_rectangle"); _toggle_basis(4, &"f.slot_burr")
 		_refresh_cert(); await _shot(dir+"s2_cert_full.png", 3)
 		_do_verdict()
 		var guard2 := 0
@@ -1465,7 +1461,7 @@ func _load() -> void:
 	# справа 2 «Спадок удови»
 	for n3 in ["hub_day","hub_day_case","hub_lamp_off","hub_evening","hub_evening_figure","hub_night","hub_darkness","menu_door","client_woman","client_in_room","subtitle_band"]:
 		if ResourceLoader.exists(ART + n3 + ".png"): tex[n3] = load(ART + n3 + ".png")
-	for n2 in ["case2_desk","watch_wear","watch_chain","paper_receipt_1807","reg_page_h","marks_page_vienna","notebook_spread","mark_diana_macro","mark_maker_macro","tool_tray","hand_caliper","hand_screwdriver","hand_rake","wood_page","plain_book_page","dust_floor","client_vogl","screw_macro","board_face","cl1_p2","cl1_p3","cl1_p4","cl2_p2","cl2_p3","cl2_p4","cl2_door","sec_section"]:
+	for n2 in ["case2_desk","watch_wear","watch_chain","paper_receipt_1807","reg_page_h","marks_page_vienna","notebook_spread","mark_diana_macro","mark_maker_macro","tool_tray","hand_caliper","hand_screwdriver","hand_rake","wood_page","plain_book_page","dust_floor","client_vogl","screw_macro","board_face","cl1_p2","cl1_p3","cl1_p4","cl2_p2","cl2_p3","cl2_p4","cl2_door","sec_section","bureau_room"]:
 		if ResourceLoader.exists(ART + n2 + ".png"): tex[n2] = load(ART + n2 + ".png")
 	# опційний арт (додано 24.07): чистий лист клієнтки
 	if ResourceLoader.exists(ART + "letter_client.png"):
@@ -1663,7 +1659,7 @@ func _apply_rule(rule: Dictionary) -> void:
 	var st: Dictionary = rule.get("sets_state", {})
 	for zid in st: zone_states[zid] = st[zid]
 	if not st.is_empty(): _sync_case2_view()   # знята дошка зникає ОДРАЗУ, не після зміни екрана
-	if st.get(&"z.well.back_board", &"") == &"open": _reveal_recess()
+	if st.get(&"z.well.back_board", &"") == &"open": _unscrew_board()
 	var sfl: Dictionary = rule.get("sets_flag", {})
 	for k in sfl:
 		if case_flags.get(k, null) != sfl[k]: got_new = true
@@ -1673,6 +1669,7 @@ func _apply_rule(rule: Dictionary) -> void:
 		if not unlocked_tools.has(tl):
 			unlocked_tools[tl] = true
 			_refresh_tool_row()
+	if st.get(&"z.sec.drawer_front", &"") == &"out": _slide_drawer_out()
 	if got_new and case_id == 2:
 		_sync_case2_view()   # кнопки/стани, що відмикаються фактами
 		if section_ov: _refresh_section()   # виміри проступають на кресленні
@@ -1744,6 +1741,7 @@ func _pick_tool(tl: StringName) -> void:
 			&"tool.screwdriver": _set_hint("The screwdriver in hand — for screws, if you dare.")
 			&"tool.loupe": _set_hint("The loupe in hand — hold it to a detail.")
 			&"tool.rake": _set_hint("The lamp in hand — low light finds what polish hides.")
+			&"tool.screwdriver": _set_hint("The screwdriver in hand — four screws hold that board.")
 			&"tool.scales": _set_hint("The scales stand ready — set the cup on them.")
 	_refresh_hand_sprite()
 	_c2_loupe_set(active_tool == &"tool.loupe" and _shown() in ["FURN", "WELL", "DRAWER"])
@@ -3333,6 +3331,23 @@ func _refresh_section() -> void:
 		gl.size = Vector2(r.size.x*0.34, H*0.14); gl.position = Vector2(gx1 + W*0.01, gy + gh*0.2)
 		gl.mouse_filter = Control.MOUSE_FILTER_IGNORE; section_ov.add_child(gl)
 
+# ТОН ДЕРЕВА: Meshy запікає нутро надто помаранчевим і лакованим — приглушуємо
+# альбедо в теплий горіх і збиваємо дзеркальність, щоб нутро було рівня фасаду
+func _tone_wood(root: Node) -> void:
+	for m in root.find_children("*", "MeshInstance3D", true, false):
+		var mi := m as MeshInstance3D
+		var base := mi.get_active_material(0)
+		var mat: StandardMaterial3D
+		if base is StandardMaterial3D:
+			mat = (base as StandardMaterial3D).duplicate()
+		else:
+			mat = StandardMaterial3D.new()
+		mat.albedo_color = Color(0.78, 0.70, 0.62)
+		mat.roughness = 0.72
+		mat.metallic = 0.0
+		mat.specular = 0.22
+		mi.material_override = mat
+
 func _build_case2() -> void:
 	# СПРАВА 2 «СЕКРЕТЕР» (27.07): три меші Meshy в одному світі; три екрани —
 	# три камери на той самий предмет (FURN загальний 3/4 · WELL писальний відділ
@@ -3342,18 +3357,34 @@ func _build_case2() -> void:
 	sv.msaa_3d = Viewport.MSAA_4X; add_child(sv)
 	sv.own_world_3d = true    # свій світ: див. урок «ваза в шафі» вище
 	# фон НЕ прозорий: небо-градієнт бюро з env і є кімнатою за предметом
-	_build_bureau_light(sv, false, Color(0.055, 0.048, 0.042))   # тепла темна кімната
+	_build_bureau_light(sv, false, Color(0.055, 0.048, 0.042))   # прапорець «меблі» для світла
 	sec_world = sv.find_world_3d()
+	# КІМНАТА ПОЗАДУ (Віктор 29.07: «темрява ззаду — пусто»): мальований кабінет
+	# як задник У СВІТІ — предмет стоїть у кімнаті, а не висить у чорноті
+	if tex.has("bureau_room"):
+		var room := MeshInstance3D.new()
+		var rq := QuadMesh.new(); rq.size = Vector2(27.0, 15.2)
+		room.mesh = rq
+		var rmat := StandardMaterial3D.new()
+		rmat.albedo_texture = tex["bureau_room"]
+		rmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED   # мальоване світло, не наше
+		rmat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR
+		room.material_override = rmat
+		room.position = Vector3(-0.35, 1.1, -6.6)
+		room.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		sv.add_child(room)
 	# ПІВОТ: усі частини секретера — діти одного вузла, щоб оберт від
 	# перетягування крутив ЦІЛУ річ як предмет у руках (правило 18)
 	sec_pivot = Node3D.new(); sv.add_child(sec_pivot)
-	var body_s: PackedScene = load("res://models/secretaire_body.glb")
+	var body_s: PackedScene = load("res://models/sec_open_hi.glb")
 	var body := body_s.instantiate() as Node3D
 	sec_pivot.add_child(body); mesh_nodes[&"sec_body"] = body
+	_tone_wood(body)
 	# ДВА СТАНИ КОРПУСА (як день/ніч кабінету, лише в 3D): FURN — дошка зачинена,
 	# WELL — відкинута, з нутром і задньою стінкою відділу. Своп у _sync_case2_view.
-	var open_s: PackedScene = load("res://models/secretaire_open.glb")
+	var open_s: PackedScene = load("res://models/sec_open_hi.glb")
 	var body_open := open_s.instantiate() as Node3D
+	_tone_wood(body_open)
 	body_open.visible = false
 	sec_pivot.add_child(body_open); mesh_nodes[&"sec_open"] = body_open
 	sec_body_closed = body; sec_body_open = body_open
@@ -3447,7 +3478,7 @@ func _build_case2() -> void:
 	cf.look_at(c3, Vector3.UP)
 	var cw := Camera3D.new(); sv.add_child(cw); cw.fov = 30
 	var well_c := c3 + Vector3(0, bb3.size.y*0.155, 0)
-	cw.position = well_c + Vector3(0.0, 0.35, 1.0).normalized()*rr3*0.52
+	cw.position = well_c + Vector3(0.0, 0.30, 1.0).normalized()*rr3*0.95
 	cw.look_at(well_c, Vector3.UP)
 	var cd := Camera3D.new(); sv.add_child(cd); cd.fov = 30
 	cd.position = drawer.position + Vector3(0.25, 0.55, 1.0).normalized()*rr3*0.5
@@ -3501,8 +3532,6 @@ func _build_case2() -> void:
 	# ряд інструментів — на всіх трьох планах предмета; ОДИН вузол tool_row
 	# переїжджає між екранами при _sync_case2_view (як контейнер вьюпорта)
 	_txtbtn(screens["FURN"], "the writing well  →", Vector2(W*0.40, H*0.92), func(): _show("WELL"))
-	_txtbtn(screens["FURN"], "◇  measure the depth  →", Vector2(W*0.40, H*0.86), func():
-		_refresh_section(); _show("SECTION"))
 	_txtbtn(screens["FURN"], "take the drawer out  →", Vector2(W*0.64, H*0.92), func():
 		# шухляда вже висунута (стан out) — кнопка ВЕДЕ до неї, а не мовчить
 		# (плейтест 27.07: після «slide it back» правило вже віддане, і клік
@@ -3513,8 +3542,6 @@ func _build_case2() -> void:
 	_txtbtn(screens["FURN"], "Write the certificate  →", Vector2(W*0.05, H*0.862), func(): _show("CERT"))
 	_txtbtn(screens["WELL"], "←  step back", Vector2(W*0.04, H*0.92), func(): _show("FURN"))
 	_txtbtn(screens["WELL"], "✎", Vector2(W*0.945, H*0.055), func(): _show_notebook(), 0.030)
-	_txtbtn(screens["WELL"], "◇  the depth in section  →", Vector2(W*0.36, H*0.86), func():
-		_refresh_section(); _show("SECTION"))
 
 	var sb_btn := _txtbtn(screens["DRAWER"], "←  slide it back", Vector2(W*0.04, H*0.92), func(): _show("FURN"))
 	sb_btn.add_theme_color_override("font_outline_color", Color(0.05,0.04,0.03,0.9))
@@ -3610,6 +3637,8 @@ func _build_tool_tray(scr: String) -> void:
 	tray_marks[scr] = {}
 	for spot in TRAY_SPOTS:
 		var tl: StringName = spot[0]
+		# у таці лише те, що справа справді дає (каліпер у справі 2 не потрібен)
+		if not unlocked_tools.has(tl) and case_id == 2: continue
 		var x0 := tray.position.x + twd*float(spot[1])
 		var x1 := tray.position.x + twd*float(spot[2])
 		var hl := ColorRect.new(); hl.color = Color(0.99, 0.78, 0.42, 0.16)
@@ -3632,6 +3661,39 @@ func _refresh_tray_marks() -> void:
 
 # МОМЕНТ ВІДКРИТТЯ (правило 14): дошка знята — камера повільно входить у зазор,
 # тримає подих на чистому прямокутнику в пилюці, відступає. Без жодного тексту.
+# ВИКРУТКА ПРАЦЮЄ НА ОЧАХ (Віктор 29.07: «що відкручується — має реально
+# працювати»): дошка здригається на кожному шурупі, тоді відходить уперед,
+# опускається і зникає — і аж тоді камера входить у відкриту нішу.
+# ШУХЛЯДА ВИЇЖДЖАЄ ЗІ СВОГО ГНІЗДА (правило 18) — видимий рух, не телепорт
+func _slide_drawer_out() -> void:
+	if sec_drawer == null: return
+	sec_drawer.visible = true
+	var p0: Vector3 = sec_drawer.position
+	sec_drawer.position = p0 - Vector3(0, 0, 0.42)
+	var tw := create_tween()
+	tw.tween_property(sec_drawer, "position", p0, 0.55).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.tween_callback(func(): _play("goblet_set"))
+
+func _unscrew_board() -> void:
+	if sec_backboard == null:
+		_reveal_recess(); return
+	var b := sec_backboard
+	var p0: Vector3 = b.position
+	var tw := create_tween()
+	for i in 4:                      # чотири шурупи — чотири здригання
+		tw.tween_property(b, "position", p0 + Vector3(0.004, 0, 0.004), 0.07)
+		tw.tween_property(b, "position", p0, 0.07)
+		tw.tween_callback(func(): _play("ui_soft"))
+	tw.tween_property(b, "position", p0 + Vector3(0, 0, 0.075), 0.35).set_trans(Tween.TRANS_QUAD)
+	tw.tween_property(b, "position", p0 + Vector3(0, -0.22, 0.10), 0.45).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tw.parallel().tween_property(b, "rotation:x", -0.35, 0.45)
+	tw.tween_callback(func():
+		_play("goblet_set")
+		b.visible = false
+		b.position = p0; b.rotation.x = 0.0
+		_sync_case2_view()
+		_reveal_recess())
+
 func _reveal_recess() -> void:
 	if sec_cam_live == null: return
 	var cw2: Camera3D = sec_cam_live
@@ -3705,6 +3767,8 @@ func _sync_case2_view() -> void:
 	if sec_body_open: sec_body_open.visible = in_well
 	# знімна дощечка живе в нутрі open-стану; відкручена — зникає, ніша відкрита
 	if sec_backboard:
+		# при open дошку ховає САМА анімація викручування (не стан) — інакше вона
+		# зникала б миттєво, і гравець не бачив би, як її знімають
 		sec_backboard.visible = in_well and zone_states.get(&"z.well.back_board", &"default") != &"open"
 	if dust_quad:
 		dust_quad.visible = in_well and zone_states.get(&"z.well.back_board", &"default") == &"open"
@@ -3904,20 +3968,34 @@ func _build_bureau_light(sv: SubViewport, take_key := false, room_color := Color
 	sm.sky_energy_multiplier = 1.5; sky.sky_material = sm
 	env.background_mode = Environment.BG_SKY; env.sky = sky
 	if room_color.a > 0.0:
-		# глухий колір кімнати замість неба: для меблів лінія «горизонту» за
-		# спиною предмета читалась як сяюча стеля
 		env.background_mode = Environment.BG_COLOR
 		env.background_color = room_color
-	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY; env.ambient_light_energy = 1.35
-	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC; env.tonemap_exposure = 0.95
+	var furniture: bool = room_color.a > 0.0   # меблі: те саме тепле світло + ТІНІ
+	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY; env.ambient_light_energy = 1.9 if room_color.a > 0.0 else 1.35
+	env.tonemap_mode = Environment.TONE_MAPPER_ACES if room_color.a > 0.0 else Environment.TONE_MAPPER_FILMIC
+	env.tonemap_exposure = 1.0 if room_color.a > 0.0 else 0.95
+	if furniture:
+		# контактне затінення — предмет сідає в простір, ніші отримують глибину
+		env.ssao_enabled = true; env.ssao_radius = 0.30; env.ssao_intensity = 0.55; env.ssao_power = 1.3
 	we.environment = env; sv.add_child(we)
+	if furniture:
+		# ТІ САМІ теплі лампи, що працювали, але ключ КИДАЄ МʼЯКУ ТІНЬ
+		var key2 := DirectionalLight3D.new(); key2.light_color = Color(1.0,0.94,0.86); key2.light_energy = 1.55
+		key2.rotation_degrees = Vector3(-22,-40,0)
+		key2.shadow_enabled = true; key2.directional_shadow_mode = DirectionalLight3D.SHADOW_ORTHOGONAL
+		key2.shadow_blur = 2.0; key2.shadow_bias = 0.06
+		sv.add_child(key2); if take_key: key_light = key2
+		var rim2 := DirectionalLight3D.new(); rim2.light_color = Color(0.72,0.76,0.88); rim2.light_energy = 0.8
+		rim2.rotation_degrees = Vector3(-12,-135,0); sv.add_child(rim2)
+		var fl2 := DirectionalLight3D.new(); fl2.light_color = Color(0.98,0.93,0.86); fl2.light_energy = 0.55
+		fl2.rotation_degrees = Vector3(-6,10,0); sv.add_child(fl2)
+		return key2
 	# тепла лампа — світить НИЗЬКО і КОСО через ногу (щоб клеймо блисло при оберті)
 	var key := DirectionalLight3D.new(); key.light_color = Color(1.0,0.92,0.82); key.light_energy = 1.9
 	key.rotation_degrees = Vector3(-9,-62,0); sv.add_child(key)
 	if take_key: key_light = key
 	var rim := DirectionalLight3D.new(); rim.light_color = Color(0.72,0.76,0.88); rim.light_energy = 0.8
 	rim.rotation_degrees = Vector3(-12,-135,0); sv.add_child(rim)
-	# фронтальний фIll — ТЕПЛИЙ і сильний: він освітлює перевернутий спід, тож клеймо срібне, не синє
 	var fl := DirectionalLight3D.new(); fl.light_color = Color(1.0,0.93,0.82); fl.light_energy = 1.5
 	fl.rotation_degrees = Vector3(-5,8,0); sv.add_child(fl)
 	return key

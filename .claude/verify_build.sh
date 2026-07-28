@@ -62,7 +62,7 @@ for t in "walk a" "walk b" "walk c" "walk e" "walk p" "walk q" "chapters" "outco
     "walk a")   echo "$OUT" | grep -q "WALK_A_OK read_news=true" || FAIL="$FAIL walk-a" ;;
     # case2: аудит 26.07 знайшов її повністю зламаною при зеленому гейті — факти
     # жили на видаленому механізмі meta("mark"), і жоден тест цього не бачив
-    "case2")    echo "$OUT" | grep -q "CASE2_OK neg_flag=true knocked=true measured=true neg_state=true confirm=true opened=true num19=true filled=true outcome=out.void_named" || FAIL="$FAIL case2" ;;
+    "case2")    echo "$OUT" | grep -q "CASE2_OK neg_flag=true screwed=true looked=true neg_state=true confirm=true opened=true num19=true filled=true outcome=out.void_named" || FAIL="$FAIL case2" ;;
     # сейв: відновлення ДО ПОЛЯ (факти в порядку, cvals, стани зон, інструменти) + відмова чужій версії
     "savetest") echo "$OUT" | grep -q "SAVE_OK wiped=true restored=true order=true cvals=true zones=true tools=true reject_v99=true" || FAIL="$FAIL savetest" ;;
     # walk e — інформаційний ланцюг кроку 6: квитанція → інструменти → заміри →
@@ -90,7 +90,7 @@ for t in "walk a" "walk b" "walk c" "walk e" "walk p" "walk q" "chapters" "outco
     # furnprobe: жодна зона не сміє дивитись нормаллю від своєї камери
     "furnprobe") echo "$OUT" | grep -q "fails= 0" || echo "$OUT" | grep -q "fails=0" || FAIL="$FAIL zone-facing" ;;
     # walk q: записник гортається; 15 фактів справи 2 розкладено по аркушах
-    "walk q")   echo "$OUT" | grep -q "WALK_Q_OK rows_first=9 rows_last=6 total=15" || FAIL="$FAIL walk-q" ;;
+    "walk q")   echo "$OUT" | grep -q "WALK_Q_OK rows_first=10 rows_last=2 total=12" || FAIL="$FAIL walk-q" ;;
     # walk p: усі лінійовані папери будуються з живими фактами без падінь
     "walk p")   echo "$OUT" | grep -q "WALK_P_OK notebook_rows=8" || FAIL="$FAIL walk-p" ;;
     "layoutcheck") echo "$OUT" | grep -q "накладань= 0" || echo "$OUT" | grep -q "накладань=0" || FAIL="$FAIL layout" ;;
