@@ -1639,6 +1639,7 @@ func _apply_rule(rule: Dictionary) -> void:
 		if not unlocked_tools.has(tl):
 			unlocked_tools[tl] = true
 			_refresh_tool_row()
+	if got_new and case_id == 2: _sync_case2_view()   # кнопки/стани, що відмикаються фактами
 	if rule.has("sfx") and aud.has(String(rule["sfx"])): _play(String(rule["sfx"]))
 	else: _play("page_turn" if got_new else "ui_soft")
 	_set_hint(String(rule.get("say", "")))
@@ -3087,15 +3088,16 @@ func _build_screw_macro() -> void:
 	_paper_backdrop(s3, 0.08)
 	var t: Texture2D = tex.get("screw_macro", null)
 	if t:
-		var mh := H*0.86; var mw := mh*float(t.get_width())/float(t.get_height())
+		var mh := H*0.78; var mw := mh*float(t.get_width())/float(t.get_height())
 		var im := TextureRect.new(); im.texture = t; im.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		im.stretch_mode = TextureRect.STRETCH_SCALE; im.size = Vector2(mw, mh)
-		im.position = Vector2(W*0.045, (H-mh)*0.45); im.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		im.position = Vector2(W*0.03, (H-mh)*0.45); im.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		s3.add_child(im)
-	var cap := Label.new(); cap.label_settings = _ls(fr, int(H*0.026), Color(0.90,0.86,0.77))
+	var cap := Label.new(); cap.name = "screwcap"
+	cap.label_settings = _ls(fr, int(H*0.026), Color(0.90,0.86,0.77))
 	cap.label_settings.shadow_color = Color(0,0,0,0.85); cap.label_settings.shadow_offset = Vector2(1.5,1.5)
 	cap.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	cap.size = Vector2(W*0.30, H*0.7); cap.position = Vector2(W*0.66, H*0.14)
+	cap.size = Vector2(W*0.26, H*0.7); cap.position = Vector2(W*0.71, H*0.14)
 	cap.text = "Under the strong glass, one head of the four.\n\nThe slot\u2019s near edge is torn, and the metal in the tear is bright \u2014 turned days ago, not years.\n\nAround the head the old wax lies cracked in a ring, broken outward.\n\nThe thread runs even, head to tip. A machine cut this \u2014 no hand before 1846 did."
 	cap.mouse_filter = Control.MOUSE_FILTER_IGNORE; s3.add_child(cap)
 	_txtbtn(s3, "\u2190  step back", Vector2(W*0.04, H*0.92), func(): _show("WELL"))
@@ -3111,9 +3113,9 @@ func _build_client2() -> void:
 		im.position = Vector2((W-cw2)*0.5, 0); im.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		s2.add_child(im)
 	_band(s2)
-	var l := Label.new(); l.name = "c2text"; l.label_settings = _ls(fr, int(H*0.030), Color(0.95,0.91,0.82))
+	var l := Label.new(); l.name = "c2text"; l.label_settings = _ls(fr, int(H*0.028), Color(0.95,0.91,0.82))
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART; l.size = Vector2(W*0.62, H*0.13); l.position = Vector2(W*0.19, H*0.815)
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART; l.size = Vector2(W*0.62, H*0.175); l.position = Vector2(W*0.19, H*0.80)
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE; s2.add_child(l)
 	var adv2 := Button.new(); adv2.flat = true; adv2.modulate.a = 0
 	adv2.size = Vector2(W, H); adv2.position = Vector2.ZERO
@@ -3454,6 +3456,9 @@ func _sync_case2_view() -> void:
 		dust_quad.visible = in_well and zone_states.get(&"z.well.back_board", &"default") == &"open"
 	if screw_macro_btn:
 		screw_macro_btn.visible = in_well and facts.has("f.board_screwed")
+	if screens.has("SCREW_MACRO"):
+		var scap := screens["SCREW_MACRO"].get_node_or_null("screwcap")
+		if scap: (scap as Label).visible = facts.has("f.screw_points")
 	if sec_drawer:
 		# шухляда «в руках» існує лише на своєму плані; на FURN вона левітувала
 		# поверх зачиненого корпусу (плейтест 27.07)
