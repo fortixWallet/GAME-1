@@ -127,6 +127,16 @@ var c2_intro2: Label
 var goblet_world: World3D            # світ чаші (справа 1) для лупи
 var sec_world: World3D               # світ секретера (справа 2) для лупи
 var c2_loupe := false                # скло активне на екранах справи 2
+var sec_cam_live: Camera3D           # ОДНА камера справи 2 — дольчить між кадрами
+var sec_cam_targets := {}            # FURN/WELL/DRAWER → Transform3D кадру
+var sec_pivot: Node3D                # обертання всього секретера (turntable)
+var sec_cam_tw: Tween                # активний дольчик (щоб не накладались)
+var sec_yaw := 0.0                   # накопичений оберт від перетягування
+var _c2_seen := false                # чи вже показували предмет (перший кадр — без дольчика)
+var c2_press_pos := Vector2.ZERO
+var c2_drag_travel := 0.0
+var c2_dragging := false
+var c2_mouse_down := false
 var hands_glass_btn: Button          # «взяти скло» просто в руках
 var set_down_btn: Button
 var loupe_held := false
@@ -1134,7 +1144,8 @@ func _dbg_furnprobe() -> void:
 	var zc := 0
 	var zfail := 0
 	for scr_z in ["FURN", "WELL", "DRAWER"]:
-		var cz: Camera3D = sec_cams[scr_z]
+		var cz: Camera3D = sec_cam_live
+		if sec_cam_targets.has(scr_z): cz.transform = sec_cam_targets[scr_z]
 		for id in _case_zones():
 			var z: Dictionary = _case_zones()[id]
 			if String(z.get("kind", &"")) != "mesh": continue
@@ -1518,6 +1529,8 @@ func _show(name: String) -> void:
 	if hand_tool_ui: call_deferred("_refresh_hand_sprite")
 	call_deferred("_auto_read", name)
 	if c2_loupe and name not in ["FURN", "WELL", "DRAWER"]: _c2_loupe_set(false)
+	if case_id == 2 and name in ["WELL", "DRAWER"] and sec_pivot:
+		sec_yaw = 0.0; sec_pivot.rotation.y = 0.0   # деталь-кадри дивляться на фасад
 	if case_id == 2 and name in ["FURN", "WELL", "DRAWER"] and not dbg_mode:
 		var step0 := _c2_ladder()
 		if step0 != "": call_deferred("_set_hint", step0)
@@ -3209,6 +3222,8 @@ func _client2_show() -> void:
 
 func _start_case2() -> void:
 	_load_case(2)
+	_c2_seen = false; sec_yaw = 0.0
+	if sec_pivot: sec_pivot.rotation.y = 0.0
 	client2_line = 0
 	_client2_show()
 	_play("door_bell")
@@ -3225,15 +3240,18 @@ func _build_case2() -> void:
 	# фон НЕ прозорий: небо-градієнт бюро з env і є кімнатою за предметом
 	_build_bureau_light(sv, false, Color(0.055, 0.048, 0.042))   # тепла темна кімната
 	sec_world = sv.find_world_3d()
+	# ПІВОТ: усі частини секретера — діти одного вузла, щоб оберт від
+	# перетягування крутив ЦІЛУ річ як предмет у руках (правило 18)
+	sec_pivot = Node3D.new(); sv.add_child(sec_pivot)
 	var body_s: PackedScene = load("res://models/secretaire_body.glb")
 	var body := body_s.instantiate() as Node3D
-	sv.add_child(body); mesh_nodes[&"sec_body"] = body
+	sec_pivot.add_child(body); mesh_nodes[&"sec_body"] = body
 	# ДВА СТАНИ КОРПУСА (як день/ніч кабінету, лише в 3D): FURN — дошка зачинена,
 	# WELL — відкинута, з нутром і задньою стінкою відділу. Своп у _sync_case2_view.
 	var open_s: PackedScene = load("res://models/secretaire_open.glb")
 	var body_open := open_s.instantiate() as Node3D
 	body_open.visible = false
-	sv.add_child(body_open); mesh_nodes[&"sec_open"] = body_open
+	sec_pivot.add_child(body_open); mesh_nodes[&"sec_open"] = body_open
 	sec_body_closed = body; sec_body_open = body_open
 	# нормування: корпус ~1.9 h у метрах моделі — ставимо в нуль, камери від нього
 	var drawer_s: PackedScene = load("res://models/secretaire_drawer.glb")
@@ -3241,7 +3259,7 @@ func _build_case2() -> void:
 	drawer.scale = Vector3(0.55, 0.55, 0.55)
 	drawer.position = Vector3(0.0, -0.35, 0.55)   # висунута з нижньої секції
 	drawer.visible = false
-	sv.add_child(drawer); mesh_nodes[&"sec_drawer"] = drawer
+	sec_pivot.add_child(drawer); mesh_nodes[&"sec_drawer"] = drawer
 	var bb_s: PackedScene = load("res://models/secretaire_backboard.glb")
 	var bb := bb_s.instantiate() as Node3D
 	var oa := _aabb(body_open)
@@ -3274,7 +3292,7 @@ func _build_case2() -> void:
 		sq.position = Vector3(bla.get_center().x, bla.get_center().y,
 							  bla.end.z + bla.size.z*0.10)
 		bmesh.add_child(sq)
-	sv.add_child(bb); mesh_nodes[&"sec_backboard"] = bb
+	sec_pivot.add_child(bb); mesh_nodes[&"sec_backboard"] = bb
 	sec_backboard = bb; sec_drawer = drawer
 	# дно ніші: пил і ЧИСТИЙ прямокутник — головний доказ віддано оку, не тексту
 	if tex.has("dust_floor"):
@@ -3290,7 +3308,7 @@ func _build_case2() -> void:
 		dq.position = Vector3(0.0, 0.192, -0.068)
 		dq.rotation_degrees = Vector3(-14, 0, 0)
 		dq.visible = false
-		sv.add_child(dq); dust_quad = dq
+		sec_pivot.add_child(dq); dust_quad = dq
 	# тавро столярні на споді шухляди: випалений штамп текстом (шрифт — виняток
 	# правила 1) + крейдяний номер. ЛОКАЛЬНИЙ AABB меша: глобальний тут брехав би
 	# (batьків scale/зсув), і перша посадка полетіла геть із геометрії.
@@ -3331,6 +3349,11 @@ func _build_case2() -> void:
 	cd.position = drawer.position + Vector3(0.25, 0.55, 1.0).normalized()*rr3*0.5
 	cd.look_at(drawer.position, Vector3.UP)
 	sec_cams = {"FURN": cf, "WELL": cw, "DRAWER": cd}
+	sec_cam_targets = {"FURN": cf.transform, "WELL": cw.transform, "DRAWER": cd.transform}
+	# ОДНА жива камера: не ріже, а дольчить між кадрами (правило 14/18)
+	sec_cam_live = Camera3D.new(); sv.add_child(sec_cam_live); sec_cam_live.fov = 34
+	sec_cam_live.transform = cf.transform
+	cf.queue_free(); cw.queue_free(); cd.queue_free()
 	for scr in ["FURN", "WELL", "DRAWER"]:
 		var sc := _screen(scr)
 		var cont := SubViewportContainer.new()
@@ -3342,7 +3365,7 @@ func _build_case2() -> void:
 		catcher.mouse_default_cursor_shape = Control.CURSOR_ARROW
 		catcher.gui_input.connect(_case2_input)
 		sc.add_child(catcher)
-		screen_cams[scr] = sec_cams[scr]
+		screen_cams[scr] = sec_cam_live
 	sec_vp = sv
 	for scr3 in ["FURN", "WELL", "DRAWER"]:
 		_build_tool_tray(scr3)
@@ -3502,11 +3525,12 @@ func _refresh_tray_marks() -> void:
 # МОМЕНТ ВІДКРИТТЯ (правило 14): дошка знята — камера повільно входить у зазор,
 # тримає подих на чистому прямокутнику в пилюці, відступає. Без жодного тексту.
 func _reveal_recess() -> void:
-	if not sec_cams.has("WELL"): return
-	var cw2: Camera3D = sec_cams["WELL"]
+	if sec_cam_live == null: return
+	var cw2: Camera3D = sec_cam_live
 	var p0: Vector3 = cw2.position
 	var fwd: Vector3 = -cw2.global_transform.basis.z
-	var tw3 := create_tween()
+	if sec_cam_tw and sec_cam_tw.is_valid(): sec_cam_tw.kill()   # дольчик не бореться з наїздом
+	var tw3 := create_tween(); sec_cam_tw = tw3
 	tw3.tween_property(cw2, "position", p0 + fwd*0.34, 1.1).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
 	tw3.tween_interval(1.3)
 	tw3.tween_property(cw2, "position", p0, 0.8).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
@@ -3537,9 +3561,20 @@ func _sync_case2_view() -> void:
 	if sec_vp == null: return
 	var scr := _shown()
 	var on_c2: bool = scr in ["FURN", "WELL", "DRAWER"]
-	# перемкнути активну камеру
-	if on_c2 and screen_cams.has(scr):
-		(screen_cams[scr] as Camera3D).current = true
+	# дольчик між кадрами замість різу (правило 14/18: одна жива річ, не 3 сцени)
+	if on_c2 and sec_cam_live and sec_cam_targets.has(scr):
+		sec_cam_live.current = true
+		var tgt: Transform3D = sec_cam_targets[scr]
+		if sec_cam_tw and sec_cam_tw.is_valid(): sec_cam_tw.kill()
+		# перший показ — без анімації (щоб не летіти з нуля); далі — плавно
+		if sec_cam_live.transform.origin.distance_to(tgt.origin) < 0.001 or not _c2_seen:
+			sec_cam_live.transform = tgt
+		else:
+			var tw := create_tween(); sec_cam_tw = tw
+			tw.tween_method(func(t: float):
+				sec_cam_live.transform = sec_cam_live.transform.interpolate_with(tgt, t),
+				0.0, 1.0, 0.65).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+		_c2_seen = true
 	# контейнер вьюпорта — лише на активному екрані
 	for s2 in ["FURN", "WELL", "DRAWER"]:
 		if not screens.has(s2): continue
@@ -3572,39 +3607,60 @@ func _sync_case2_view() -> void:
 		sec_drawer.visible = scr == "DRAWER" and zone_states.get(&"z.sec.drawer_front", &"default") == &"out"
 
 func _case2_input(ev: InputEvent) -> void:
-	# РУКА Й ОКО — НЕ ІНСТРУМЕНТИ (Віктор: «набір нелогічний»). Вони і є гравець:
-	# клік = торкнутись/роздивитись; у лоток беруться лише ФІЗИЧНІ предмети.
-	if ev is InputEventMouseButton and (ev as InputEventMouseButton).pressed \
-			and (ev as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT:
-		var pos: Vector2 = (ev as InputEventMouseButton).position
-		if active_tool != &"*":
-			var zt := _pick_3d_at(pos, active_tool)
-			if zt != "": _apply_zone(zt, active_tool); return
-			# інструмент у руці, але зоні він не потрібен: чесна відповідь, не тиша
-			var zn := _pick_3d_at(pos, &"tool.hand")
-			if zn == "": zn = _pick_3d_at(pos, &"tool.eye")
-			if zn != "":
-				_set_hint("Not the tool for this — set it down, or try it elsewhere.")
-				return
-		var zid := _pick_3d_at(pos, &"tool.hand")
-		if zid != "": _apply_zone(zid, &"tool.hand"); return
-		zid = _pick_3d_at(pos, &"tool.eye")
-		if zid != "": _apply_zone(zid, &"tool.eye")
+	# РУКА Й ОКО — НЕ ІНСТРУМЕНТИ. Клік = торкнутись/роздивитись; ПЕРЕТЯГУВАННЯ =
+	# ОБЕРНУТИ ЦІЛУ РІЧ (turntable, як чашу в руках — правило 18). Дію віддано на
+	# ВІДПУСК і лише якщо це був клік, а не оберт (інакше клік по зоні на початку
+	# перетягування спрацьовував би раптово).
+	if ev is InputEventMouseButton and (ev as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT:
+		var mb := ev as InputEventMouseButton
+		if mb.pressed:
+			c2_press_pos = mb.position; c2_drag_travel = 0.0; c2_dragging = false; c2_mouse_down = true
+		else:
+			c2_mouse_down = false
+			if c2_drag_travel < 12.0:
+				_case2_click(c2_press_pos)   # це був клік
+			c2_dragging = false
+		return
 	elif ev is InputEventMouseMotion:
+		var mm := ev as InputEventMouseMotion
+		var held := c2_mouse_down   # власний прапорець: пілот не шле button_mask
+		if held:
+			c2_drag_travel += mm.relative.length()
+			if c2_drag_travel >= 12.0 and sec_pivot:
+				c2_dragging = true
+				sec_yaw -= mm.relative.x * 0.004
+				sec_yaw = clampf(sec_yaw, -0.62, 0.62)   # ±35°: видно передні кути, не втрачаєш фасад
+				sec_pivot.rotation.y = sec_yaw
+				if c2_loupe:                          # скло їде за курсором і в оберті
+					loupe_ui.position = mm.position - Vector2(GLASS_CX*loupe_lw, GLASS_CY*loupe_lh)
+					_aim_loupe(mm.position)
+			return
 		if c2_loupe:
-			var mp2: Vector2 = (ev as InputEventMouseMotion).position
-			loupe_ui.position = mp2 - Vector2(GLASS_CX*loupe_lw, GLASS_CY*loupe_lh)
-			_aim_loupe(mp2)
-		var zid2 := _pick_3d_at((ev as InputEventMouseMotion).position, &"tool.eye")
+			loupe_ui.position = mm.position - Vector2(GLASS_CX*loupe_lw, GLASS_CY*loupe_lh)
+			_aim_loupe(mm.position)
+		var zid2 := _pick_3d_at(mm.position, &"tool.eye")
 		if zid2 == "":
-			zid2 = _pick_3d_at((ev as InputEventMouseMotion).position, &"tool.hand")
+			zid2 = _pick_3d_at(mm.position, &"tool.hand")
 		var z: Dictionary = _case_zones().get(StringName(zid2), {})
 		_set_hint(String(z.get("hint", "")) if zid2 != "" else "")
-		# курсор — чесна мова: рука ЛИШЕ там, де є що робити (Віктор: «не розумію,
-		# що із шафою робити» — рука-всюди знецінювала єдиний сигнал інтерактивності)
 		var sc2: Node = screens[_shown()].get_node_or_null("catch3d")
 		if sc2: (sc2 as Control).mouse_default_cursor_shape = \
 			Control.CURSOR_POINTING_HAND if zid2 != "" else Control.CURSOR_ARROW
+
+# клік по 3D-предмету (винесено з _case2_input: спрацьовує на відпуск-без-оберту)
+func _case2_click(pos: Vector2) -> void:
+	if active_tool != &"*":
+		var zt := _pick_3d_at(pos, active_tool)
+		if zt != "": _apply_zone(zt, active_tool); return
+		var zn := _pick_3d_at(pos, &"tool.hand")
+		if zn == "": zn = _pick_3d_at(pos, &"tool.eye")
+		if zn != "":
+			_set_hint("Not the tool for this — set it down, or try it elsewhere.")
+			return
+	var zid := _pick_3d_at(pos, &"tool.hand")
+	if zid != "": _apply_zone(zid, &"tool.hand"); return
+	zid = _pick_3d_at(pos, &"tool.eye")
+	if zid != "": _apply_zone(zid, &"tool.eye")
 
 
 func _unhandled_input(event: InputEvent) -> void:
