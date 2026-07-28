@@ -3344,10 +3344,16 @@ func _tone_wood(root: Node) -> void:
 			mat = StandardMaterial3D.new()
 		# помаранч гасимо холоднішим множником, лак — нулем блиску (Віктор 29.07:
 		# «дуже яскраво, лак ніби щойно залитий»)
-		mat.albedo_color = Color(0.46, 0.42, 0.42)
-		mat.roughness = 1.0
+		# КАРТИ БЛИСКУ З МЕША — ГЕТЬ: roughness/metallic у Godot МНОЖАТЬСЯ на свої
+		# текстури, тому число 1.0 не гасило запечений лак, і він спалахував при
+		# обертанні (скарга Віктора 29.07 зі скріна)
+		mat.roughness_texture = null
+		mat.metallic_texture = null
+		mat.albedo_color = Color(0.52, 0.47, 0.45)
+		mat.roughness = 0.96
 		mat.metallic = 0.0
-		mat.specular = 0.0
+		mat.specular = 0.06
+		mat.metallic_specular = 0.0
 		mi.material_override = mat
 
 func _build_case2() -> void:
