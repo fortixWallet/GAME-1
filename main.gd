@@ -122,6 +122,7 @@ var desk_intro: Label                # інтро столу — гасне пр
 var dust_quad: MeshInstance3D        # пил на дні ніші (справа 2)
 var c2_intro1: Label                 # вступ справи 2 — гасне з першим банером
 var c2_intro2: Label
+var screw_macro_btn: Button          # макро шурупів — після того, як дошку роздивились
 var hands_glass_btn: Button          # «взяти скло» просто в руках
 var set_down_btn: Button
 var loupe_held := false
@@ -186,7 +187,7 @@ func _ready() -> void:
 	hint_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(hint_label)
 	_build_loupe()
-	_build_menu(); _build_hub(); _build_client(); _build_chapters()
+	_build_menu(); _build_hub(); _build_client(); _build_client2(); _build_screw_macro(); _build_chapters()
 	move_child(hint_label, get_child_count()-1)   # підказки завжди поверх сцен
 	_show("MENU")
 	amb.play()
@@ -1445,7 +1446,7 @@ func _load() -> void:
 	# справа 2 «Спадок удови»
 	for n3 in ["hub_day","hub_day_case","hub_lamp_off","hub_evening","hub_evening_figure","hub_night","hub_darkness","menu_door","client_woman","client_in_room","subtitle_band"]:
 		if ResourceLoader.exists(ART + n3 + ".png"): tex[n3] = load(ART + n3 + ".png")
-	for n2 in ["case2_desk","watch_wear","watch_chain","paper_receipt_1807","reg_page_h","marks_page_vienna","notebook_spread","mark_diana_macro","mark_maker_macro","tool_tray","hand_caliper","hand_screwdriver","hand_rake","wood_page","plain_book_page","dust_floor"]:
+	for n2 in ["case2_desk","watch_wear","watch_chain","paper_receipt_1807","reg_page_h","marks_page_vienna","notebook_spread","mark_diana_macro","mark_maker_macro","tool_tray","hand_caliper","hand_screwdriver","hand_rake","wood_page","plain_book_page","dust_floor","client_vogl","screw_macro"]:
 		if ResourceLoader.exists(ART + n2 + ".png"): tex[n2] = load(ART + n2 + ".png")
 	# опційний арт (додано 24.07): чистий лист клієнтки
 	if ResourceLoader.exists(ART + "letter_client.png"):
@@ -1491,7 +1492,7 @@ func _screen(name: String) -> Control:
 
 # довідникові екрани: відкриття сторінки і Є читанням — правила tool="*"
 # застосовуються самі (закриті чесно відповідають req_say)
-const AUTO_READ := ["BOOK_MARKS", "BOOK_SCREWS", "BOOK_REG", "BOOK_WOOD"]
+const AUTO_READ := ["BOOK_MARKS", "BOOK_SCREWS", "BOOK_REG", "BOOK_WOOD", "SCREW_MACRO"]
 func _auto_read(scr: String) -> void:
 	if scr not in AUTO_READ: return
 	for id in _case_zones():
@@ -1944,6 +1945,8 @@ func _goto(key: String) -> void:
 			seals_set = maxi(seals_set, 1); _show("LEDGER")
 		"case2":
 			_load_case(2); client_seen = true; _show("FURN")
+		"client2":
+			_start_case2()
 		_:
 			_show("MENU")
 
@@ -1968,6 +1971,7 @@ func _build_chapters() -> void:
 			["Evening — the room", "evening"], ["Darkness", "dark"], ["The ledger", "ledger"],
 		]],
 		["CASE 2 · THE SECRETAIRE", 0.565, [
+			["Frau Vogl at the counter", "client2"],
 			["The piece, floor to cornice", "case2"],
 		]],
 	]
@@ -2083,6 +2087,8 @@ func _enter_hub() -> void:
 		_hub_say("Someone is waiting at the door.")
 	elif not case_done:
 		_hub_say("The goblet is on your desk.")
+	elif case_id == 1:
+		_hub_say("The day is done. Sleep would be wise \u2014 the bell rings early in this trade. (the door)")
 	else:
 		_hub_say("The day is done. The ledger lies open on your desk.")
 
@@ -2091,6 +2097,10 @@ func _hub_say(t: String) -> void:
 
 func _hub_door() -> void:
 	if not client_seen: _play("door_bell"); _show("CLIENT")
+	elif case_done and case_id == 1:
+		# ранок наступного дня: друга клієнтка (міст справ 1→2)
+		tod = "day"; lamp_on = true
+		_start_case2()
 	else: _hub_say("The street is empty. The bell will ring again tomorrow.")
 
 func _hub_window() -> void:
@@ -3025,6 +3035,8 @@ func _outcome_text() -> String:
 			if wsum < wmin: continue
 		last_outcome_id = String(oo.get("id", ""))
 		return String(oo.get("text", ""))
+	# правило 17: промах усіх наслідків — це ПОДІЯ, її видно в логу з даними
+	print("OUTCOME_MISS case=", case_id, " cvals=", cvals, " basis=", basis)
 	return "The morning brought nothing that could be set down in the ledger."
 
 var last_outcome_id := ""   # для тестів: який запис ранку зіграв
@@ -3060,6 +3072,75 @@ func _show_morning() -> void:
 # ---------- ГРОСБУХ: кінець справи + ЛІЧИЛЬНИК ПЕЧАТОК (гачок мета-сюжету) ----------
 # ================= СПРАВА 2 «СПАДОК УДОВИ» (два свідчення) =================
 # Річ сама викриває брехуна: знос голівки під ліву руку + свіжі подряпини на вушку.
+const CLIENT2_LINES := [
+	"The bell. A woman in a dark shawl comes in alone; what she brings stands on a cart outside, wrapped in blankets.\n\n\u00abFrau Vogl. I kept house for Herr F. Twenty-two years.\u00bb",
+	"\u00abThe secretaire is mine, by his will. I mean to sell it, and the bureau is to say what it is worth.\u00bb",
+	"\u00abMy son sails on Thursday. The ticket is forty-one gulden and I have nineteen. I am not asking you for a good price. I am asking you for a quick one.\u00bb",
+	"The porters carry it in and set it by the window. She watches the way one watches a room being emptied \u2014 and keeps her right hand inside the shawl.",
+]
+var client2_line := 0
+
+func _build_screw_macro() -> void:
+	# рваний шліц + тріснуте кільце воску — доказ, відданий ОКУ (аудит 27.07);
+	# відкриття екрана і Є розгляданням (AUTO_READ → f.slot_burr)
+	var s3 := _screen("SCREW_MACRO")
+	_paper_backdrop(s3, 0.08)
+	var t: Texture2D = tex.get("screw_macro", null)
+	if t:
+		var mh := H*0.86; var mw := mh*float(t.get_width())/float(t.get_height())
+		var im := TextureRect.new(); im.texture = t; im.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		im.stretch_mode = TextureRect.STRETCH_SCALE; im.size = Vector2(mw, mh)
+		im.position = Vector2(W*0.045, (H-mh)*0.45); im.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		s3.add_child(im)
+	var cap := Label.new(); cap.label_settings = _ls(fr, int(H*0.026), Color(0.90,0.86,0.77))
+	cap.label_settings.shadow_color = Color(0,0,0,0.85); cap.label_settings.shadow_offset = Vector2(1.5,1.5)
+	cap.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	cap.size = Vector2(W*0.30, H*0.7); cap.position = Vector2(W*0.66, H*0.14)
+	cap.text = "Under the strong glass, one head of the four.\n\nThe slot\u2019s near edge is torn, and the metal in the tear is bright \u2014 turned days ago, not years.\n\nAround the head the old wax lies cracked in a ring, broken outward.\n\nThe thread runs even, head to tip. A machine cut this \u2014 no hand before 1846 did."
+	cap.mouse_filter = Control.MOUSE_FILTER_IGNORE; s3.add_child(cap)
+	_txtbtn(s3, "\u2190  step back", Vector2(W*0.04, H*0.92), func(): _show("WELL"))
+
+func _build_client2() -> void:
+	var s2 := _screen("CLIENT2")
+	_paper_backdrop(s2, 0.06)
+	var t: Texture2D = tex.get("client_vogl", null)
+	if t:
+		var ch2 := float(H); var cw2 := ch2*float(t.get_width())/float(t.get_height())
+		var im := TextureRect.new(); im.texture = t; im.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		im.stretch_mode = TextureRect.STRETCH_SCALE; im.size = Vector2(cw2, ch2)
+		im.position = Vector2((W-cw2)*0.5, 0); im.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		s2.add_child(im)
+	_band(s2)
+	var l := Label.new(); l.name = "c2text"; l.label_settings = _ls(fr, int(H*0.030), Color(0.95,0.91,0.82))
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART; l.size = Vector2(W*0.62, H*0.13); l.position = Vector2(W*0.19, H*0.815)
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE; s2.add_child(l)
+	var adv2 := Button.new(); adv2.flat = true; adv2.modulate.a = 0
+	adv2.size = Vector2(W, H); adv2.position = Vector2.ZERO
+	adv2.pressed.connect(func(): _client2_next())
+	s2.add_child(adv2); s2.move_child(adv2, 0)
+	_txtbtn(s2, "go on  →", Vector2(W*0.845, H*0.905), func(): _client2_next(), 0.030)
+
+func _client2_next() -> void:
+	client2_line += 1
+	if client2_line >= CLIENT2_LINES.size():
+		_play("goblet_set")
+		_show("FURN")
+		return
+	_client2_show()
+
+func _client2_show() -> void:
+	if not screens.has("CLIENT2"): _build_client2()
+	var l: Label = screens["CLIENT2"].get_node("c2text")
+	l.text = CLIENT2_LINES[clampi(client2_line, 0, CLIENT2_LINES.size()-1)]
+
+func _start_case2() -> void:
+	_load_case(2)
+	client2_line = 0
+	_client2_show()
+	_play("door_bell")
+	_show("CLIENT2")
+
 func _build_case2() -> void:
 	# СПРАВА 2 «СЕКРЕТЕР» (27.07): три меші Meshy в одному світі; три екрани —
 	# три камери на той самий предмет (FURN загальний 3/4 · WELL писальний відділ
@@ -3093,6 +3174,14 @@ func _build_case2() -> void:
 	bb.scale = Vector3(0.30, 0.30, 0.30)
 	# перед задньою стінкою писального відділу open-моделі, з малим зазором
 	bb.position = Vector3(oa.get_center().x, oa.get_center().y + oa.size.y*0.075, oa.get_center().z - oa.size.z*0.16)
+	# дошка — НЕ сира заготовка: пригасити і потеплити альбедо (аудит: «бліда наклейка»)
+	for bm in bb.find_children("*", "MeshInstance3D", true, false):
+		var bmi := bm as MeshInstance3D
+		var bmat := bmi.get_active_material(0)
+		if bmat is StandardMaterial3D:
+			var bmat2: StandardMaterial3D = (bmat as StandardMaterial3D).duplicate()
+			bmat2.albedo_color = Color(0.82, 0.70, 0.52)
+			bmi.material_override = bmat2
 	sv.add_child(bb); mesh_nodes[&"sec_backboard"] = bb
 	sec_backboard = bb; sec_drawer = drawer
 	# дно ніші: пил і ЧИСТИЙ прямокутник — головний доказ віддано оку, не тексту
@@ -3203,6 +3292,8 @@ func _build_case2() -> void:
 	_txtbtn(screens["FURN"], "Write the certificate  →", Vector2(W*0.05, H*0.862), func(): _show("CERT"))
 	_txtbtn(screens["WELL"], "←  step back", Vector2(W*0.04, H*0.92), func(): _show("FURN"))
 	_txtbtn(screens["WELL"], "✎", Vector2(W*0.945, H*0.055), func(): _show_notebook(), 0.030)
+	screw_macro_btn = _txtbtn(screens["WELL"], "◉  study a screw head up close", Vector2(W*0.60, H*0.135), func(): _show("SCREW_MACRO"))
+	screw_macro_btn.visible = false
 	var sb_btn := _txtbtn(screens["DRAWER"], "←  slide it back", Vector2(W*0.04, H*0.92), func(): _show("FURN"))
 	sb_btn.add_theme_color_override("font_outline_color", Color(0.05,0.04,0.03,0.9))
 	sb_btn.add_theme_constant_override("outline_size", 8)
@@ -3361,6 +3452,8 @@ func _sync_case2_view() -> void:
 		sec_backboard.visible = in_well and zone_states.get(&"z.well.back_board", &"default") != &"open"
 	if dust_quad:
 		dust_quad.visible = in_well and zone_states.get(&"z.well.back_board", &"default") == &"open"
+	if screw_macro_btn:
+		screw_macro_btn.visible = in_well and facts.has("f.board_screwed")
 	if sec_drawer:
 		# шухляда «в руках» існує лише на своєму плані; на FURN вона левітувала
 		# поверх зачиненого корпусу (плейтест 27.07)
