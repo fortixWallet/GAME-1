@@ -3342,10 +3342,12 @@ func _tone_wood(root: Node) -> void:
 			mat = (base as StandardMaterial3D).duplicate()
 		else:
 			mat = StandardMaterial3D.new()
-		mat.albedo_color = Color(0.78, 0.70, 0.62)
-		mat.roughness = 0.72
+		# помаранч гасимо холоднішим множником, лак — нулем блиску (Віктор 29.07:
+		# «дуже яскраво, лак ніби щойно залитий»)
+		mat.albedo_color = Color(0.46, 0.42, 0.42)
+		mat.roughness = 1.0
 		mat.metallic = 0.0
-		mat.specular = 0.22
+		mat.specular = 0.0
 		mi.material_override = mat
 
 func _build_case2() -> void:
@@ -3980,7 +3982,7 @@ func _build_bureau_light(sv: SubViewport, take_key := false, room_color := Color
 	we.environment = env; sv.add_child(we)
 	if furniture:
 		# ТІ САМІ теплі лампи, що працювали, але ключ КИДАЄ МʼЯКУ ТІНЬ
-		var key2 := DirectionalLight3D.new(); key2.light_color = Color(1.0,0.94,0.86); key2.light_energy = 1.55
+		var key2 := DirectionalLight3D.new(); key2.light_color = Color(1.0,0.94,0.86); key2.light_energy = 1.25
 		key2.rotation_degrees = Vector3(-22,-40,0)
 		key2.shadow_enabled = true; key2.directional_shadow_mode = DirectionalLight3D.SHADOW_ORTHOGONAL
 		key2.shadow_blur = 2.0; key2.shadow_bias = 0.06
