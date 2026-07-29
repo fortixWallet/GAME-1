@@ -368,4 +368,6 @@ const T := {
 "Four screws, and the rest of the carcass dowelled. The screwdriver is in the tray.": "Чотири шурупи, а решта корпуса на шкантах. Викрутка лежить у таці.",
 "The recess is open. Low light across its floor would show what has been moved.": "Ніша відкрита. Низьке світло по її дну показало б, що звідти брали.",
 "The screwdriver in hand — four screws hold that board.": "Викрутка в руці — ту дощечку тримають чотири шурупи.",
+"The back board — held by four screws": "Задня дощечка — тримається на чотирьох шурупах",
+"Four screws hold that board, and the rest of the carcass is dowelled. Take the screwdriver from the tray and put it to the board — those screws come out.": "Ту дощечку тримають чотири шурупи, а решта корпуса — на шкантах. Візьми викрутку з таці й притули до дошки — ці шурупи викручуються.",
 }

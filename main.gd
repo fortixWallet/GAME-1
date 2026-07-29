@@ -772,7 +772,7 @@ func _c2_ladder() -> String:
 	if not facts.has("f.ref_screw_points"):
 		return "A screw like that has a date. The chapter on screws is among the papers."
 	if not facts.has("f.board_lifted"):
-		return "Four screws, and the rest of the carcass dowelled. The screwdriver is in the tray."
+		return "Four screws hold that board, and the rest of the carcass is dowelled. Take the screwdriver from the tray and put it to the board — those screws come out."
 	if not facts.has("f.dust_rectangle"):
 		return "The recess is open. Low light across its floor would show what has been moved."
 	return ""
@@ -3403,38 +3403,18 @@ func _build_case2() -> void:
 	drawer.position = Vector3(0.0, -0.35, 0.55)   # висунута з нижньої секції
 	drawer.visible = false
 	sec_pivot.add_child(drawer); mesh_nodes[&"sec_drawer"] = drawer
-	var bb_s: PackedScene = load("res://models/secretaire_backboard.glb")
-	var bb := bb_s.instantiate() as Node3D
-	var oa := _aabb(body_open)
-	bb.scale = Vector3(0.30, 0.30, 0.30)
-	# перед задньою стінкою писального відділу open-моделі, з малим зазором
-	bb.position = Vector3(oa.get_center().x, oa.get_center().y + oa.size.y*0.075, oa.get_center().z - oa.size.z*0.16)
-	# дошка — НЕ сира заготовка: пригасити і потеплити альбедо (аудит: «бліда наклейка»)
-	for bm in bb.find_children("*", "MeshInstance3D", true, false):
-		var bmi := bm as MeshInstance3D
-		var bmat := bmi.get_active_material(0)
-		if bmat is StandardMaterial3D:
-			var bmat2: StandardMaterial3D = (bmat as StandardMaterial3D).duplicate()
-			bmat2.albedo_color = Color(0.82, 0.70, 0.52)
-			bmi.material_override = bmat2
-	var bmesh: MeshInstance3D = null
-	for bm2 in bb.find_children("*", "MeshInstance3D", true, false):
-		bmesh = bm2 as MeshInstance3D; break
-	if bmesh and tex.has("board_face"):
-		# ЛИЦЕ ДОШКИ — суцільна мальована пластина (рецепт foot_plate справи 1):
-		# голим оком — та сама дошка, під склом — рваний шліц і тріснутий віск
-		var bla: AABB = bmesh.get_aabb()
-		var sq := MeshInstance3D.new()
-		var sqm := QuadMesh.new()
-		sqm.size = Vector2(bla.size.x, bla.size.y)
-		sq.mesh = sqm
-		var smat := StandardMaterial3D.new()
-		smat.albedo_texture = tex["board_face"]
-		smat.roughness = 0.95
-		sq.material_override = smat
-		sq.position = Vector3(bla.get_center().x, bla.get_center().y,
-							  bla.end.z + bla.size.z*0.10)
-		bmesh.add_child(sq)
+	# ЗАДНЯ ДОЩЕЧКА: мальована панель (board_face) на місці зони кліку — великі
+	# латунні шурупи зі шліцами читаються як шурупи, а не як цвяхи (Віктор 29.07)
+	var bb := MeshInstance3D.new()
+	var bqm := QuadMesh.new(); bqm.size = Vector2(0.79, 0.56)
+	bb.mesh = bqm
+	if tex.has("board_face"):
+		var bmat3 := StandardMaterial3D.new()
+		bmat3.albedo_texture = tex["board_face"]
+		bmat3.roughness = 0.95; bmat3.specular = 0.05; bmat3.metallic = 0.0
+		bb.material_override = bmat3
+	bb.position = Vector3(0.03, -0.038, -0.030)
+	bb.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	sec_pivot.add_child(bb); mesh_nodes[&"sec_backboard"] = bb
 	sec_backboard = bb; sec_drawer = drawer
 	# дно ніші: пил і ЧИСТИЙ прямокутник — головний доказ віддано оку, не тексту
@@ -3697,7 +3677,6 @@ func _unscrew_board() -> void:
 	tw.parallel().tween_property(b, "rotation:x", -0.35, 0.45)
 	tw.tween_callback(func():
 		_play("goblet_set")
-		b.visible = false
 		b.position = p0; b.rotation.x = 0.0
 		_sync_case2_view()
 		_reveal_recess())
@@ -3777,9 +3756,16 @@ func _sync_case2_view() -> void:
 	if sec_backboard:
 		# при open дошку ховає САМА анімація викручування (не стан) — інакше вона
 		# зникала б миттєво, і гравець не бачив би, як її знімають
-		sec_backboard.visible = in_well and zone_states.get(&"z.well.back_board", &"default") != &"open"
+		# після викручування панель не зникає (з-під неї визирала б запечена дошка
+		# меша), а СТАЄ нішею: та сама площина, інша мальована поверхня
+		sec_backboard.visible = in_well
+		var opened2: bool = zone_states.get(&"z.well.back_board", &"default") == &"open"
+		var want_tex := "dust_floor" if opened2 else "board_face"
+		var bm3 := sec_backboard.material_override as StandardMaterial3D
+		if bm3 and tex.has(want_tex) and bm3.albedo_texture != tex[want_tex]:
+			bm3.albedo_texture = tex[want_tex]
 	if dust_quad:
-		dust_quad.visible = in_well and zone_states.get(&"z.well.back_board", &"default") == &"open"
+		dust_quad.visible = false
 
 	if sec_drawer:
 		# шухляда «в руках» існує лише на своєму плані; на FURN вона левітувала

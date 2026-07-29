@@ -32,9 +32,9 @@ const ZONES := {
 	# --- писальний відділ (дошка відкинута): екран WELL ---
 	&"z.well.back_board": {
 		"kind": &"mesh", "screen": &"WELL", "node": &"sec_body",
-		"at": Vector3(0.0, 0.185, -0.05), "facing": Vector3(0, 0.2, 1),
-		"r": 0.105, "facing_min": 0.08,
-		"hint": "The back board of the writing well",
+		"at": Vector3(0.03, -0.038, -0.03), "facing": Vector3(0, 0, 1),
+		"r": 0.30, "facing_min": 0.08,
+		"hint": "The back board — held by four screws",
 		"tools": [&"tool.eye", &"tool.loupe", &"tool.screwdriver"],
 	},
 	&"z.void.lining": {
