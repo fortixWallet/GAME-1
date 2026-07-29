@@ -125,6 +125,8 @@ var dust_quad: MeshInstance3D        # пил на дні ніші (справа
 var c2_intro1: Label                 # вступ справи 2 — гасне з першим банером
 var c2_intro2: Label
 var sec_fallfront: Node3D             # відкидна дошка — окрема рухома деталь
+var ff_open := false                  # чи вже відкинуто
+var ff_hinge: Node3D                  # вузол-завіса: навколо нього відкидається дошка
 var goblet_world: World3D            # світ чаші (справа 1) для лупи
 var sec_world: World3D               # світ секретера (справа 2) для лупи
 var c2_loupe := false                # скло активне на екранах справи 2
@@ -3224,7 +3226,7 @@ func _client2_show() -> void:
 
 func _start_case2() -> void:
 	_load_case(2)
-	_c2_seen = false; sec_yaw = 0.0
+	_c2_seen = false; sec_yaw = 0.0; ff_open = false
 	if sec_pivot: sec_pivot.rotation.y = 0.0
 	client2_line = 0
 	_client2_show()
@@ -3430,8 +3432,13 @@ func _build_case2() -> void:
 		_fit_mm(ff, 1040.0)
 		_tone_wood(ff)
 		ff.scale.y *= 0.18                          # дошка, а не стільниця: ~25 мм
-		ff.rotation_degrees = Vector3(0, 0, 0)
-		ff.position = Vector3(0.0, -0.02, 0.20)     # відкинута на завісі, писальна поверхня
+		var ffa := _aabb(ff)
+		ff_hinge = Node3D.new()
+		ff_hinge.position = Vector3(0.0, -0.03, 0.02)   # лінія завіси: низ фасаду
+		sec_pivot.add_child(ff_hinge)
+		sec_pivot.remove_child(ff); ff_hinge.add_child(ff)
+		ff.position = Vector3(0.0, 0.0, ffa.size.z * 0.5)   # дошка попереду завіси
+		ff.rotation_degrees = Vector3.ZERO
 		mesh_nodes[&"sec_fallfront"] = ff
 		sec_fallfront = ff
 	var pan_s: PackedScene = load("res://models/sec_panel_v3.glb")
@@ -3554,7 +3561,7 @@ func _build_case2() -> void:
 	# навігація: план → деталь і назад (режисура: без стрибків повз середній план)
 	# ряд інструментів — на всіх трьох планах предмета; ОДИН вузол tool_row
 	# переїжджає між екранами при _sync_case2_view (як контейнер вьюпорта)
-	_txtbtn(screens["FURN"], "the writing well  →", Vector2(W*0.40, H*0.92), func(): _show("WELL"))
+	_txtbtn(screens["FURN"], "the writing well  →", Vector2(W*0.40, H*0.92), func(): _open_fallfront())
 	_txtbtn(screens["FURN"], "take the drawer out  →", Vector2(W*0.64, H*0.92), func():
 		# шухляда вже висунута (стан out) — кнопка ВЕДЕ до неї, а не мовчить
 		# (плейтест 27.07: після «slide it back» правило вже віддане, і клік
@@ -3688,6 +3695,22 @@ func _refresh_tray_marks() -> void:
 # працювати»): дошка здригається на кожному шурупі, тоді відходить уперед,
 # опускається і зникає — і аж тоді камера входить у відкриту нішу.
 # ШУХЛЯДА ВИЇЖДЖАЄ ЗІ СВОГО ГНІЗДА (правило 18) — видимий рух, не телепорт
+# Відкидна дошка опускається на завісі НА ОЧАХ, і тільки тоді камера в'їжджає
+# в колодязь (Віктор 29.07: «він мав би відкриватись і досліджуватись»).
+func _open_fallfront() -> void:
+	if sec_fallfront == null or ff_open:
+		_show("WELL"); return
+	ff_open = true
+	sec_fallfront.visible = true
+	if ff_hinge == null:
+		_show("WELL"); return
+	ff_hinge.rotation_degrees = Vector3(78, 0, 0)   # зачинена: піднята до фасаду
+	_play("goblet_set")
+	var tw := create_tween()
+	tw.tween_property(ff_hinge, "rotation_degrees", Vector3(0, 0, 0), 0.9) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.tween_callback(func(): _show("WELL"))
+
 func _slide_drawer_out() -> void:
 	if sec_drawer == null: return
 	sec_drawer.visible = true
@@ -3790,7 +3813,7 @@ func _sync_case2_view() -> void:
 	if sec_body_open: sec_body_open.visible = in_well
 	# знімна дощечка живе в нутрі open-стану; відкручена — зникає, ніша відкрита
 	var board_open: bool = zone_states.get(&"z.well.back_board", &"default") == &"open"
-	if sec_fallfront: sec_fallfront.visible = in_well
+	if ff_hinge: ff_hinge.visible = in_well or ff_open
 	if sec_backboard:
 		sec_backboard.visible = in_well and not board_open
 	if dust_quad:
