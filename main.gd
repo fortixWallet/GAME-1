@@ -3403,18 +3403,41 @@ func _build_case2() -> void:
 	drawer.position = Vector3(0.0, -0.35, 0.55)   # висунута з нижньої секції
 	drawer.visible = false
 	sec_pivot.add_child(drawer); mesh_nodes[&"sec_drawer"] = drawer
-	# ЗАДНЯ ДОЩЕЧКА: мальована панель (board_face) на місці зони кліку — великі
-	# латунні шурупи зі шліцами читаються як шурупи, а не як цвяхи (Віктор 29.07)
+	# ЗАДНЯ ДОЩЕЧКА — ОБ'ЄМНА ДЕТАЛЬ (правило 18, урок «лупа втоплена в стіл»):
+	# плита з товщиною, що ВТОПЛЕНА в отвір і кидає тінь, а не пласка наклейка.
+	# За нею — глибина ніші, тому знята дошка відкриває справжню дірку.
+	var recess := MeshInstance3D.new()          # нутро ніші: видно, коли дошку знято
+	var rqm := QuadMesh.new(); rqm.size = Vector2(0.60, 0.40)
+	recess.mesh = rqm
+	if tex.has("dust_floor"):
+		var rmat2 := StandardMaterial3D.new()
+		rmat2.albedo_texture = tex["dust_floor"]
+		rmat2.roughness = 1.0; rmat2.specular = 0.0
+		recess.material_override = rmat2
+	recess.position = Vector3(0.03, -0.038, -0.115)   # ГЛИБШЕ за площину дошки
+	recess.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	sec_pivot.add_child(recess); dust_quad = recess
+	# плита дає ТОВЩИНУ і тінь (торці — просте дерево), лице — мальоване
 	var bb := MeshInstance3D.new()
-	var bqm := QuadMesh.new(); bqm.size = Vector2(0.79, 0.56)
-	bb.mesh = bqm
+	var bbm := BoxMesh.new(); bbm.size = Vector3(0.62, 0.425, 0.022)
+	bb.mesh = bbm
+	var edge_mat := StandardMaterial3D.new()
+	edge_mat.albedo_color = Color(0.74, 0.66, 0.52)   # торець бука
+	edge_mat.roughness = 1.0; edge_mat.specular = 0.0
+	bb.material_override = edge_mat
+	bb.position = Vector3(0.03, -0.038, -0.055)
+	bb.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+	var face := MeshInstance3D.new()
+	var fqm := QuadMesh.new(); fqm.size = Vector2(0.62, 0.425)
+	face.mesh = fqm
 	if tex.has("board_face"):
-		var bmat3 := StandardMaterial3D.new()
-		bmat3.albedo_texture = tex["board_face"]
-		bmat3.roughness = 0.95; bmat3.specular = 0.05; bmat3.metallic = 0.0
-		bb.material_override = bmat3
-	bb.position = Vector3(0.03, -0.038, -0.030)
-	bb.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		var fmat := StandardMaterial3D.new()
+		fmat.albedo_texture = tex["board_face"]
+		fmat.roughness = 0.95; fmat.specular = 0.05; fmat.metallic = 0.0
+		face.material_override = fmat
+	face.position = Vector3(0, 0, 0.0115)             # рівно на лицьовій грані плити
+	face.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	bb.add_child(face)
 	sec_pivot.add_child(bb); mesh_nodes[&"sec_backboard"] = bb
 	sec_backboard = bb; sec_drawer = drawer
 	# дно ніші: пил і ЧИСТИЙ прямокутник — головний доказ віддано оку, не тексту
@@ -3677,6 +3700,7 @@ func _unscrew_board() -> void:
 	tw.parallel().tween_property(b, "rotation:x", -0.35, 0.45)
 	tw.tween_callback(func():
 		_play("goblet_set")
+		b.visible = false
 		b.position = p0; b.rotation.x = 0.0
 		_sync_case2_view()
 		_reveal_recess())
@@ -3753,19 +3777,11 @@ func _sync_case2_view() -> void:
 	if sec_body_closed: sec_body_closed.visible = on_c2 and not in_well
 	if sec_body_open: sec_body_open.visible = in_well
 	# знімна дощечка живе в нутрі open-стану; відкручена — зникає, ніша відкрита
+	var board_open: bool = zone_states.get(&"z.well.back_board", &"default") == &"open"
 	if sec_backboard:
-		# при open дошку ховає САМА анімація викручування (не стан) — інакше вона
-		# зникала б миттєво, і гравець не бачив би, як її знімають
-		# після викручування панель не зникає (з-під неї визирала б запечена дошка
-		# меша), а СТАЄ нішею: та сама площина, інша мальована поверхня
-		sec_backboard.visible = in_well
-		var opened2: bool = zone_states.get(&"z.well.back_board", &"default") == &"open"
-		var want_tex := "dust_floor" if opened2 else "board_face"
-		var bm3 := sec_backboard.material_override as StandardMaterial3D
-		if bm3 and tex.has(want_tex) and bm3.albedo_texture != tex[want_tex]:
-			bm3.albedo_texture = tex[want_tex]
+		sec_backboard.visible = in_well and not board_open
 	if dust_quad:
-		dust_quad.visible = false
+		dust_quad.visible = in_well          # нутро видно завжди, дошка його затуляє
 
 	if sec_drawer:
 		# шухляда «в руках» існує лише на своєму плані; на FURN вона левітувала
