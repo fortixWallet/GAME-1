@@ -126,6 +126,8 @@ var c2_intro1: Label                 # вступ справи 2 — гасне 
 var c2_intro2: Label
 var sec_fallfront: Node3D             # відкидна дошка — окрема рухома деталь
 var sec_doors: Array = []             # дверцята верхньої секції (завіси по краях)
+var bright_veil: ColorRect            # шар яскравості поверх усього
+var settings_prev := ""
 var doors_open := false
 var ff_open := false                  # чи вже відкинуто
 var ff_hinge: Node3D                  # вузол-завіса: навколо нього відкидається дошка
@@ -210,9 +212,18 @@ func _ready() -> void:
 	hint_label.label_settings.shadow_offset = Vector2(1.5, 1.5)
 	hint_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(hint_label)
+	# шар яскравості — поверх усього, крізь нього не клікають
+	bright_veil = ColorRect.new(); bright_veil.name = "bright_veil"
+	bright_veil.color = Color(0,0,0,0); bright_veil.size = Vector2(W, H)
+	bright_veil.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(bright_veil)
+	_load_opt()
 	_build_loupe()
 	_build_menu(); _build_hub(); _build_client(); _build_client2(); _build_chapters()
 	move_child(hint_label, get_child_count()-1)   # підказки завжди поверх сцен
+	_build_settings()
+	_apply_opt()
+	move_child(bright_veil, get_child_count()-1)
 	_show("MENU")
 	amb.play()
 	# ЗНІМКИ МУСЯТЬ БУТИ ОДНОГО РОЗМІРУ. Вікно стоїть у режимі 2 (розгорнуте), тому кадр
@@ -520,6 +531,10 @@ func _pickup_loupe() -> void:
 # F2 = редактор розкладки · правий клік = «покласти назад»
 func _input(event: InputEvent) -> void:
 	if dbg_mode: return
+	if event is InputEventKey and (event as InputEventKey).pressed and (event as InputEventKey).keycode == KEY_ESCAPE:
+		if _shown() == "SETTINGS": _close_settings()
+		else: _open_settings()
+		get_viewport().set_input_as_handled(); return
 	if event is InputEventKey and (event as InputEventKey).pressed and (event as InputEventKey).keycode == KEY_F1:
 		if loupe_held: _drop_loupe()
 		_show("CHAPTERS"); get_viewport().set_input_as_handled(); return
@@ -792,7 +807,7 @@ func _process(_delta: float) -> void:
 		if facts.size() != last_fact_count:
 			last_fact_count = facts.size(); idle_t = 0.0
 		idle_t += _delta
-		if idle_t > 12.0:
+		if idle_t > (12.0 if int(opt["hints"]) == 2 else 30.0) and int(opt["hints"]) > 0:
 			idle_t = 0.0
 			var step := _c2_ladder()
 			if step != "": _set_hint(step)
@@ -2422,6 +2437,128 @@ func _load_game() -> bool:
 	_refresh_tool_row(); _sync_view()
 	return true
 
+# ── НАЛАШТУВАННЯ ГРАВЦЯ ────────────────────────────────────────────────────
+# Склад за практикою жанру: мова · екран · яскравість · РОЗМІР ТЕКСТУ (у нас
+# гра текстова, це головна доступність) · гучності · драбина підказок.
+const CFG_PATH := "user://settings.cfg"
+var opt := {
+	"lang": "uk", "window": 2, "brightness": 1.0, "text_scale": 1.0,
+	"vol_master": 0.9, "vol_ambient": 0.55, "vol_sfx": 0.9,
+	"hints": 1, "band": 0.88,
+}
+
+func _build_settings() -> void:
+	var s := _screen("SETTINGS")
+	_paper_backdrop(s, 0.12)
+	var head := Label.new(); head.label_settings = _ls(fb, int(H*0.040), Color(0.90,0.86,0.77))
+	head.text = _t("Settings"); head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	head.size = Vector2(W, H*0.06); head.position = Vector2(0, H*0.055)
+	head.mouse_filter = Control.MOUSE_FILTER_IGNORE; s.add_child(head)
+	_txtbtn(s, "←  back", Vector2(W*0.04, H*0.92), func(): _close_settings())
+	_refresh_settings()
+
+# один рядок налаштування: підпис ліворуч, значення і стрілки праворуч
+func _opt_row(s: Control, y: float, label: String, value: String,
+			  on_prev: Callable, on_next: Callable) -> void:
+	var l := Label.new(); l.label_settings = _ls(fr, int(H*0.028*float(opt["text_scale"])), Color(0.88,0.83,0.72))
+	l.text = _t(label); l.position = Vector2(W*0.16, H*y)
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE; s.add_child(l)
+	var v := Label.new(); v.label_settings = _ls(fh, int(H*0.030*float(opt["text_scale"])), Color(0.95,0.80,0.45))
+	v.text = value; v.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	v.size = Vector2(W*0.22, H*0.05); v.position = Vector2(W*0.56, H*(y-0.004))
+	v.mouse_filter = Control.MOUSE_FILTER_IGNORE; s.add_child(v)
+	_txtbtn(s, "‹", Vector2(W*0.525, H*(y-0.006)), on_prev, 0.032)
+	_txtbtn(s, "›", Vector2(W*0.795, H*(y-0.006)), on_next, 0.032)
+
+func _refresh_settings() -> void:
+	if not screens.has("SETTINGS"): return
+	var s: Control = screens["SETTINGS"]
+	for c in s.get_children():
+		if c is Label or c is Button: c.queue_free()
+	var head := Label.new(); head.label_settings = _ls(fb, int(H*0.040), Color(0.90,0.86,0.77))
+	head.text = _t("Settings"); head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	head.size = Vector2(W, H*0.06); head.position = Vector2(0, H*0.055)
+	head.mouse_filter = Control.MOUSE_FILTER_IGNORE; s.add_child(head)
+	var y := 0.19
+	var step := 0.072
+	# мова
+	_opt_row(s, y, "Language", "Українська" if opt["lang"] == "uk" else "English",
+		func(): _cycle_lang(-1), func(): _cycle_lang(1)); y += step
+	# екран
+	var wnames := ["Windowed", "Borderless", "Fullscreen"]
+	_opt_row(s, y, "Screen", _t(wnames[int(opt["window"])]),
+		func(): _cycle_int("window", -1, 0, 2), func(): _cycle_int("window", 1, 0, 2)); y += step
+	# яскравість
+	_opt_row(s, y, "Brightness", "%d%%" % int(float(opt["brightness"])*100),
+		func(): _cycle_f("brightness", -0.1, 0.5, 1.5), func(): _cycle_f("brightness", 0.1, 0.5, 1.5)); y += step
+	# розмір тексту — головна доступність текстової гри
+	_opt_row(s, y, "Text size", "%d%%" % int(float(opt["text_scale"])*100),
+		func(): _cycle_f("text_scale", -0.1, 0.8, 1.6), func(): _cycle_f("text_scale", 0.1, 0.8, 1.6)); y += step
+	# підкладка під підказками (читабельність на строкатому кадрі)
+	_opt_row(s, y, "Caption background", "%d%%" % int(float(opt["band"])*100),
+		func(): _cycle_f("band", -0.1, 0.0, 1.0), func(): _cycle_f("band", 0.1, 0.0, 1.0)); y += step
+	# звук
+	_opt_row(s, y, "Master volume", "%d%%" % int(float(opt["vol_master"])*100),
+		func(): _cycle_f("vol_master", -0.1, 0.0, 1.0), func(): _cycle_f("vol_master", 0.1, 0.0, 1.0)); y += step
+	_opt_row(s, y, "Room sound", "%d%%" % int(float(opt["vol_ambient"])*100),
+		func(): _cycle_f("vol_ambient", -0.1, 0.0, 1.0), func(): _cycle_f("vol_ambient", 0.1, 0.0, 1.0)); y += step
+	_opt_row(s, y, "Effects", "%d%%" % int(float(opt["vol_sfx"])*100),
+		func(): _cycle_f("vol_sfx", -0.1, 0.0, 1.0), func(): _cycle_f("vol_sfx", 0.1, 0.0, 1.0)); y += step
+	# драбина підказок
+	var hnames := ["Off", "Rare", "Often"]
+	_opt_row(s, y, "Hints", _t(hnames[int(opt["hints"])]),
+		func(): _cycle_int("hints", -1, 0, 2), func(): _cycle_int("hints", 1, 0, 2))
+	_txtbtn(s, "←  back", Vector2(W*0.04, H*0.92), func(): _close_settings())
+
+func _cycle_lang(d: int) -> void:
+	opt["lang"] = "en" if opt["lang"] == "uk" else "uk"
+	_apply_opt(); _save_opt(); _refresh_settings(); _play("ui_soft")
+
+func _cycle_int(key: String, d: int, lo: int, hi: int) -> void:
+	opt[key] = clampi(int(opt[key]) + d, lo, hi)
+	_apply_opt(); _save_opt(); _refresh_settings(); _play("ui_soft")
+
+func _cycle_f(key: String, d: float, lo: float, hi: float) -> void:
+	opt[key] = snappedf(clampf(float(opt[key]) + d, lo, hi), 0.05)
+	_apply_opt(); _save_opt(); _refresh_settings(); _play("ui_soft")
+
+func _open_settings() -> void:
+	if not screens.has("SETTINGS"): _build_settings()
+	settings_prev = _shown()
+	_refresh_settings()
+	_show("SETTINGS")
+
+func _close_settings() -> void:
+	_show(settings_prev if settings_prev != "" and settings_prev != "SETTINGS" else "MENU")
+
+func _load_opt() -> void:
+	var c := ConfigFile.new()
+	if c.load(CFG_PATH) != OK: return
+	for k in opt: opt[k] = c.get_value("game", k, opt[k])
+
+func _save_opt() -> void:
+	var c := ConfigFile.new()
+	for k in opt: c.set_value("game", k, opt[k])
+	c.save(CFG_PATH)
+
+func _apply_opt() -> void:
+	lang = String(opt["lang"])
+	# вікно: 0 вікно · 1 без рамки · 2 на весь екран
+	match int(opt["window"]):
+		0: DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
+		1: DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
+		2: DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN)
+	if bright_veil:
+		var b: float = float(opt["brightness"])
+		bright_veil.color = Color(0, 0, 0, clampf((1.0 - b) * 0.9, 0.0, 0.75)) if b < 1.0 \
+			else Color(1, 1, 1, clampf((b - 1.0) * 0.35, 0.0, 0.3))
+	AudioServer.set_bus_volume_db(0, linear_to_db(maxf(float(opt["vol_master"]), 0.001)))
+	if amb: amb.volume_db = linear_to_db(maxf(float(opt["vol_ambient"]), 0.001)) - 8.0
+	for k2 in aud: (aud[k2] as AudioStreamPlayer).volume_db = linear_to_db(maxf(float(opt["vol_sfx"]), 0.001))
+	if hint_band: hint_band.modulate.a = float(opt["band"])
+	if hint_label:
+		hint_label.label_settings.font_size = int(H * 0.030 * float(opt["text_scale"]))
+
 func _show_notebook() -> void:
 	if _shown() != "NOTEBOOK": notebook_prev = _shown()
 	_refresh_notebook()
@@ -3479,12 +3616,13 @@ func _build_case2() -> void:
 	# КРИШКА (креслення §2 п.2): 1010×420×24, завіса по нижньому краю
 	if ResourceLoader.exists("res://models/part_lid.glb"):
 		var pair := _hinged("res://models/part_lid.glb", 1010.0,
-			_mm(0, -55, 232),          # точка стику (завіса)
+			_mm(0, 210, 260),          # точка стику: нижній край ПРОРІЗУ
 			_mm(0, 0, 210),            # деталь попереду завіси на пів-глибини
 			Vector3(68, 0, 0))         # ЗАЧИНЕНА: похило вгору-назад
 		ff_hinge = pair[0]
 		var ff: Node3D = pair[1]
 		ff.scale.y *= 0.40             # товщина під 24 мм
+		ff.scale.z *= 1.38             # глибина: у закритому стані перекриває весь проріз
 		mesh_nodes[&"sec_fallfront"] = ff
 		sec_fallfront = ff
 	var bb := _part("res://models/sec_panel_v3.glb", 365.0, sec_pivot)
