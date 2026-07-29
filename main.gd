@@ -124,6 +124,7 @@ var desk_intro: Label                # інтро столу — гасне пр
 var dust_quad: MeshInstance3D        # пил на дні ніші (справа 2)
 var c2_intro1: Label                 # вступ справи 2 — гасне з першим банером
 var c2_intro2: Label
+var sec_fallfront: Node3D             # відкидна дошка — окрема рухома деталь
 var goblet_world: World3D            # світ чаші (справа 1) для лупи
 var sec_world: World3D               # світ секретера (справа 2) для лупи
 var c2_loupe := false                # скло активне на екранах справи 2
@@ -3419,6 +3420,20 @@ func _build_case2() -> void:
 	# ЗАДНЯ ДОЩЕЧКА — ОКРЕМА МОДЕЛЬ (правило 18): дошка з товщиною і об'ємними
 	# латунними шурупами, підігнана по ширині 400 мм і посаджена в СПРАВЖНІЙ
 	# отвір корпуса. Знімається викруткою — за нею порожнина самого корпуса.
+	# ВІДКИДНА ДОШКА — окрема деталь: у розкритому стані лежить відкинутою на
+	# завісі (писальна поверхня), а не зникає (Віктор 29.07: «не хватає
+	# передньої кришки, яку в теорії треба буде зняти»)
+	if ResourceLoader.exists("res://models/sec_fallfront.glb"):
+		var ff_s: PackedScene = load("res://models/sec_fallfront.glb")
+		var ff := ff_s.instantiate() as Node3D
+		sec_pivot.add_child(ff)
+		_fit_mm(ff, 1040.0)
+		_tone_wood(ff)
+		ff.scale.y *= 0.18                          # дошка, а не стільниця: ~25 мм
+		ff.rotation_degrees = Vector3(0, 0, 0)
+		ff.position = Vector3(0.0, -0.02, 0.20)     # відкинута на завісі, писальна поверхня
+		mesh_nodes[&"sec_fallfront"] = ff
+		sec_fallfront = ff
 	var pan_s: PackedScene = load("res://models/sec_panel_v3.glb")
 	var bb := pan_s.instantiate() as Node3D
 	sec_pivot.add_child(bb)
@@ -3775,6 +3790,7 @@ func _sync_case2_view() -> void:
 	if sec_body_open: sec_body_open.visible = in_well
 	# знімна дощечка живе в нутрі open-стану; відкручена — зникає, ніша відкрита
 	var board_open: bool = zone_states.get(&"z.well.back_board", &"default") == &"open"
+	if sec_fallfront: sec_fallfront.visible = in_well
 	if sec_backboard:
 		sec_backboard.visible = in_well and not board_open
 	if dust_quad:
