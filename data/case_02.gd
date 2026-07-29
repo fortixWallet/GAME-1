@@ -22,10 +22,17 @@ const ZONES := {
 		"hint": "The keyhole escutcheon",
 		"tools": [&"tool.loupe", &"tool.eye"],
 	},
+	&"z.sec.fallfront": {
+		"kind": &"mesh", "screen": &"FURN", "node": &"sec_body",
+		"at": Vector3(0.0, 0.20, 0.16), "facing": Vector3(0, 0.6, 1),
+		"r": 0.26, "facing_min": 0.04,
+		"hint": "The fall-front — it lets down into a writing surface",
+		"tools": [&"tool.hand", &"tool.eye"],
+	},
 	&"z.sec.drawer_front": {
 		"kind": &"mesh", "screen": &"FURN", "node": &"sec_body",
-		"at": Vector3(0.0, -0.25, 0.32), "facing": Vector3(0, 0, 1),
-		"r": 0.26, "facing_min": 0.10,
+		"at": Vector3(0.0, -0.22, 0.30), "facing": Vector3(0, 0, 1),
+		"r": 0.24, "facing_min": 0.06,
 		"hint": "The long drawer",
 		"tools": [&"tool.hand", &"tool.eye"],
 	},
@@ -87,6 +94,8 @@ const ZONES := {
 }
 
 const RULES := [
+	{"zone": &"z.sec.fallfront", "tool": &"tool.hand", "sets_flag": {&"ff_toggle": true},
+	 "say": "The fall-front lets down on its hinges; the writing well stands open."},
 	{"zone": &"z.sec.drawer_front", "tool": &"tool.hand",
 	 "sets_state": {&"z.sec.drawer_front": &"out"}, "screen": &"DRAWER",
 	 "say": "The drawer comes out whole and rides up into both hands."},

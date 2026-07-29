@@ -370,4 +370,9 @@ const T := {
 "The screwdriver in hand — four screws hold that board.": "Викрутка в руці — ту дощечку тримають чотири шурупи.",
 "The back board — held by four screws": "Задня дощечка — тримається на чотирьох шурупах",
 "Four screws hold that board, and the rest of the carcass is dowelled. Take the screwdriver from the tray and put it to the board — those screws come out.": "Ту дощечку тримають чотири шурупи, а решта корпуса — на шкантах. Візьми викрутку з таці й притули до дошки — ці шурупи викручуються.",
+"The fall-front — it lets down into a writing surface": "Відкидна кришка — опускається писальною поверхнею",
+"The fall-front lets down on its hinges; the writing well stands open.": "Кришка опускається на завісах; письмовий колодязь відкрито.",
+"The fall-front closes; the piece stands as it came in.": "Кришка зачиняється; річ стоїть, як її принесли.",
+"The long drawer rides out on its runners.": "Довга шухляда виїжджає по своїх полозках.",
+"The drawer slides home.": "Шухляда засувається на місце.",
 }

@@ -127,6 +127,11 @@ var c2_intro2: Label
 var sec_fallfront: Node3D             # відкидна дошка — окрема рухома деталь
 var ff_open := false                  # чи вже відкинуто
 var ff_hinge: Node3D                  # вузол-завіса: навколо нього відкидається дошка
+var ff_busy := false
+var drawer_out := false
+var drawer_busy := false
+var drawer_pos_in := Vector3.ZERO
+var drawer_pos_out := Vector3.ZERO
 var goblet_world: World3D            # світ чаші (справа 1) для лупи
 var sec_world: World3D               # світ секретера (справа 2) для лупи
 var c2_loupe := false                # скло активне на екранах справи 2
@@ -3338,6 +3343,22 @@ func _refresh_section() -> void:
 # альбедо в теплий горіх і збиваємо дзеркальність, щоб нутро було рівня фасаду
 # Масштабує модель так, щоб її ШИРИНА дорівнювала заданій у міліметрах, і
 # ставить її початок координат у центр (0,0,0) власного габариту.
+# Деталь у тримачі: модель підігнана за мм і центрована ВСЕРЕДИНІ, рухається
+# тримач. Інакше моє ж центрування губилось при заданні позиції (баг 29.07).
+func _part(path: String, width_mm: float, parent: Node) -> Node3D:
+	var holder := Node3D.new()
+	parent.add_child(holder)
+	var inst := (load(path) as PackedScene).instantiate() as Node3D
+	holder.add_child(inst)
+	var a := _aabb(inst)
+	if a.size.x > 0.0:
+		var k: float = (width_mm * 0.001) / a.size.x
+		inst.scale = Vector3(k, k, k)
+	var a2 := _aabb(inst)
+	inst.position -= a2.get_center()      # центр деталі — у початку тримача
+	_tone_wood(inst)
+	return holder
+
 func _fit_mm(node: Node3D, width_mm: float) -> AABB:
 	var a := _aabb(node)
 	if a.size.x <= 0.0: return a
@@ -3398,7 +3419,7 @@ func _build_case2() -> void:
 	# ПІВОТ: усі частини секретера — діти одного вузла, щоб оберт від
 	# перетягування крутив ЦІЛУ річ як предмет у руках (правило 18)
 	sec_pivot = Node3D.new(); sv.add_child(sec_pivot)
-	var body_s: PackedScene = load("res://models/secretaire_body.glb")
+	var body_s: PackedScene = load("res://models/sec_carcass_v3.glb")
 	var body := body_s.instantiate() as Node3D
 	sec_pivot.add_child(body); mesh_nodes[&"sec_body"] = body
 	_tone_wood(body)
@@ -3413,12 +3434,11 @@ func _build_case2() -> void:
 	sec_pivot.add_child(body_open); mesh_nodes[&"sec_open"] = body_open
 	sec_body_closed = body; sec_body_open = body_open
 	# нормування: корпус ~1.9 h у метрах моделі — ставимо в нуль, камери від нього
-	var drawer_s: PackedScene = load("res://models/secretaire_drawer.glb")
-	var drawer := drawer_s.instantiate() as Node3D
-	drawer.scale = Vector3(0.55, 0.55, 0.55)
-	drawer.position = Vector3(0.0, -0.35, 0.55)   # висунута з нижньої секції
-	drawer.visible = false
-	sec_pivot.add_child(drawer); mesh_nodes[&"sec_drawer"] = drawer
+	var drawer := _part("res://models/secretaire_drawer.glb", 950.0, sec_pivot)
+	mesh_nodes[&"sec_drawer"] = drawer
+	drawer_pos_in = Vector3(0.0, -0.20, 0.20)
+	drawer_pos_out = Vector3(0.0, -0.20, 0.62)
+	drawer.position = drawer_pos_in
 	# ЗАДНЯ ДОЩЕЧКА — ОКРЕМА МОДЕЛЬ (правило 18): дошка з товщиною і об'ємними
 	# латунними шурупами, підігнана по ширині 400 мм і посаджена в СПРАВЖНІЙ
 	# отвір корпуса. Знімається викруткою — за нею порожнина самого корпуса.
@@ -3426,36 +3446,20 @@ func _build_case2() -> void:
 	# завісі (писальна поверхня), а не зникає (Віктор 29.07: «не хватає
 	# передньої кришки, яку в теорії треба буде зняти»)
 	if ResourceLoader.exists("res://models/sec_fallfront.glb"):
-		var ff_s: PackedScene = load("res://models/sec_fallfront.glb")
-		var ff := ff_s.instantiate() as Node3D
-		sec_pivot.add_child(ff)
-		_fit_mm(ff, 1040.0)
-		_tone_wood(ff)
-		ff.scale.y *= 0.18                          # дошка, а не стільниця: ~25 мм
-		var ffa := _aabb(ff)
 		ff_hinge = Node3D.new()
-		ff_hinge.position = Vector3(0.0, -0.03, 0.02)   # лінія завіси: низ фасаду
+		ff_hinge.position = Vector3(0.0, -0.03, 0.26)  # передній край писальної поверхні
 		sec_pivot.add_child(ff_hinge)
-		sec_pivot.remove_child(ff); ff_hinge.add_child(ff)
-		ff.position = Vector3(0.0, 0.0, ffa.size.z * 0.5)   # дошка попереду завіси
-		ff.rotation_degrees = Vector3.ZERO
+		var ff := _part("res://models/sec_fallfront.glb", 1040.0, ff_hinge)
+		# ВИМІРЯНО: модель лежить горизонтально 1040 × 490, товщина 130 мм
+		ff.scale.y *= 0.19                       # товщина 25 мм
+		var ffd: float = _aabb(ff).size.z
+		ff.position = Vector3(0.0, 0.0, -ffd * 0.5)   # дошка йде НАЗАД від завіси
+		ff_hinge.rotation_degrees = Vector3(68, 0, 0) # ЗАЧИНЕНА: піднята в похилий фасад
 		mesh_nodes[&"sec_fallfront"] = ff
 		sec_fallfront = ff
-	var pan_s: PackedScene = load("res://models/sec_panel_v3.glb")
-	var bb := pan_s.instantiate() as Node3D
-	sec_pivot.add_child(bb)
-	_fit_mm(bb, 365.0)
+	var bb := _part("res://models/sec_panel_v3.glb", 365.0, sec_pivot)
 	bb.rotation_degrees = Vector3(-90, 0, 0)
 	bb.position = Vector3(0.0, 0.350, -0.195)
-	for pm in bb.find_children("*", "MeshInstance3D", true, false):
-		var pmi := pm as MeshInstance3D
-		var pmat := StandardMaterial3D.new()
-		var pbase := pmi.get_active_material(0)
-		if pbase is StandardMaterial3D: pmat = (pbase as StandardMaterial3D).duplicate()
-		pmat.roughness_texture = null; pmat.metallic_texture = null
-		pmat.albedo_color = Color(0.60, 0.54, 0.46)   # бук, не білий
-		pmat.roughness = 0.95; pmat.metallic = 0.0; pmat.specular = 0.05
-		pmi.material_override = pmat
 	mesh_nodes[&"sec_backboard"] = bb
 	dust_quad = null
 	sec_backboard = bb; sec_drawer = drawer
@@ -3504,7 +3508,7 @@ func _build_case2() -> void:
 	var c3 := bb3.get_center()
 	var rr3 := bb3.size.length()
 	var cf := Camera3D.new(); sv.add_child(cf); cf.fov = 36
-	cf.position = c3 + Vector3(0.62, 0.18, 1.0).normalized()*rr3*1.38
+	cf.position = c3 + Vector3(0.42, 0.16, 1.0).normalized()*rr3*1.95
 	cf.look_at(c3, Vector3.UP)
 	var cw := Camera3D.new(); sv.add_child(cw); cw.fov = 30
 	var well_c := c3 + Vector3(0, bb3.size.y*0.155, 0)
@@ -3561,13 +3565,7 @@ func _build_case2() -> void:
 	# навігація: план → деталь і назад (режисура: без стрибків повз середній план)
 	# ряд інструментів — на всіх трьох планах предмета; ОДИН вузол tool_row
 	# переїжджає між екранами при _sync_case2_view (як контейнер вьюпорта)
-	_txtbtn(screens["FURN"], "the writing well  →", Vector2(W*0.40, H*0.92), func(): _open_fallfront())
-	_txtbtn(screens["FURN"], "take the drawer out  →", Vector2(W*0.64, H*0.92), func():
-		# шухляда вже висунута (стан out) — кнопка ВЕДЕ до неї, а не мовчить
-		# (плейтест 27.07: після «slide it back» правило вже віддане, і клік
-		# повторював текст стуку — агент 6 команд вважав навігацію мертвою)
-		if zone_states.get(&"z.sec.drawer_front", &"default") == &"out": _show("DRAWER")
-		else: _apply_zone("z.sec.drawer_front", &"tool.hand"))
+	_txtbtn(screens["FURN"], "the writing well  →", Vector2(W*0.40, H*0.92), func(): _show("WELL"))
 	_txtbtn(screens["FURN"], "the papers  →", Vector2(W*0.05, H*0.92), func(): _show("C2DOCS"))
 	_txtbtn(screens["FURN"], "Write the certificate  →", Vector2(W*0.05, H*0.862), func(): _show("CERT"))
 	_txtbtn(screens["WELL"], "←  step back", Vector2(W*0.04, H*0.92), func(): _show("FURN"))
@@ -3695,22 +3693,6 @@ func _refresh_tray_marks() -> void:
 # працювати»): дошка здригається на кожному шурупі, тоді відходить уперед,
 # опускається і зникає — і аж тоді камера входить у відкриту нішу.
 # ШУХЛЯДА ВИЇЖДЖАЄ ЗІ СВОГО ГНІЗДА (правило 18) — видимий рух, не телепорт
-# Відкидна дошка опускається на завісі НА ОЧАХ, і тільки тоді камера в'їжджає
-# в колодязь (Віктор 29.07: «він мав би відкриватись і досліджуватись»).
-func _open_fallfront() -> void:
-	if sec_fallfront == null or ff_open:
-		_show("WELL"); return
-	ff_open = true
-	sec_fallfront.visible = true
-	if ff_hinge == null:
-		_show("WELL"); return
-	ff_hinge.rotation_degrees = Vector3(78, 0, 0)   # зачинена: піднята до фасаду
-	_play("goblet_set")
-	var tw := create_tween()
-	tw.tween_property(ff_hinge, "rotation_degrees", Vector3(0, 0, 0), 0.9) \
-		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	tw.tween_callback(func(): _show("WELL"))
-
 func _slide_drawer_out() -> void:
 	if sec_drawer == null: return
 	sec_drawer.visible = true
@@ -3813,7 +3795,7 @@ func _sync_case2_view() -> void:
 	if sec_body_open: sec_body_open.visible = in_well
 	# знімна дощечка живе в нутрі open-стану; відкручена — зникає, ніша відкрита
 	var board_open: bool = zone_states.get(&"z.well.back_board", &"default") == &"open"
-	if ff_hinge: ff_hinge.visible = in_well or ff_open
+	if ff_hinge: ff_hinge.visible = on_c2
 	if sec_backboard:
 		sec_backboard.visible = in_well and not board_open
 	if dust_quad:
@@ -3822,7 +3804,7 @@ func _sync_case2_view() -> void:
 	if sec_drawer:
 		# шухляда «в руках» існує лише на своєму плані; на FURN вона левітувала
 		# поверх зачиненого корпусу (плейтест 27.07)
-		sec_drawer.visible = scr == "DRAWER" and zone_states.get(&"z.sec.drawer_front", &"default") == &"out"
+		sec_drawer.visible = on_c2
 
 func _case2_input(ev: InputEvent) -> void:
 	# РУКА Й ОКО — НЕ ІНСТРУМЕНТИ. Клік = торкнутись/роздивитись; ПЕРЕТЯГУВАННЯ =
@@ -3866,7 +3848,54 @@ func _case2_input(ev: InputEvent) -> void:
 			Control.CURSOR_POINTING_HAND if zid2 != "" else Control.CURSOR_ARROW
 
 # клік по 3D-предмету (винесено з _case2_input: спрацьовує на відпуск-без-оберту)
+# Деталі предмета відкриваються/закриваються КЛІКОМ ПО СОБІ (Віктор 29.07:
+# «не знаю що клікати... відкрив-закрив шухляду, вона має закриватись»).
+# Дії з річчю живуть на речі, не в кнопках унизу.
+func _c2_part_toggle(zone_id: String) -> bool:
+	match zone_id:
+		"z.sec.fallfront":
+			if ff_busy: return true
+			_toggle_fallfront(); return true
+		"z.sec.drawer_front":
+			if drawer_busy: return true
+			_toggle_drawer(); return true
+	return false
+
+func _toggle_fallfront() -> void:
+	if ff_hinge == null: return
+	ff_busy = true
+	ff_open = not ff_open
+	if ff_open: sec_fallfront.visible = true
+	_play("goblet_set")
+	var tgt := Vector3(0, 0, 0) if ff_open else Vector3(68, 0, 0)
+	var tw := create_tween()
+	tw.tween_property(ff_hinge, "rotation_degrees", tgt, 1.15) \
+		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+	tw.tween_callback(func():
+		ff_busy = false
+		_set_hint("The fall-front lets down on its hinges; the writing well stands open." if ff_open
+			else "The fall-front closes; the piece stands as it came in.")
+		_sync_case2_view())
+
+func _toggle_drawer() -> void:
+	if sec_drawer == null: return
+	drawer_busy = true
+	drawer_out = not drawer_out
+	sec_drawer.visible = true
+	var tw := create_tween()
+	tw.tween_property(sec_drawer, "position", drawer_pos_out if drawer_out else drawer_pos_in, 1.25) \
+		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+	tw.tween_callback(func():
+		drawer_busy = false
+		_play("goblet_set")
+		_set_hint("The long drawer rides out on its runners." if drawer_out
+			else "The drawer slides home.")
+		_sync_case2_view())
+
 func _case2_click(pos: Vector2) -> void:
+	# рухома деталь під курсором? тоді клік — це відкрити/закрити її
+	var zpart := _pick_3d_at(pos, &"tool.hand")
+	if zpart != "" and _c2_part_toggle(zpart): return
 	if active_tool != &"*":
 		var zt := _pick_3d_at(pos, active_tool)
 		if zt != "": _apply_zone(zt, active_tool); return
