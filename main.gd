@@ -3333,6 +3333,17 @@ func _refresh_section() -> void:
 
 # ТОН ДЕРЕВА: Meshy запікає нутро надто помаранчевим і лакованим — приглушуємо
 # альбедо в теплий горіх і збиваємо дзеркальність, щоб нутро було рівня фасаду
+# Масштабує модель так, щоб її ШИРИНА дорівнювала заданій у міліметрах, і
+# ставить її початок координат у центр (0,0,0) власного габариту.
+func _fit_mm(node: Node3D, width_mm: float) -> AABB:
+	var a := _aabb(node)
+	if a.size.x <= 0.0: return a
+	var k: float = (width_mm * 0.001) / a.size.x
+	node.scale = Vector3(k, k, k)
+	var a2 := _aabb(node)
+	node.position -= a2.get_center() - node.position
+	return _aabb(node)
+
 func _tone_wood(root: Node) -> void:
 	for m in root.find_children("*", "MeshInstance3D", true, false):
 		var mi := m as MeshInstance3D
@@ -3384,15 +3395,17 @@ func _build_case2() -> void:
 	# ПІВОТ: усі частини секретера — діти одного вузла, щоб оберт від
 	# перетягування крутив ЦІЛУ річ як предмет у руках (правило 18)
 	sec_pivot = Node3D.new(); sv.add_child(sec_pivot)
-	var body_s: PackedScene = load("res://models/sec_open_hi.glb")
+	var body_s: PackedScene = load("res://models/sec_carcass_v3.glb")
 	var body := body_s.instantiate() as Node3D
 	sec_pivot.add_child(body); mesh_nodes[&"sec_body"] = body
 	_tone_wood(body)
+	_fit_mm(body, 1100.0)
 	# ДВА СТАНИ КОРПУСА (як день/ніч кабінету, лише в 3D): FURN — дошка зачинена,
 	# WELL — відкинута, з нутром і задньою стінкою відділу. Своп у _sync_case2_view.
-	var open_s: PackedScene = load("res://models/sec_open_hi.glb")
+	var open_s: PackedScene = load("res://models/sec_carcass_v3.glb")
 	var body_open := open_s.instantiate() as Node3D
 	_tone_wood(body_open)
+	_fit_mm(body_open, 1100.0)
 	body_open.visible = false
 	sec_pivot.add_child(body_open); mesh_nodes[&"sec_open"] = body_open
 	sec_body_closed = body; sec_body_open = body_open
@@ -3403,42 +3416,26 @@ func _build_case2() -> void:
 	drawer.position = Vector3(0.0, -0.35, 0.55)   # висунута з нижньої секції
 	drawer.visible = false
 	sec_pivot.add_child(drawer); mesh_nodes[&"sec_drawer"] = drawer
-	# ЗАДНЯ ДОЩЕЧКА — ОБ'ЄМНА ДЕТАЛЬ (правило 18, урок «лупа втоплена в стіл»):
-	# плита з товщиною, що ВТОПЛЕНА в отвір і кидає тінь, а не пласка наклейка.
-	# За нею — глибина ніші, тому знята дошка відкриває справжню дірку.
-	var recess := MeshInstance3D.new()          # нутро ніші: видно, коли дошку знято
-	var rqm := QuadMesh.new(); rqm.size = Vector2(0.60, 0.40)
-	recess.mesh = rqm
-	if tex.has("dust_floor"):
-		var rmat2 := StandardMaterial3D.new()
-		rmat2.albedo_texture = tex["dust_floor"]
-		rmat2.roughness = 1.0; rmat2.specular = 0.0
-		recess.material_override = rmat2
-	recess.position = Vector3(0.03, -0.038, -0.115)   # ГЛИБШЕ за площину дошки
-	recess.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	sec_pivot.add_child(recess); dust_quad = recess
-	# плита дає ТОВЩИНУ і тінь (торці — просте дерево), лице — мальоване
-	var bb := MeshInstance3D.new()
-	var bbm := BoxMesh.new(); bbm.size = Vector3(0.62, 0.425, 0.022)
-	bb.mesh = bbm
-	var edge_mat := StandardMaterial3D.new()
-	edge_mat.albedo_color = Color(0.74, 0.66, 0.52)   # торець бука
-	edge_mat.roughness = 1.0; edge_mat.specular = 0.0
-	bb.material_override = edge_mat
-	bb.position = Vector3(0.03, -0.038, -0.055)
-	bb.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
-	var face := MeshInstance3D.new()
-	var fqm := QuadMesh.new(); fqm.size = Vector2(0.62, 0.425)
-	face.mesh = fqm
-	if tex.has("board_face"):
-		var fmat := StandardMaterial3D.new()
-		fmat.albedo_texture = tex["board_face"]
-		fmat.roughness = 0.95; fmat.specular = 0.05; fmat.metallic = 0.0
-		face.material_override = fmat
-	face.position = Vector3(0, 0, 0.0115)             # рівно на лицьовій грані плити
-	face.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	bb.add_child(face)
-	sec_pivot.add_child(bb); mesh_nodes[&"sec_backboard"] = bb
+	# ЗАДНЯ ДОЩЕЧКА — ОКРЕМА МОДЕЛЬ (правило 18): дошка з товщиною і об'ємними
+	# латунними шурупами, підігнана по ширині 400 мм і посаджена в СПРАВЖНІЙ
+	# отвір корпуса. Знімається викруткою — за нею порожнина самого корпуса.
+	var pan_s: PackedScene = load("res://models/sec_panel_v3.glb")
+	var bb := pan_s.instantiate() as Node3D
+	sec_pivot.add_child(bb)
+	_fit_mm(bb, 365.0)
+	bb.rotation_degrees = Vector3(-90, 0, 0)
+	bb.position = Vector3(0.0, 0.350, -0.195)
+	for pm in bb.find_children("*", "MeshInstance3D", true, false):
+		var pmi := pm as MeshInstance3D
+		var pmat := StandardMaterial3D.new()
+		var pbase := pmi.get_active_material(0)
+		if pbase is StandardMaterial3D: pmat = (pbase as StandardMaterial3D).duplicate()
+		pmat.roughness_texture = null; pmat.metallic_texture = null
+		pmat.albedo_color = Color(0.60, 0.54, 0.46)   # бук, не білий
+		pmat.roughness = 0.95; pmat.metallic = 0.0; pmat.specular = 0.05
+		pmi.material_override = pmat
+	mesh_nodes[&"sec_backboard"] = bb
+	dust_quad = null
 	sec_backboard = bb; sec_drawer = drawer
 	# дно ніші: пил і ЧИСТИЙ прямокутник — головний доказ віддано оку, не тексту
 	if tex.has("dust_floor"):
