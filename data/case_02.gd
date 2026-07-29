@@ -22,6 +22,13 @@ const ZONES := {
 		"hint": "The keyhole escutcheon",
 		"tools": [&"tool.loupe", &"tool.eye"],
 	},
+	&"z.sec.doors": {
+		"kind": &"mesh", "screen": &"FURN", "node": &"sec_body",
+		"at": Vector3(0.0, 0.48, 0.26), "facing": Vector3(0, 0, 1),
+		"r": 0.28, "facing_min": 0.06,
+		"hint": "The upper doors",
+		"tools": [&"tool.hand", &"tool.eye"],
+	},
 	&"z.sec.fallfront": {
 		"kind": &"mesh", "screen": &"FURN", "node": &"sec_body",
 		"at": Vector3(0.0, 0.20, 0.16), "facing": Vector3(0, 0.6, 1),
@@ -94,6 +101,8 @@ const ZONES := {
 }
 
 const RULES := [
+	{"zone": &"z.sec.doors", "tool": &"tool.hand",
+	 "say": "The upper doors stand open: shelves, and nothing on them but dust."},
 	{"zone": &"z.sec.fallfront", "tool": &"tool.hand", "sets_flag": {&"ff_toggle": true},
 	 "say": "The fall-front lets down on its hinges; the writing well stands open."},
 	{"zone": &"z.sec.drawer_front", "tool": &"tool.hand",

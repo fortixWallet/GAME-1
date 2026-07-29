@@ -125,6 +125,8 @@ var dust_quad: MeshInstance3D        # пил на дні ніші (справа
 var c2_intro1: Label                 # вступ справи 2 — гасне з першим банером
 var c2_intro2: Label
 var sec_fallfront: Node3D             # відкидна дошка — окрема рухома деталь
+var sec_doors: Array = []             # дверцята верхньої секції (завіси по краях)
+var doors_open := false
 var ff_open := false                  # чи вже відкинуто
 var ff_hinge: Node3D                  # вузол-завіса: навколо нього відкидається дошка
 var ff_busy := false
@@ -3452,6 +3454,18 @@ func _build_case2() -> void:
 	sec_pivot.add_child(body_open); mesh_nodes[&"sec_open"] = body_open
 	sec_body_closed = body; sec_body_open = body_open
 	# нормування: корпус ~1.9 h у метрах моделі — ставимо в нуль, камери від нього
+	# ДВЕРЦЯТА ВЕРХНЬОЇ СЕКЦІЇ (§2 п.6-7): 270×620×20, завіса по зовнішньому
+	# краю, відкриваються назовні навколо Y — верхня секція більше не глуха
+	if ResourceLoader.exists("res://models/part_door.glb"):
+		for i in 2:
+			var sgn: float = -1.0 if i == 0 else 1.0
+			var dpair := _hinged("res://models/part_door.glb", 270.0,
+				_mm(sgn * 270.0, 480, 255),   # завіса на зовнішньому краю
+				_mm(-sgn * 135.0, 0, 0),      # деталь усередину від завіси
+				Vector3.ZERO)                  # ЗАЧИНЕНІ
+			var dnode: Node3D = dpair[1]
+			dnode.scale.z *= 0.29              # товщина під 20 мм
+			sec_doors.append(dpair[0])
 	# ДОВГА ШУХЛЯДА (§2 п.3): 1010×175×430, центр (0,−190,+45), хід по Z
 	var drawer := _part("res://models/secretaire_drawer.glb", 1010.0, sec_pivot)
 	mesh_nodes[&"sec_drawer"] = drawer
@@ -3474,7 +3488,7 @@ func _build_case2() -> void:
 	# КРИШКА (креслення §2 п.2): 1010×420×24, завіса по нижньому краю
 	if ResourceLoader.exists("res://models/part_lid.glb"):
 		var pair := _hinged("res://models/part_lid.glb", 1010.0,
-			_mm(0, -25, 248),          # точка стику (завіса)
+			_mm(0, -55, 232),          # точка стику (завіса)
 			_mm(0, 0, 210),            # деталь попереду завіси на пів-глибини
 			Vector3(68, 0, 0))         # ЗАЧИНЕНА: похило вгору-назад
 		ff_hinge = pair[0]
@@ -3884,6 +3898,8 @@ func _c2_part_toggle(zone_id: String) -> bool:
 		"z.sec.drawer_front":
 			if drawer_busy: return true
 			_toggle_drawer(); return true
+		"z.sec.doors":
+			_toggle_doors(); return true
 	return false
 
 func _toggle_fallfront() -> void:
@@ -3901,6 +3917,20 @@ func _toggle_fallfront() -> void:
 		_set_hint("The fall-front lets down on its hinges; the writing well stands open." if ff_open
 			else "The fall-front closes; the piece stands as it came in.")
 		_sync_case2_view())
+
+func _toggle_doors() -> void:
+	if sec_doors.is_empty(): return
+	doors_open = not doors_open
+	_play("goblet_set")
+	for i in sec_doors.size():
+		var sgn: float = -1.0 if i == 0 else 1.0
+		var d: Node3D = sec_doors[i]
+		var tw := create_tween()
+		tw.tween_property(d, "rotation_degrees",
+			Vector3(0, sgn * 105.0, 0) if doors_open else Vector3.ZERO, 1.0) \
+			.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+	_set_hint("The upper doors stand open: shelves, and nothing on them but dust."
+		if doors_open else "The upper doors close.")
 
 func _toggle_drawer() -> void:
 	if sec_drawer == null: return
