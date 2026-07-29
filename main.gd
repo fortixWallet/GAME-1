@@ -126,6 +126,10 @@ var c2_intro1: Label                 # вступ справи 2 — гасне 
 var c2_intro2: Label
 var sec_fallfront: Node3D             # відкидна дошка — окрема рухома деталь
 var sec_doors: Array = []             # дверцята верхньої секції (завіси по краях)
+var sec_screws: Array = []            # чотири шурупи — окремі деталі
+var sec_lopers: Array = []            # дві планки, що тримають опущену кришку
+var ff_closed_deg := 72.0             # кут зачиненої кришки — виводиться з габариту
+var sec_driver: Node3D                # 3D-викрутка
 var bright_veil: ColorRect            # шар яскравості поверх усього
 var settings_prev := ""
 var doors_open := false
@@ -187,6 +191,7 @@ func _ready() -> void:
 	_build_cert()
 	_build_ledger()
 	_build_case2()
+	_build_case2_plates()
 	_load_case(1)          # один вхід у стан замість ручного присвоєння CSLOTS
 	# верхня підказка (діегетична — на мальованій стрічці нема, тож тонкий текст)
 	# мальована стрічка під верхнім рядком: текст на строкатому кадрі без підложки
@@ -1486,7 +1491,7 @@ func _load() -> void:
 	# справа 2 «Спадок удови»
 	for n3 in ["hub_day","hub_day_case","hub_lamp_off","hub_evening","hub_evening_figure","hub_night","hub_darkness","menu_door","client_woman","client_in_room","subtitle_band"]:
 		if ResourceLoader.exists(ART + n3 + ".png"): tex[n3] = load(ART + n3 + ".png")
-	for n2 in ["case2_desk","watch_wear","watch_chain","paper_receipt_1807","reg_page_h","marks_page_vienna","notebook_spread","mark_diana_macro","mark_maker_macro","tool_tray","hand_caliper","hand_screwdriver","hand_rake","wood_page","plain_book_page","dust_floor","client_vogl","screw_macro","board_face","cl1_p2","cl1_p3","cl1_p4","cl2_p2","cl2_p3","cl2_p4","cl2_door","sec_section","bureau_room"]:
+	for n2 in ["case2_desk","watch_wear","watch_chain","paper_receipt_1807","reg_page_h","marks_page_vienna","notebook_spread","mark_diana_macro","mark_maker_macro","tool_tray","hand_caliper","hand_screwdriver","hand_rake","wood_page","plain_book_page","dust_floor","client_vogl","screw_macro","board_face","cl1_p2","cl1_p3","cl1_p4","cl2_p2","cl2_p3","cl2_p4","cl2_door","sec_section","bureau_room","c2_piece","c2_open","c2_stamp","c2_endgrain","c2_recess","box_closed","box_open","box_under"]:
 		if ResourceLoader.exists(ART + n2 + ".png"): tex[n2] = load(ART + n2 + ".png")
 	# опційний арт (додано 24.07): чистий лист клієнтки
 	if ResourceLoader.exists(ART + "letter_client.png"):
@@ -1606,6 +1611,10 @@ var pending_confirm := ""  # зона, що чекає другого кліку
 var active_tool: StringName = &"*"     # обраний вимірювальний інструмент (крок 6)
 var unlocked_tools := {}               # tool id → true (unlocks правил; скидається _load_case)
 
+# на мальованих плитах клік по деталі теж відкриває/веде (той самий тоглер)
+func _plate_click(zone_id: String) -> bool:
+	return _c2_part_toggle(zone_id)
+
 func _paper_catcher(screen_name: String, parent: Control, paper: Control) -> void:
 	paper_frames[screen_name] = {
 		"frame": Rect2(paper.position, paper.size),
@@ -1620,7 +1629,9 @@ func _paper_catcher(screen_name: String, parent: Control, paper: Control) -> voi
 		if ev is InputEventMouseButton and (ev as InputEventMouseButton).pressed \
 				and (ev as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT:
 			var id := _pick_2d_at(screen_name, c.position + (ev as InputEventMouseButton).position)
-			if id != "": _apply_zone(id, active_tool)
+			if id != "":
+				if _plate_click(id): return
+				_apply_zone(id, active_tool)
 		elif ev is InputEventMouseMotion:
 			var id2 := _pick_2d_at(screen_name, c.position + (ev as InputEventMouseMotion).position)
 			var z: Dictionary = _case_zones().get(StringName(id2), {})
@@ -1774,8 +1785,7 @@ func _pick_tool(tl: StringName) -> void:
 # спрайт інструмента в руці: видимий, коли взято НЕ лупу (лупа має власне скло)
 func _refresh_hand_sprite() -> void:
 	if hand_tool_ui == null: return
-	var names := {&"tool.caliper": "hand_caliper", &"tool.screwdriver": "hand_screwdriver",
-		&"tool.rake": "hand_rake"}
+	var names := {&"tool.caliper": "hand_caliper", &"tool.rake": "hand_rake"}   # викрутка — 3D-деталь, не спрайт
 	if not names.has(active_tool) or not tex.has(names[active_tool]) \
 			or _shown() not in ["FURN", "WELL", "DRAWER", "DESK", "HANDS"]:
 		# поза предметними екранами інструмент лишається в руці ЛОГІЧНО, але спрайт
@@ -2005,7 +2015,7 @@ func _goto(key: String) -> void:
 			client_seen = true; case_done = true; tod = "evening"
 			seals_set = maxi(seals_set, 1); _show("LEDGER")
 		"case2":
-			_load_case(2); client_seen = true; _show("FURN")
+			_load_case(2); client_seen = true; _show("C2PIECE")
 		"client2":
 			_start_case2()
 		_:
@@ -3287,11 +3297,11 @@ func _show_morning() -> void:
 # ================= СПРАВА 2 «СПАДОК УДОВИ» (два свідчення) =================
 # Річ сама викриває брехуна: знос голівки під ліву руку + свіжі подряпини на вушку.
 const CLIENT2_LINES := [
-	"The bell. A woman in a dark shawl comes in alone; what she brings stands on a cart outside, wrapped in blankets.\n\n\u00abFrau Vogl. I kept house for Herr F. Twenty-two years.\u00bb",
-	"\u00abThe secretaire is mine, by his will. I mean to sell it, and the bureau is to say what it is worth.\u00bb",
+	"The bell. A woman in a dark shawl comes in alone, carrying a walnut writing box in both arms as one carries something that is not quite one's own.\n\n\u00abFrau Vogl. I kept house for Herr F. Twenty-two years.\u00bb",
+	"\u00abThe writing box is mine, by his will. I mean to sell it, and the bureau is to say what it is worth.\u00bb",
 	"\u00abMy son sails on Thursday. The ticket is forty-one gulden and I have nineteen. I am not asking you for a good price. I am asking you for a quick one.\u00bb",
-	"She holds the door wide. The porters walk the wrapped bulk through on its corner \u2014 a hand's breadth clear of either jamb.",
-	"The porters carry it in and set it by the window. She watches the way one watches a room being emptied \u2014 and keeps her right hand inside the shawl.",
+	"She sets the box on the blotter and steps back from it, wiping her right palm on her skirt.",
+	"She watches it the way one watches a room being emptied \u2014 and keeps her right hand inside the shawl.",
 ]
 var client2_line := 0
 var client_panels: Array = []        # комікс-панелі сцени клієнтки 1
@@ -3357,7 +3367,7 @@ func _client2_next() -> void:
 	client2_line += 1
 	if client2_line >= CLIENT2_LINES.size():
 		_play("goblet_set")
-		_show("FURN")
+		_show("C2PIECE")
 		return
 	_client2_show()
 
@@ -3548,6 +3558,39 @@ func _tone_wood(root: Node) -> void:
 		mat.metallic_specular = 0.0
 		mi.material_override = mat
 
+# ЕКРАН-ПЛИТА (стиль Strange Antiquities, 30.07): мальована річ на весь кадр,
+# зони кліку — у частках зображення. Жодного 3D: усе, що гравець роздивляється,
+# намальоване, а лупа і довідники працюють тим самим механізмом, що в справі 1.
+func _plate_screen(scr: String, texname: String, back_to: String, back_lbl: String) -> Dictionary:
+	var s := _screen(scr)
+	_paper_backdrop(s, 0.10)
+	var t: Texture2D = tex.get(texname, null)
+	var im := TextureRect.new()
+	if t:
+		var ih := H * 0.94
+		var iw := ih * float(t.get_width()) / float(t.get_height())
+		if iw > W * 0.72:
+			iw = W * 0.72; ih = iw * float(t.get_height()) / float(t.get_width())
+		im.texture = t
+		im.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		im.stretch_mode = TextureRect.STRETCH_SCALE
+		im.size = Vector2(iw, ih)
+		im.position = Vector2((W - iw) * 0.5, (H - ih) * 0.5)
+		im.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		s.add_child(im)
+	_txtbtn(s, back_lbl, Vector2(W*0.04, H*0.92), func(): _show(back_to))
+	_txtbtn(s, "✎", Vector2(W*0.945, H*0.055), func(): _show_notebook(), 0.030)
+	_paper_catcher(scr, s, im)
+	return {"s": s, "pg": im}
+
+func _build_case2_plates() -> void:
+	_plate_screen("C2PIECE", "box_closed", "C2DOCS", "←  set it aside")
+	_plate_screen("C2OPEN", "box_open", "C2PIECE", "←  close the box")
+	_plate_screen("C2STAMP", "box_under", "C2PIECE", "←  set it right way up")
+	_plate_screen("C2GRAIN", "c2_endgrain", "C2OPEN", "←  step back")
+	_plate_screen("C2RECESS", "c2_recess", "C2OPEN", "←  step back")
+	_plate_screen("C2SCREW", "screw_macro", "C2OPEN", "←  step back")
+
 func _build_case2() -> void:
 	# СПРАВА 2 «СЕКРЕТЕР» (27.07): три меші Meshy в одному світі; три екрани —
 	# три камери на той самий предмет (FURN загальний 3/4 · WELL писальний відділ
@@ -3576,101 +3619,99 @@ func _build_case2() -> void:
 	# ПІВОТ: усі частини секретера — діти одного вузла, щоб оберт від
 	# перетягування крутив ЦІЛУ річ як предмет у руках (правило 18)
 	sec_pivot = Node3D.new(); sv.add_child(sec_pivot)
+	# ═══ ЗБІРКА СЕКРЕТЕРА (перезібрано з нуля 30.07) ═══════════════════════
+	# Усі положення виводяться з ФАКТИЧНОГО габариту корпуса частками висоти й
+	# глибини — не з абсолютних міліметрів, які не збігались із моделлю.
+	# Фізична механіка за джерелами (_src/SEC_ASSEMBLY.md §5в):
+	#   лопери → кришка на завісі по НИЖНЬОМУ краю прорізу → шухляди по полозках.
 	var body_s: PackedScene = load("res://models/sec_carcass_v3.glb")
 	var body := body_s.instantiate() as Node3D
 	sec_pivot.add_child(body); mesh_nodes[&"sec_body"] = body
 	_tone_wood(body)
 	_fit_mm(body, 1100.0)
-	# ДВА СТАНИ КОРПУСА (як день/ніч кабінету, лише в 3D): FURN — дошка зачинена,
-	# WELL — відкинута, з нутром і задньою стінкою відділу. Своп у _sync_case2_view.
-	var open_s: PackedScene = load("res://models/sec_carcass_v3.glb")
-	var body_open := open_s.instantiate() as Node3D
-	_tone_wood(body_open)
-	_fit_mm(body_open, 1100.0)   # той самий габарит, що в зачиненої
+	var CB := _aabb(body)                       # габарит корпуса після підгонки
+	var y0: float = CB.position.y               # низ
+	var HH: float = CB.size.y                   # висота
+	var zf: float = CB.end.z                    # площина фасаду
+	# частки висоти, зняті з моделі: цоколь · довга шухляда · малі · колодязь
+	var Y_DRAWER: float = y0 + HH * 0.255       # центр довгої шухляди
+	var Y_SMALL:  float = y0 + HH * 0.435       # центр малих шухляд
+	var Y_HINGE:  float = y0 + HH * 0.470       # НИЗ ПРОРІЗУ = завіса кришки
+	var Y_WELL:   float = y0 + HH * 0.760       # середина задньої стінки колодязя
+	# закритий стан: усе на місці, нічого не виступає
+	# ОДНА модель на обидва стани: інші меші несумісні за стилем і масштабом
+	var body_open := body_s.instantiate() as Node3D
+	_tone_wood(body_open); _fit_mm(body_open, 1100.0)
 	body_open.visible = false
 	sec_pivot.add_child(body_open); mesh_nodes[&"sec_open"] = body_open
+	sec_pivot.add_child(body_open); mesh_nodes[&"sec_open"] = body_open
 	sec_body_closed = body; sec_body_open = body_open
-	# нормування: корпус ~1.9 h у метрах моделі — ставимо в нуль, камери від нього
-	# ДВЕРЦЯТА ВЕРХНЬОЇ СЕКЦІЇ (§2 п.6-7) — модель part_door готова за числами,
-	# але фактична висота корпуса в сцені 1293 мм проти 1450 у кресленні (§5а):
-	# деталь сідала в колодязь. Вішати, коли зʼявиться ракурс на всю висоту.
-	# ДОВГА ШУХЛЯДА (§2 п.3): 1010×175×430, центр (0,−190,+45), хід по Z
-	var drawer := _part("res://models/secretaire_drawer.glb", 1010.0, sec_pivot)
-	mesh_nodes[&"sec_drawer"] = drawer
-	drawer_pos_in = _mm(0, -190, 45)
-	drawer_pos_out = _mm(0, -190, 430)
-	drawer.position = drawer_pos_in
-	# МАЛІ ШУХЛЯДИ (§2 п.4-5): 480×140×430, центри (∓260,−25,+45)
-	for side in [-1.0, 1.0]:
-		var sd := _part("res://models/part_drawer_small.glb", 480.0, sec_pivot)
-		sd.position = _mm(side * 260.0, -25, 45)
-		sd.rotation_degrees = Vector3(0, -90, 0)   # фасадом до глядача
-		sd.name = "small_drawer_%d" % int(side)
 
-	# ЗАДНЯ ДОЩЕЧКА — ОКРЕМА МОДЕЛЬ (правило 18): дошка з товщиною і об'ємними
-	# латунними шурупами, підігнана по ширині 400 мм і посаджена в СПРАВЖНІЙ
-	# отвір корпуса. Знімається викруткою — за нею порожнина самого корпуса.
-	# ВІДКИДНА ДОШКА — окрема деталь: у розкритому стані лежить відкинутою на
-	# завісі (писальна поверхня), а не зникає (Віктор 29.07: «не хватає
-	# передньої кришки, яку в теорії треба буде зняти»)
-	# КРИШКА (креслення §2 п.2): 1010×420×24, завіса по нижньому краю
+	# ── КРИШКА: завіса по нижньому краю прорізу, падає вперед у горизонт ──
 	if ResourceLoader.exists("res://models/part_lid.glb"):
-		var pair := _hinged("res://models/part_lid.glb", 1010.0,
-			_mm(0, 210, 260),          # точка стику: нижній край ПРОРІЗУ
-			_mm(0, 0, 210),            # деталь попереду завіси на пів-глибини
-			Vector3(68, 0, 0))         # ЗАЧИНЕНА: похило вгору-назад
-		ff_hinge = pair[0]
-		var ff: Node3D = pair[1]
-		ff.scale.y *= 0.40             # товщина під 24 мм
-		ff.scale.z *= 1.38             # глибина: у закритому стані перекриває весь проріз
+		ff_hinge = Node3D.new()
+		ff_hinge.position = Vector3(0.0, Y_HINGE, zf - 0.015)
+		sec_pivot.add_child(ff_hinge)
+		var ff := _part("res://models/part_lid.glb", 1010.0, ff_hinge)
+		ff.scale.y *= 0.40                       # товщина дошки
+		var lid_d: float = _aabb(ff).size.z
+		ff.position = Vector3(0.0, 0.0, -lid_d * 0.5)   # дошка НАЗАД від завіси
+		# кут виводимо з геометрії: кришка дотягується рівно до верху корпуса
+		var reach: float = clampf((CB.end.y - Y_HINGE) / maxf(lid_d, 0.001), 0.0, 0.985)
+		ff_closed_deg = rad_to_deg(asin(reach))
+		ff_hinge.rotation_degrees = Vector3(ff_closed_deg, 0, 0)   # ЗАЧИНЕНА
 		mesh_nodes[&"sec_fallfront"] = ff
 		sec_fallfront = ff
-	var bb := _part("res://models/sec_panel_v3.glb", 365.0, sec_pivot)
+
+	# ── ЛОПЕРИ: дві планки, що тримають опущену кришку (фізична правда) ──
+	for lsign in [-1.0, 1.0]:
+		var lop := MeshInstance3D.new()
+		var lbm := BoxMesh.new(); lbm.size = Vector3(0.045, 0.016, 0.30)
+		lop.mesh = lbm
+		var lmat := StandardMaterial3D.new()
+		lmat.albedo_color = Color(0.42, 0.36, 0.28); lmat.roughness = 1.0; lmat.specular = 0.0
+		lop.material_override = lmat
+		lop.position = Vector3(lsign * 0.36, Y_HINGE - 0.012, zf - 0.16)
+		sec_pivot.add_child(lop)
+		sec_lopers.append(lop)
+
+	# ── ШУХЛЯДИ: чиста трансляція по полозках, фасади врівень із корпусом ──
+	var drawer := _part("res://models/secretaire_drawer.glb", 1010.0, sec_pivot)
+	mesh_nodes[&"sec_drawer"] = drawer
+	var dd: float = _aabb(drawer).size.z
+	drawer_pos_in = Vector3(0.0, Y_DRAWER, zf - dd * 0.5 - CB.size.z * 0.10)
+	drawer_pos_out = drawer_pos_in + Vector3(0, 0, dd * 0.82)
+	drawer.position = drawer_pos_in
+	for side in [-1.0, 1.0]:
+		var sd := _part("res://models/part_drawer_small.glb", 470.0, sec_pivot)
+		sd.rotation_degrees = Vector3(0, 90, 0)      # фасадом до глядача
+		var sdd: float = _aabb(sd).size.z
+		sd.position = Vector3(side * 0.255, Y_SMALL, zf - sdd * 0.5 - CB.size.z * 0.10)
+		sd.name = "small_drawer_%d" % int(side)
+
+	# ── ФАЛЬШ-ПАНЕЛЬ на задній стінці колодязя + ЧОТИРИ ШУРУПИ ──
+	var bb := _part("res://models/sec_panel_v3.glb", 360.0, sec_pivot)
 	bb.rotation_degrees = Vector3(-90, 0, 0)
-	bb.position = _mm(0, 250, -150)
+	var pz: float = CB.position.z + CB.size.z * 0.28   # задня стінка колодязя
+	bb.position = Vector3(0.0, Y_WELL, pz)
 	mesh_nodes[&"sec_backboard"] = bb
+	sec_backboard = bb
 	dust_quad = null
-	sec_backboard = bb; sec_drawer = drawer
-	# дно ніші: пил і ЧИСТИЙ прямокутник — головний доказ віддано оку, не тексту
-	if tex.has("dust_floor"):
-		var dq := MeshInstance3D.new()
-		var qm := QuadMesh.new(); qm.size = Vector2(0.21, 0.16)
-		dq.mesh = qm
-		var dm2 := StandardMaterial3D.new()
-		dm2.albedo_texture = tex["dust_floor"]
-		dm2.roughness = 1.0
-		dq.material_override = dm2
-		# ніша дивиться на камеру: квад майже вертикальний, на місці знятої дошки,
-		# трохи глибше — власна рамка текстури грає глибину
-		dq.position = Vector3(0.0, 0.192, -0.068)
-		dq.rotation_degrees = Vector3(-14, 0, 0)
-		dq.visible = false
-		sec_pivot.add_child(dq); dust_quad = dq
-	# тавро столярні на споді шухляди: випалений штамп текстом (шрифт — виняток
-	# правила 1) + крейдяний номер. ЛОКАЛЬНИЙ AABB меша: глобальний тут брехав би
-	# (batьків scale/зсув), і перша посадка полетіла геть із геометрії.
-	var dmesh: MeshInstance3D = null
-	for dm in drawer.find_children("*", "MeshInstance3D", true, false):
-		dmesh = dm as MeshInstance3D; break
-	var dla: AABB = dmesh.get_aabb() if dmesh else AABB(Vector3(-1,-0.3,-0.5), Vector3(2,0.6,1))
-	var brand := Label3D.new()
-	brand.text = _t("M·GRUBER · WIEN")
-	brand.font = fb; brand.font_size = 48; brand.pixel_size = 0.0011
-	brand.modulate = Color(0.23, 0.13, 0.07, 0.95)
-	brand.position = Vector3(dla.get_center().x - dla.size.x*0.22,
-							 dla.position.y + 0.003,
-							 dla.get_center().z + dla.size.z*0.18)
-	brand.rotation_degrees = Vector3(90, 0, 0)
-	brand.outline_size = 0
-	drawer.add_child(brand)
-	var chalk := Label3D.new()
-	chalk.text = _t("367")
-	chalk.font = fh; chalk.font_size = 66; chalk.pixel_size = 0.0011
-	chalk.modulate = Color(0.92, 0.90, 0.84, 0.85)
-	chalk.position = brand.position + Vector3(dla.size.x*0.30, 0, -dla.size.z*0.04)
-	chalk.rotation_degrees = Vector3(90, 0, 0)
-	chalk.outline_size = 0
-	drawer.add_child(chalk)
+	if ResourceLoader.exists("res://models/part_screw.glb"):
+		for i in 4:
+			var scr := _part("res://models/part_screw.glb", 40.0, sec_pivot)
+			scr.rotation_degrees = Vector3(0, -90, 0)   # різь у дошку, головка до глядача
+			scr.position = Vector3((-0.115 if i % 2 == 0 else 0.115),
+								   Y_WELL + (0.062 if i < 2 else -0.062), pz + 0.020)
+			scr.name = "screw_%d" % i
+			sec_screws.append(scr)
+	if ResourceLoader.exists("res://models/part_screwdriver.glb"):
+		sec_driver = _part("res://models/part_screwdriver.glb", 60.0, sec_pivot)
+		var dv := _aabb(sec_driver)
+		if dv.size.z > 0.0: sec_driver.scale *= (0.230 / dv.size.z)
+		sec_driver.visible = false
+	sec_drawer = drawer
+
 	# три камери — ВІД ФАКТИЧНОГО ГАБАРИТУ моделі, не з голови (низ різало)
 	var bb3 := _aabb(body)
 	var c3 := bb3.get_center()
@@ -3711,7 +3752,7 @@ func _build_case2() -> void:
 	var i1 := Label.new(); i1.name = "c2_intro"
 	i1.label_settings = _ls(fr, int(H*0.028), Color(0.92,0.88,0.78))
 	i1.label_settings.shadow_color = Color(0,0,0,0.85); i1.label_settings.shadow_offset = Vector2(1.5,1.5)
-	i1.text = _t("Frau Vogl, housekeeper twenty-two years to the late Herr F.\nThe secretaire is hers by his will, and she means to sell it.\n«My son sails on Thursday. I am not asking a good price — I am asking a quick one.»")
+	i1.text = _t("Frau Vogl, housekeeper twenty-two years to the late Herr F.\nThe writing box is hers by his will, and she means to sell it.\n«My son sails on Thursday. I am not asking a good price — I am asking a quick one.»")
 	i1.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	i1.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	i1.size = Vector2(W*0.72, H*0.15); i1.position = Vector2(W*0.14, H*0.055)
@@ -3733,7 +3774,10 @@ func _build_case2() -> void:
 	# навігація: план → деталь і назад (режисура: без стрибків повз середній план)
 	# ряд інструментів — на всіх трьох планах предмета; ОДИН вузол tool_row
 	# переїжджає між екранами при _sync_case2_view (як контейнер вьюпорта)
-	_txtbtn(screens["FURN"], "the writing well  →", Vector2(W*0.40, H*0.92), func(): _show("WELL"))
+	_txtbtn(screens["FURN"], "the writing well  →", Vector2(W*0.40, H*0.92), func():
+		if not ff_open:
+			_set_hint("The fall-front is still up. Let it down first — click the front itself.")
+		else: _show("WELL"))
 	_txtbtn(screens["FURN"], "the papers  →", Vector2(W*0.05, H*0.92), func(): _show("C2DOCS"))
 	_txtbtn(screens["FURN"], "Write the certificate  →", Vector2(W*0.05, H*0.862), func(): _show("CERT"))
 	_txtbtn(screens["WELL"], "←  step back", Vector2(W*0.04, H*0.92), func(): _show("FURN"))
@@ -3873,22 +3917,43 @@ func _slide_drawer_out() -> void:
 func _unscrew_board() -> void:
 	if sec_backboard == null:
 		_reveal_recess(); return
-	var b := sec_backboard
-	var p0: Vector3 = b.position
+	# ФІЗИЧНА ПОСЛІДОВНІСТЬ: викрутка стає на шуруп → крутить → шуруп виходить
+	# із дошки і падає. Чотири шурупи по черзі, тоді дошка відходить.
 	var tw := create_tween()
-	for i in 4:                      # чотири шурупи — чотири здригання
-		tw.tween_property(b, "position", p0 + Vector3(0.004, 0, 0.004), 0.07)
-		tw.tween_property(b, "position", p0, 0.07)
-		tw.tween_callback(func(): _play("ui_soft"))
-	tw.tween_property(b, "position", p0 + Vector3(0, 0, 0.075), 0.35).set_trans(Tween.TRANS_QUAD)
-	tw.tween_property(b, "position", p0 + Vector3(0, -0.22, 0.10), 0.45).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	for i in sec_screws.size():
+		var scr: Node3D = sec_screws[i]
+		var p0: Vector3 = scr.position
+		# викрутка приходить до цього шурупа
+		if sec_driver:
+			tw.tween_callback(func():
+				sec_driver.visible = true
+				sec_driver.position = p0 + Vector3(0, 0, 0.115)
+				sec_driver.rotation_degrees = Vector3(0, 0, 0))
+		# три оберти: шуруп крутиться і виходить назустріч глядачеві
+		for t in 3:
+			tw.tween_callback(func(): _play("ui_soft"))
+			tw.parallel().tween_property(scr, "rotation_degrees:z", -120.0 * float(t + 1), 0.20)
+			tw.parallel().tween_property(scr, "position", p0 + Vector3(0, 0, 0.006 * float(t + 1)), 0.20)
+			if sec_driver:
+				tw.parallel().tween_property(sec_driver, "rotation_degrees:z", -120.0 * float(t + 1), 0.20)
+		# випадає з гнізда
+		tw.tween_property(scr, "position", p0 + Vector3(0, -0.10, 0.05), 0.30).set_ease(Tween.EASE_IN)
+		tw.parallel().tween_property(scr, "scale", scr.scale * 0.01, 0.30)
+		tw.tween_callback(func(): scr.visible = false)
+	if sec_driver: tw.tween_callback(func(): sec_driver.visible = false)
+	# дошка, звільнена від шурупів, відходить і падає
+	var b := sec_backboard
+	var bp: Vector3 = b.position
+	tw.tween_property(b, "position", bp + Vector3(0, 0, 0.075), 0.35).set_trans(Tween.TRANS_QUAD)
+	tw.tween_property(b, "position", bp + Vector3(0, -0.22, 0.10), 0.45).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	tw.parallel().tween_property(b, "rotation:x", -0.35, 0.45)
 	tw.tween_callback(func():
 		_play("goblet_set")
 		b.visible = false
-		b.position = p0; b.rotation.x = 0.0
+		b.position = bp; b.rotation.x = 0.0
 		_sync_case2_view()
 		_reveal_recess())
+
 
 func _reveal_recess() -> void:
 	if sec_cam_live == null: return
@@ -3959,10 +4024,17 @@ func _sync_case2_view() -> void:
 			have.queue_free()
 	# два стани корпуса: WELL бачить відкинуту дошку з нутром
 	var in_well: bool = scr == "WELL"
-	if sec_body_closed: sec_body_closed.visible = on_c2 and not in_well
-	if sec_body_open: sec_body_open.visible = in_well
+	if sec_body_closed: sec_body_closed.visible = on_c2
+	if sec_body_open: sec_body_open.visible = false
 	# знімна дощечка живе в нутрі open-стану; відкручена — зникає, ніша відкрита
 	var board_open: bool = zone_states.get(&"z.well.back_board", &"default") == &"open"
+	for scr2 in sec_screws:
+		(scr2 as Node3D).visible = in_well and not board_open
+	if sec_driver and not board_open:
+		sec_driver.visible = in_well and active_tool == &"tool.screwdriver"
+		if sec_driver.visible and not sec_screws.is_empty():
+			sec_driver.position = (sec_screws[0] as Node3D).position + Vector3(0.02, 0.03, 0.13)
+			sec_driver.rotation_degrees = Vector3(-18, 0, 12)
 	if ff_hinge: ff_hinge.visible = on_c2
 	if sec_backboard:
 		sec_backboard.visible = in_well and not board_open
@@ -3997,7 +4069,7 @@ func _case2_input(ev: InputEvent) -> void:
 			if c2_drag_travel >= 12.0 and sec_pivot:
 				c2_dragging = true
 				sec_yaw -= mm.relative.x * 0.004
-				sec_yaw = clampf(sec_yaw, -0.62, 0.62)   # ±35°: видно передні кути, не втрачаєш фасад
+				sec_yaw = clampf(sec_yaw, -0.30, 0.30)   # ±17°: видно кути, зад-порожнина не показується
 				sec_pivot.rotation.y = sec_yaw
 				if c2_loupe:                          # скло їде за курсором і в оберті
 					loupe_ui.position = mm.position - Vector2(GLASS_CX*loupe_lw, GLASS_CY*loupe_lh)
@@ -4022,11 +4094,13 @@ func _case2_input(ev: InputEvent) -> void:
 func _c2_part_toggle(zone_id: String) -> bool:
 	match zone_id:
 		"z.sec.fallfront":
-			if ff_busy: return true
-			_toggle_fallfront(); return true
+			_play("goblet_set"); ff_open = true
+			_set_hint("The fall-front lets down on its hinges; the writing well stands open.")
+			_show("C2OPEN"); return true
 		"z.sec.drawer_front":
-			if drawer_busy: return true
-			_toggle_drawer(); return true
+			_play("goblet_set")
+			_set_hint("The long drawer rides out on its runners.")
+			_show("C2STAMP"); return true
 		"z.sec.doors":
 			_toggle_doors(); return true
 	return false
@@ -4037,10 +4111,14 @@ func _toggle_fallfront() -> void:
 	ff_open = not ff_open
 	if ff_open: sec_fallfront.visible = true
 	_play("goblet_set")
-	var tgt := Vector3(0, 0, 0) if ff_open else Vector3(68, 0, 0)
+	var tgt := Vector3(0, 0, 0) if ff_open else Vector3(ff_closed_deg, 0, 0)
+	if ff_hinge: ff_hinge.visible = true
 	var tw := create_tween()
-	tw.tween_property(ff_hinge, "rotation_degrees", tgt, 1.15) \
-		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+	tw.tween_property(ff_hinge, "rotation_degrees", tgt, 0.55) \
+		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN)
+	tw.tween_callback(func(): _sync_case2_view())   # підміна корпуса під кришкою
+	tw.tween_property(ff_hinge, "rotation_degrees", tgt, 0.60) \
+		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	tw.tween_callback(func():
 		ff_busy = false
 		_set_hint("The fall-front lets down on its hinges; the writing well stands open." if ff_open

@@ -395,4 +395,5 @@ const T := {
 "The upper doors": "Верхні дверцята",
 "The upper doors stand open: shelves, and nothing on them but dust.": "Верхні дверцята відчинені: полиці, і на них нічого, крім пилу.",
 "The upper doors close.": "Верхні дверцята зачиняються.",
+"The fall-front is still up. Let it down first — click the front itself.": "Кришка ще піднята. Спершу опусти її — клікни по самій кришці.",
 }
