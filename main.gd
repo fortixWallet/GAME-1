@@ -3454,18 +3454,9 @@ func _build_case2() -> void:
 	sec_pivot.add_child(body_open); mesh_nodes[&"sec_open"] = body_open
 	sec_body_closed = body; sec_body_open = body_open
 	# нормування: корпус ~1.9 h у метрах моделі — ставимо в нуль, камери від нього
-	# ДВЕРЦЯТА ВЕРХНЬОЇ СЕКЦІЇ (§2 п.6-7): 270×620×20, завіса по зовнішньому
-	# краю, відкриваються назовні навколо Y — верхня секція більше не глуха
-	if ResourceLoader.exists("res://models/part_door.glb"):
-		for i in 2:
-			var sgn: float = -1.0 if i == 0 else 1.0
-			var dpair := _hinged("res://models/part_door.glb", 270.0,
-				_mm(sgn * 270.0, 480, 255),   # завіса на зовнішньому краю
-				_mm(-sgn * 135.0, 0, 0),      # деталь усередину від завіси
-				Vector3.ZERO)                  # ЗАЧИНЕНІ
-			var dnode: Node3D = dpair[1]
-			dnode.scale.z *= 0.29              # товщина під 20 мм
-			sec_doors.append(dpair[0])
+	# ДВЕРЦЯТА ВЕРХНЬОЇ СЕКЦІЇ (§2 п.6-7) — модель part_door готова за числами,
+	# але фактична висота корпуса в сцені 1293 мм проти 1450 у кресленні (§5а):
+	# деталь сідала в колодязь. Вішати, коли зʼявиться ракурс на всю висоту.
 	# ДОВГА ШУХЛЯДА (§2 п.3): 1010×175×430, центр (0,−190,+45), хід по Z
 	var drawer := _part("res://models/secretaire_drawer.glb", 1010.0, sec_pivot)
 	mesh_nodes[&"sec_drawer"] = drawer
