@@ -3384,7 +3384,7 @@ func _tone_wood(root: Node) -> void:
 		# обертанні (скарга Віктора 29.07 зі скріна)
 		mat.roughness_texture = null
 		mat.metallic_texture = null
-		mat.albedo_color = Color(0.40, 0.45, 0.47)
+		mat.albedo_color = Color(0.46, 0.44, 0.42)
 		mat.roughness = 0.96
 		mat.metallic = 0.0
 		mat.specular = 0.06
@@ -3436,9 +3436,15 @@ func _build_case2() -> void:
 	# нормування: корпус ~1.9 h у метрах моделі — ставимо в нуль, камери від нього
 	var drawer := _part("res://models/secretaire_drawer.glb", 950.0, sec_pivot)
 	mesh_nodes[&"sec_drawer"] = drawer
-	drawer_pos_in = Vector3(0.0, -0.20, 0.20)
+	drawer_pos_in = Vector3(0.0, -0.20, 0.10)
 	drawer_pos_out = Vector3(0.0, -0.20, 0.62)
 	drawer.position = drawer_pos_in
+	# два верхні гнізда закривають менші шухляди тієї ж столярні (нерухомі —
+	# у справі важить лише довга, але зяючих дір у речі бути не може)
+	for side in [-1.0, 1.0]:
+		var sd := _part("res://models/secretaire_drawer.glb", 455.0, sec_pivot)
+		sd.position = Vector3(side * 0.255, -0.055, 0.10)
+		sd.name = "small_drawer_%d" % int(side)
 	# ЗАДНЯ ДОЩЕЧКА — ОКРЕМА МОДЕЛЬ (правило 18): дошка з товщиною і об'ємними
 	# латунними шурупами, підігнана по ширині 400 мм і посаджена в СПРАВЖНІЙ
 	# отвір корпуса. Знімається викруткою — за нею порожнина самого корпуса.
