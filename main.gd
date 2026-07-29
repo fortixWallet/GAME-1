@@ -3360,7 +3360,7 @@ func _tone_wood(root: Node) -> void:
 		# обертанні (скарга Віктора 29.07 зі скріна)
 		mat.roughness_texture = null
 		mat.metallic_texture = null
-		mat.albedo_color = Color(0.52, 0.47, 0.45)
+		mat.albedo_color = Color(0.40, 0.45, 0.47)
 		mat.roughness = 0.96
 		mat.metallic = 0.0
 		mat.specular = 0.06
@@ -3395,7 +3395,7 @@ func _build_case2() -> void:
 	# ПІВОТ: усі частини секретера — діти одного вузла, щоб оберт від
 	# перетягування крутив ЦІЛУ річ як предмет у руках (правило 18)
 	sec_pivot = Node3D.new(); sv.add_child(sec_pivot)
-	var body_s: PackedScene = load("res://models/sec_carcass_v3.glb")
+	var body_s: PackedScene = load("res://models/secretaire_body.glb")
 	var body := body_s.instantiate() as Node3D
 	sec_pivot.add_child(body); mesh_nodes[&"sec_body"] = body
 	_tone_wood(body)
@@ -3405,7 +3405,7 @@ func _build_case2() -> void:
 	var open_s: PackedScene = load("res://models/sec_carcass_v3.glb")
 	var body_open := open_s.instantiate() as Node3D
 	_tone_wood(body_open)
-	_fit_mm(body_open, 1100.0)
+	_fit_mm(body_open, 1100.0)   # той самий габарит, що в зачиненої
 	body_open.visible = false
 	sec_pivot.add_child(body_open); mesh_nodes[&"sec_open"] = body_open
 	sec_body_closed = body; sec_body_open = body_open
