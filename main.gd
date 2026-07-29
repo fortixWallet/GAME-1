@@ -3345,6 +3345,24 @@ func _refresh_section() -> void:
 # ставить її початок координат у центр (0,0,0) власного габариту.
 # Деталь у тримачі: модель підігнана за мм і центрована ВСЕРЕДИНІ, рухається
 # тримач. Інакше моє ж центрування губилось при заданні позиції (баг 29.07).
+# Креслення _src/SEC_ASSEMBLY.md: габарит корпуса 1100×1450×520 мм, початок
+# координат — у ЦЕНТРІ корпуса. Усі числа нижче — з таблиці §2/§3, не з ока.
+const SEC_W := 1.100     # ширина корпуса, м (масштаб сцени)
+func _mm(x: float, y: float, z: float) -> Vector3:
+	return Vector3(x, y, z) * 0.001
+
+# Деталь із ЗАВІСОЮ: вузол-завіса ставиться в точку стику, деталь — його дитина
+# зі зміщенням; крутиться завіса. Так напрямок відкриття задається кресленням.
+func _hinged(path: String, width_mm: float, hinge: Vector3, offset: Vector3,
+			 closed_deg: Vector3) -> Array:
+	var h := Node3D.new()
+	h.position = hinge
+	sec_pivot.add_child(h)
+	var part := _part(path, width_mm, h)
+	part.position = offset
+	h.rotation_degrees = closed_deg
+	return [h, part]
+
 func _part(path: String, width_mm: float, parent: Node) -> Node3D:
 	var holder := Node3D.new()
 	parent.add_child(holder)
@@ -3434,38 +3452,39 @@ func _build_case2() -> void:
 	sec_pivot.add_child(body_open); mesh_nodes[&"sec_open"] = body_open
 	sec_body_closed = body; sec_body_open = body_open
 	# нормування: корпус ~1.9 h у метрах моделі — ставимо в нуль, камери від нього
-	var drawer := _part("res://models/secretaire_drawer.glb", 950.0, sec_pivot)
+	# ДОВГА ШУХЛЯДА (§2 п.3): 1010×175×430, центр (0,−190,+45), хід по Z
+	var drawer := _part("res://models/secretaire_drawer.glb", 1010.0, sec_pivot)
 	mesh_nodes[&"sec_drawer"] = drawer
-	drawer_pos_in = Vector3(0.0, -0.20, 0.10)
-	drawer_pos_out = Vector3(0.0, -0.20, 0.62)
+	drawer_pos_in = _mm(0, -190, 45)
+	drawer_pos_out = _mm(0, -190, 430)
 	drawer.position = drawer_pos_in
-	# два верхні гнізда закривають менші шухляди тієї ж столярні (нерухомі —
-	# у справі важить лише довга, але зяючих дір у речі бути не може)
+	# МАЛІ ШУХЛЯДИ (§2 п.4-5): 480×140×430, центри (∓260,−25,+45)
 	for side in [-1.0, 1.0]:
-		var sd := _part("res://models/secretaire_drawer.glb", 455.0, sec_pivot)
-		sd.position = Vector3(side * 0.255, -0.055, 0.10)
+		var sd := _part("res://models/part_drawer_small.glb", 480.0, sec_pivot)
+		sd.position = _mm(side * 260.0, -25, 45)
+		sd.rotation_degrees = Vector3(0, -90, 0)   # фасадом до глядача
 		sd.name = "small_drawer_%d" % int(side)
+
 	# ЗАДНЯ ДОЩЕЧКА — ОКРЕМА МОДЕЛЬ (правило 18): дошка з товщиною і об'ємними
 	# латунними шурупами, підігнана по ширині 400 мм і посаджена в СПРАВЖНІЙ
 	# отвір корпуса. Знімається викруткою — за нею порожнина самого корпуса.
 	# ВІДКИДНА ДОШКА — окрема деталь: у розкритому стані лежить відкинутою на
 	# завісі (писальна поверхня), а не зникає (Віктор 29.07: «не хватає
 	# передньої кришки, яку в теорії треба буде зняти»)
-	if ResourceLoader.exists("res://models/sec_fallfront.glb"):
-		ff_hinge = Node3D.new()
-		ff_hinge.position = Vector3(0.0, -0.03, 0.26)  # передній край писальної поверхні
-		sec_pivot.add_child(ff_hinge)
-		var ff := _part("res://models/sec_fallfront.glb", 1040.0, ff_hinge)
-		# ВИМІРЯНО: модель лежить горизонтально 1040 × 490, товщина 130 мм
-		ff.scale.y *= 0.19                       # товщина 25 мм
-		var ffd: float = _aabb(ff).size.z
-		ff.position = Vector3(0.0, 0.0, -ffd * 0.5)   # дошка йде НАЗАД від завіси
-		ff_hinge.rotation_degrees = Vector3(68, 0, 0) # ЗАЧИНЕНА: піднята в похилий фасад
+	# КРИШКА (креслення §2 п.2): 1010×420×24, завіса по нижньому краю
+	if ResourceLoader.exists("res://models/part_lid.glb"):
+		var pair := _hinged("res://models/part_lid.glb", 1010.0,
+			_mm(0, -25, 248),          # точка стику (завіса)
+			_mm(0, 0, 210),            # деталь попереду завіси на пів-глибини
+			Vector3(68, 0, 0))         # ЗАЧИНЕНА: похило вгору-назад
+		ff_hinge = pair[0]
+		var ff: Node3D = pair[1]
+		ff.scale.y *= 0.40             # товщина під 24 мм
 		mesh_nodes[&"sec_fallfront"] = ff
 		sec_fallfront = ff
 	var bb := _part("res://models/sec_panel_v3.glb", 365.0, sec_pivot)
 	bb.rotation_degrees = Vector3(-90, 0, 0)
-	bb.position = Vector3(0.0, 0.350, -0.195)
+	bb.position = _mm(0, 250, -150)
 	mesh_nodes[&"sec_backboard"] = bb
 	dust_quad = null
 	sec_backboard = bb; sec_drawer = drawer
