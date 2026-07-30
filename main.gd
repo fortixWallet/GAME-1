@@ -1183,8 +1183,13 @@ func _dbg_pilot() -> void:
 			var ke := InputEventKey.new(); ke.pressed = true
 			ke.keycode = OS.find_keycode_from_string(String(parts[1]))
 			get_viewport().push_input(ke, true); await get_tree().process_frame
-		# після будь-якої команди: пауза на твіни, знімок, звіт
-		for _i in 14: await RenderingServer.frame_post_draw
+		# після будь-якої команди: ДОЧЕКАТИСЬ анімації, тоді знімок і звіт.
+		# Рахувати кадри було ненадійно: анімація кришки (4×0.11 с) не встигала,
+		# звіт показував старий екран, і це читалось як баг, якого нема (31.07).
+		var guard_anim := 0
+		while box_busy and guard_anim < 240:
+			await RenderingServer.frame_post_draw; guard_anim += 1
+		for _i in 16: await RenderingServer.frame_post_draw
 		seq += 1
 		var shot_name := "p%03d.png" % seq
 		await _shot(dirp + shot_name, 2)
@@ -1810,7 +1815,9 @@ func _pick_tool(tl: StringName) -> void:
 # спрайт інструмента в руці: видимий, коли взято НЕ лупу (лупа має власне скло)
 func _refresh_hand_sprite() -> void:
 	if hand_tool_ui == null: return
-	var names := {&"tool.caliper": "hand_caliper", &"tool.rake": "hand_rake"}   # викрутка — 3D-деталь, не спрайт
+	# інструмент, узятий у руку, ВИДНО біля курсора. Лупа має власне скло, тож її тут нема.
+	var names := {&"tool.caliper": "hand_caliper", &"tool.rake": "hand_rake",
+				  &"tool.screwdriver": "hand_screwdriver"}
 	if not names.has(active_tool) or not tex.has(names[active_tool]) \
 			or not (_shown() in ["DESK", "HANDS"] or paper_frames.has(_shown())):
 		# поза предметними екранами інструмент лишається в руці ЛОГІЧНО, але спрайт
@@ -4000,8 +4007,14 @@ func _build_tool_tray(scr: String) -> void:
 		if not unlocked_tools.has(tl) and case_id == 2: continue
 		var x0 := tray.position.x + twd*float(spot[1])
 		var x1 := tray.position.x + twd*float(spot[2])
-		var hl := ColorRect.new(); hl.color = Color(0.99, 0.78, 0.42, 0.16)
-		hl.size = Vector2(x1 - x0, th*0.86); hl.position = Vector2(x0, tray.position.y + th*0.07)
+		var hl := TextureRect.new()
+		var felt := AtlasTexture.new(); felt.atlas = t
+		var fw: float = float(t.get_width()); var fh: float = float(t.get_height())
+		felt.region = Rect2(fw*0.262, fh*0.30, fw*0.078, fh*0.44)   # чисте сукно таці
+		hl.texture = felt
+		hl.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		hl.stretch_mode = TextureRect.STRETCH_SCALE
+		hl.size = Vector2(x1 - x0, th*0.80); hl.position = Vector2(x0, tray.position.y + th*0.10)
 		hl.mouse_filter = Control.MOUSE_FILTER_IGNORE; hl.visible = false
 		host.add_child(hl)
 		(tray_marks[scr] as Dictionary)[tl] = hl
@@ -4014,9 +4027,13 @@ func _build_tool_tray(scr: String) -> void:
 		host.add_child(b)
 
 func _refresh_tray_marks() -> void:
+	# інструмент, який гравець тримає, ЗНИКАЄ зі свого гнізда: поверх нього лягає
+	# виріз порожнього сукна тієї самої таці (Віктор, 31.07: «із набору інструментів
+	# мають зникати»). Так видно, що саме в руці, без жодного напису.
 	for scr in tray_marks:
 		for tl in (tray_marks[scr] as Dictionary):
-			((tray_marks[scr] as Dictionary)[tl] as ColorRect).visible = (active_tool == tl)
+			var nd = (tray_marks[scr] as Dictionary)[tl]
+			if nd is CanvasItem: (nd as CanvasItem).visible = (active_tool == tl)
 
 # МОМЕНТ ВІДКРИТТЯ (правило 14): дошка знята — камера повільно входить у зазор,
 # тримає подих на чистому прямокутнику в пилюці, відступає. Без жодного тексту.
@@ -4217,6 +4234,14 @@ func _c2_part_toggle(zone_id: String) -> bool:
 			_box_animate(1, func():
 				_set_hint("The lid comes up on its hinges; the box stands open.")
 				_show("C2OPEN"))
+			return true
+		"z.sec.lid_close":
+			# клік будь-де по відкритій скриньці = закрити (Віктор, 31.07: дія має
+			# жити на самій речі, а не лише в кнопці внизу)
+			ff_open = false
+			_box_animate(-1, func():
+				_set_hint("The lid closes; the box stands as it came in.")
+				_show("C2PIECE"))
 			return true
 		"z.sec.drawer_front":
 			_play("goblet_set")

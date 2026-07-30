@@ -23,8 +23,8 @@ const ZONES := {
 	},
 	&"z.sec.fallfront": {
 		"kind": &"img", "screen": &"C2PIECE", "surface": &"box_closed",
-		"u": Vector2(0.49, 0.458), "shape": &"rect", "half": Vector2(0.23, 0.17),
-		"hint": "The lid",
+		"u": Vector2(0.545, 0.545), "shape": &"rect", "half": Vector2(0.30, 0.245),
+		"hint": "The box — open it",
 		"tools": [&"tool.hand", &"tool.eye"],
 	},
 	&"z.sec.drawer_front": {
@@ -34,6 +34,14 @@ const ZONES := {
 		"tools": [&"tool.hand", &"tool.eye"],
 	},
 	# --- скринька відкрита: екран C2OPEN ---
+	# клік будь-де по відкритій скриньці — закрити. Найбільша зона екрана, тож
+	# дошка, ніша й ярличок виграють у pick_2d як менші.
+	&"z.sec.lid_close": {
+		"kind": &"img", "screen": &"C2OPEN", "surface": &"box_open",
+		"u": Vector2(0.53, 0.50), "shape": &"rect", "half": Vector2(0.32, 0.45),
+		"hint": "Close the box",
+		"tools": [&"tool.hand", &"tool.eye"],
+	},
 	&"z.well.back_board": {
 		"kind": &"img", "screen": &"C2OPEN", "surface": &"box_open",
 		"u": Vector2(0.40, 0.26), "shape": &"rect", "half": Vector2(0.16, 0.15),
