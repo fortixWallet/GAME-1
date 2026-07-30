@@ -801,7 +801,7 @@ var last_fact_count := -1
 
 # Екрани, на яких гравець тримає РІЧ справи 2 (плити скриньки). Драбина підказок
 # і холостий таймер живуть саме тут, а не на покинутих 3D-екранах.
-const C2_SCREENS := ["C2PIECE", "C2OPEN", "C2STAMP", "C2GRAIN", "C2RECESS", "C2SCREW"]
+const C2_SCREENS := ["C2PIECE", "C2OPEN", "C2STAMP", "C2RECESS", "C2SCREW"]
 
 func _c2_ladder() -> String:
 	if not facts.has("f.board_screwed"):
@@ -3662,7 +3662,6 @@ func _build_case2_plates() -> void:
 					_set_hint("The lid closes; the box stands as it came in.")
 					_show("C2PIECE")))
 	_plate_screen("C2STAMP", "box_under", "C2PIECE", "←  set it right way up")
-	_plate_screen("C2GRAIN", "c2_endgrain", "C2OPEN", "←  step back")
 	_plate_screen("C2RECESS", "c2_recess", "C2OPEN", "←  step back")
 	_plate_screen("C2SCREW", "screw_macro", "C2OPEN", "←  step back")
 
@@ -4187,8 +4186,6 @@ func _c2_part_toggle(zone_id: String) -> bool:
 			_show("C2STAMP"); return true
 		"z.void.mouth":
 			_show("C2RECESS"); return true
-		"z.void.rim":
-			_show("C2GRAIN"); return true
 		"z.screws.loose":
 			_show("C2SCREW"); return true
 	return false

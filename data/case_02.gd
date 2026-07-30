@@ -55,22 +55,16 @@ const ZONES := {
 		"tools": [&"tool.hand", &"tool.eye"],
 		"requires_state": {&"z.well.back_board": &"open"},
 	},
-	&"z.void.rim": {
-		"kind": &"img", "screen": &"C2RECESS", "surface": &"c2_recess",
-		"u": Vector2(0.50, 0.11), "shape": &"rect", "half": Vector2(0.34, 0.09),
-		"hint": "The cut edge of the lining",
-		"tools": [&"tool.hand", &"tool.eye"],
-	},
 	&"z.void.lining": {
-		"kind": &"img", "screen": &"C2GRAIN", "surface": &"c2_endgrain",
-		"u": Vector2(0.32, 0.5), "shape": &"rect", "half": Vector2(0.28, 0.36),
-		"hint": "The lining of the recess",
+		"kind": &"img", "screen": &"C2RECESS", "surface": &"c2_recess",
+		"u": Vector2(0.885, 0.40), "shape": &"rect", "half": Vector2(0.085, 0.34),
+		"hint": "Where the lining meets the wood of the box",
 		"tools": [&"tool.loupe"],
 		"requires_state": {&"z.well.back_board": &"open"},
 	},
 	&"z.void.floor": {
 		"kind": &"img", "screen": &"C2RECESS", "surface": &"c2_recess",
-		"u": Vector2(0.5, 0.6), "shape": &"rect", "half": Vector2(0.35, 0.28),
+		"u": Vector2(0.42, 0.45), "shape": &"rect", "half": Vector2(0.33, 0.36),
 		"hint": "The floor of the recess",
 		"tools": [&"tool.rake", &"tool.loupe"],
 		"requires_state": {&"z.well.back_board": &"open"},
@@ -78,7 +72,7 @@ const ZONES := {
 	# --- вийнята шухляда в руках: екран DRAWER ---
 	&"z.drawer.underside": {
 		"kind": &"img", "screen": &"C2STAMP", "surface": &"box_under",
-		"u": Vector2(0.555, 0.50), "shape": &"rect", "half": Vector2(0.10, 0.06),
+		"u": Vector2(0.425, 0.636), "shape": &"rect", "half": Vector2(0.11, 0.075),
 		"hint": "The underside of the box",
 		"tools": [&"tool.eye", &"tool.rake", &"tool.loupe"],
 	},

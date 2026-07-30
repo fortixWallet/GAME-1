@@ -452,4 +452,5 @@ const T := {
 "SPRUCE — the case wood": "ЯЛИНА — дерево коробу",
 "of every Vienna case.": "кожного віденського коробу.",
 "Frau Vogl, housekeeper twenty-two years to the late Herr F.\nThe writing box is hers by his will, and she means to sell it.": "Пані Фоґль, двадцять два роки економка покійного пана Ф.\nСкринька належить їй за його волею, і вона має намір її продати.",
+"Where the lining meets the wood of the box": "Там, де обшивка межує з деревом скриньки",
 }
