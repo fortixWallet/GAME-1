@@ -28,6 +28,22 @@ python3 tools/check_gd_rules.py 2>&1)
   fi
 fi
 
+# 0б) КАДРИ ОДНОГО ПРЕДМЕТА ТРИМАЮТЬ ОДНУ КАМЕРУ (правило 19). Фазова кореляція по
+#     нерухомій частині кадру. Ловить те, що бачить лише око гравця: стрибок ракурсу
+#     між станами речі. Тиждень 24–31.07 пішов саме на це.
+PY=$(command -v python3)
+for c in /Users/skydrows/Documents/Trading/.venv/bin/python3 "$PY"; do
+  [ -x "$c" ] && "$c" -c "import numpy, PIL" 2>/dev/null && PY="$c" && break
+done
+FOUT=$("$PY" tools/check_frames.py 2>&1); FRC=$?
+echo "--- check_frames ---" >>"$LOG"; echo "$FOUT" >>"$LOG"
+if [ $FRC -ne 0 ]; then
+  echo "КАДРИ РОЗІЙШЛИСЬ — у грі це стрибок ракурсу:"
+  echo "$FOUT" | grep -E "✗|FRAMES"
+  exit 2
+fi
+echo "$FOUT" | grep "^FRAMES"
+
 # 1) імпорт: перший запуск може впасти на шрифті (баг 4.6.3) — тому дві спроби
 godot --headless --path . --import >>"$LOG" 2>&1
 godot --headless --path . --import >>"$LOG" 2>&1
