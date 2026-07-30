@@ -647,14 +647,38 @@ func _loupe_frame() -> void:
 		loupe_vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS
 		_aim_loupe(gc)
 		_hover_zone_3d(gc)
+	elif paper_frames.has(_shown()):
+		# НА ПЛИТІ Й НА ПАПЕРІ: збільшення з ОРИГІНАЛУ намальованого аркуша
+		loupe_vp_tex.visible = false; loupe_glass.visible = true
+		if loupe_vp: loupe_vp.render_target_update_mode = SubViewport.UPDATE_DISABLED
+		_glass_plate(gc)
 	else:
 		# НА СТОЛІ: різке збільшення з ОРИГІНАЛУ картини (не з екрана)
 		loupe_vp_tex.visible = false; loupe_glass.visible = true
 		if loupe_vp: loupe_vp.render_target_update_mode = SubViewport.UPDATE_DISABLED
 		_glass_desk(gc)
 
+# скло над ПЛИТОЮ/ПАПЕРОМ: аркуш вписаний у свій прямокутник один-в-один,
+# тож uv рахується прямо з нього. Джерело — оригінальна текстура, не екран,
+# тому під склом видно деталі, яких на екрані просто нема.
+func _glass_plate(gc: Vector2) -> void:
+	var d: Dictionary = paper_frames.get(_shown(), {})
+	var t2: Texture2D = d.get("tex", null)
+	if t2 == null: return
+	var fr: Rect2 = d["frame"]
+	if fr.size.x <= 1.0 or fr.size.y <= 1.0: return
+	var mat: ShaderMaterial = loupe_glass.material
+	mat.set_shader_parameter("src", t2)
+	var gr: float = GLASS_R*loupe_lw*2.0
+	mat.set_shader_parameter("center", Vector2((gc.x-fr.position.x)/fr.size.x,
+											   (gc.y-fr.position.y)/fr.size.y))
+	const PLATE_ZOOM := 2.1
+	mat.set_shader_parameter("span", Vector2(gr/(fr.size.x*PLATE_ZOOM),
+											 gr/(fr.size.y*PLATE_ZOOM)))
+
 # скло над столом: екранна точка gc → uv в ОРИГІНАЛІ case_desk (інверсія COVERED-мапінгу)
 func _glass_desk(gc: Vector2) -> void:
+	(loupe_glass.material as ShaderMaterial).set_shader_parameter("src", tex_comp)
 	var iw: float = float(tex["case_desk"].get_width()); var ih: float = float(tex["case_desk"].get_height())
 	var sc: float = maxf(W/iw, H/ih)
 	var dw: float = iw*sc; var dh: float = ih*sc
@@ -1169,6 +1193,7 @@ func _dbg_pilot() -> void:
 		# «не подивився» на вигляд однакові. facts=N ловить мовчазні провали правил.
 		fd.store_string("done " + str(seq) + " screen=" + _shown()
 			+ " facts=" + str(facts.size()) + "/" + str(_case_facts_table().size())
+			+ " tool=" + String(active_tool) + " loupe=" + str(loupe_held)
 			+ " shot=" + shot_name)
 		fd.close()
 	get_tree().quit()
@@ -1519,19 +1544,19 @@ func _auto_read(scr: String) -> void:
 
 func _show(name: String) -> void:
 	# папери на весь екран — скло кладеться саме (воно інструмент столу і рук)
-	if loupe_held and name != "DESK" and name != "HANDS":
+	if loupe_held and name != "DESK" and name != "HANDS" and not paper_frames.has(name):
 		_drop_loupe()
 	_set_hint("")   # старий банер не їде через екрани (say нового правила ляже ПІСЛЯ _show)
 	if hand_tool_ui: call_deferred("_refresh_hand_sprite")
 	call_deferred("_auto_read", name)
-	if c2_loupe and name not in ["FURN", "WELL", "DRAWER"]: _c2_loupe_set(false)
+	if c2_loupe and name not in C2_SCREENS: _c2_loupe_set(false)
 	if case_id == 2 and name in ["WELL", "DRAWER"] and sec_pivot:
 		sec_yaw = 0.0; sec_pivot.rotation.y = 0.0   # деталь-кадри дивляться на фасад
 	if case_id == 2 and name in ["C2PIECE", "C2OPEN"] and not box_busy: _c2_plate_sync()
 	if case_id == 2 and name in C2_SCREENS and not dbg_mode:
 		var step0 := _c2_ladder()
 		if step0 != "": call_deferred("_set_hint", step0)
-	elif not c2_loupe and active_tool == &"tool.loupe" and name in ["FURN", "WELL", "DRAWER"]:
+	elif not c2_loupe and active_tool == &"tool.loupe" and false:
 		call_deferred("_c2_loupe_set", true)
 	cup_dragging = false   # не тягнемо чашу крізь зміну екрана (інакше лупа завмирає)
 	for k in screens: screens[k].visible = (k == name)
@@ -1589,6 +1614,11 @@ func _paper_catcher(screen_name: String, parent: Control, paper: Control) -> voi
 	paper_frames[screen_name] = {
 		"frame": Rect2(paper.position, paper.size),
 		"aspect": paper.size.x / maxf(paper.size.y, 1.0),
+		# ЛУПА НА ПЛИТІ Й НА ПАПЕРІ: скло збільшує ОРИГІНАЛ намальованого аркуша,
+		# а не екран. Без цього посилання лупа на 2D не мала що показувати —
+		# вона бралась у руку, але скло лишалось порожнім, і виглядало, ніби
+		# інструмент не береться взагалі (Віктор, 31.07).
+		"tex": (paper as TextureRect).texture if paper is TextureRect else null,
 	}
 	var c := Control.new()
 	c.name = "zone_catcher"
@@ -1767,14 +1797,22 @@ func _pick_tool(tl: StringName) -> void:
 			&"tool.screwdriver": _set_hint("The screwdriver in hand — four screws hold that board.")
 			&"tool.scales": _set_hint("The scales stand ready — set the cup on them.")
 	_refresh_hand_sprite()
-	_c2_loupe_set(active_tool == &"tool.loupe" and _shown() in ["FURN", "WELL", "DRAWER"])
+	# лупа на 2D бере скло в руку тут же, на тому екрані, де стоїть річ
+	if active_tool == &"tool.loupe" and paper_frames.has(_shown()):
+		loupe_held = true; loupe_ui.visible = true
+		loupe_glass.visible = true; loupe_vp_tex.visible = false
+		move_child(loupe_ui, get_child_count()-1)
+		if hint_band: move_child(hint_band, get_child_count()-1)
+		if hint_label: move_child(hint_label, get_child_count()-1)
+	elif loupe_held and paper_frames.has(_shown()):
+		loupe_held = false; loupe_ui.visible = false
 
 # спрайт інструмента в руці: видимий, коли взято НЕ лупу (лупа має власне скло)
 func _refresh_hand_sprite() -> void:
 	if hand_tool_ui == null: return
 	var names := {&"tool.caliper": "hand_caliper", &"tool.rake": "hand_rake"}   # викрутка — 3D-деталь, не спрайт
 	if not names.has(active_tool) or not tex.has(names[active_tool]) \
-			or _shown() not in ["FURN", "WELL", "DRAWER", "DESK", "HANDS"]:
+			or not (_shown() in ["DESK", "HANDS"] or paper_frames.has(_shown())):
 		# поза предметними екранами інструмент лишається в руці ЛОГІЧНО, але спрайт
 		# не висить привидом над паперами і атестатом (плейтест 27.07)
 		hand_tool_ui.visible = false
