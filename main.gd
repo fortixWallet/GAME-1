@@ -132,6 +132,8 @@ var ff_closed_deg := 72.0             # кут зачиненої кришки �
 var sec_driver: Node3D                # 3D-викрутка
 var bright_veil: ColorRect            # шар яскравості поверх усього
 var settings_prev := ""
+var box_frame_img := {}                # TextureRect плити за екраном
+var box_busy := false                 # кришка в русі
 var doors_open := false
 var ff_open := false                  # чи вже відкинуто
 var ff_hinge: Node3D                  # вузол-завіса: навколо нього відкидається дошка
@@ -1148,7 +1150,11 @@ func _dbg_pilot() -> void:
 		var shot_name := "p%03d.png" % seq
 		await _shot(dirp + shot_name, 2)
 		var fd := FileAccess.open(done_path, FileAccess.WRITE)
-		fd.store_string("done " + str(seq) + " screen=" + _shown() + " shot=" + shot_name)
+		# правило 17: звіт друкує СКІЛЬКИ побачив — інакше «нічого не знайшов» і
+		# «не подивився» на вигляд однакові. facts=N ловить мовчазні провали правил.
+		fd.store_string("done " + str(seq) + " screen=" + _shown()
+			+ " facts=" + str(facts.size()) + "/" + str(_case_facts_table().size())
+			+ " shot=" + shot_name)
 		fd.close()
 	get_tree().quit()
 
@@ -1491,7 +1497,7 @@ func _load() -> void:
 	# справа 2 «Спадок удови»
 	for n3 in ["hub_day","hub_day_case","hub_lamp_off","hub_evening","hub_evening_figure","hub_night","hub_darkness","menu_door","client_woman","client_in_room","subtitle_band"]:
 		if ResourceLoader.exists(ART + n3 + ".png"): tex[n3] = load(ART + n3 + ".png")
-	for n2 in ["case2_desk","watch_wear","watch_chain","paper_receipt_1807","reg_page_h","marks_page_vienna","notebook_spread","mark_diana_macro","mark_maker_macro","tool_tray","hand_caliper","hand_screwdriver","hand_rake","wood_page","plain_book_page","dust_floor","client_vogl","screw_macro","board_face","cl1_p2","cl1_p3","cl1_p4","cl2_p2","cl2_p3","cl2_p4","cl2_door","sec_section","bureau_room","c2_piece","c2_open","c2_stamp","c2_endgrain","c2_recess","box_closed","box_open","box_under"]:
+	for n2 in ["case2_desk","watch_wear","watch_chain","paper_receipt_1807","reg_page_h","marks_page_vienna","notebook_spread","mark_diana_macro","mark_maker_macro","tool_tray","hand_caliper","hand_screwdriver","hand_rake","wood_page","plain_book_page","dust_floor","client_vogl","screw_macro","board_face","cl1_p2","cl1_p3","cl1_p4","cl2_p2","cl2_p3","cl2_p4","cl2_door","sec_section","bureau_room","c2_piece","c2_open","c2_stamp","c2_endgrain","c2_recess","box_closed","box_a1","box_a2","box_open","box_under"]:
 		if ResourceLoader.exists(ART + n2 + ".png"): tex[n2] = load(ART + n2 + ".png")
 	# опційний арт (додано 24.07): чистий лист клієнтки
 	if ResourceLoader.exists(ART + "letter_client.png"):
@@ -1539,14 +1545,15 @@ func _screen(name: String) -> Control:
 
 # довідникові екрани: відкриття сторінки і Є читанням — правила tool="*"
 # застосовуються самі (закриті чесно відповідають req_say)
-const AUTO_READ := ["BOOK_MARKS", "BOOK_SCREWS", "BOOK_REG", "BOOK_WOOD"]
+const AUTO_READ := ["BOOK_MARKS", "BOOK_SCREWS", "BOOK_REG", "BOOK_WOOD", "C2DOCS", "C2STAMP", "C2GRAIN", "C2RECESS", "C2SCREW"]
 func _auto_read(scr: String) -> void:
 	if scr not in AUTO_READ: return
 	for id in _case_zones():
 		var z: Dictionary = _case_zones()[id]
 		if String(z.get("screen", &"")) != scr: continue
 		if String(z.get("kind", &"")) != "img": continue
-		_apply_zone(String(id), &"*")
+		var tls: Array = z.get("tools", [])
+		_apply_zone(String(id), StringName(tls[0]) if not tls.is_empty() else &"*")
 
 func _show(name: String) -> void:
 	# папери на весь екран — скло кладеться саме (воно інструмент столу і рук)
@@ -1631,7 +1638,10 @@ func _paper_catcher(screen_name: String, parent: Control, paper: Control) -> voi
 			var id := _pick_2d_at(screen_name, c.position + (ev as InputEventMouseButton).position)
 			if id != "":
 				if _plate_click(id): return
-				_apply_zone(id, active_tool)
+				# ОКО ЗАВЖДИ ПРИ ТОБІ. Без цього клік порожньою рукою йшов у рушій
+				# як tool="*", жодне правило не збігалось (rules.gd:66), і гра
+				# промовляла текст, не даючи факту — записник лишався порожній.
+				_apply_zone(id, active_tool if active_tool != &"*" else &"tool.eye")
 		elif ev is InputEventMouseMotion:
 			var id2 := _pick_2d_at(screen_name, c.position + (ev as InputEventMouseMotion).position)
 			var z: Dictionary = _case_zones().get(StringName(id2), {})
@@ -1667,14 +1677,26 @@ func _apply_zone(zone_id: String, tool: StringName = &"*") -> void:
 			return
 		# правило вже віддало все — повторити say останнього придатного, але лише
 		# якщо воно про ЦЕЙ інструмент (повтор тексту стуку на клік циркулем збивав з ніг)
+		# І ЛИШЕ ЯКЩО ВОНО СПРАВДІ ВІДПРАЦЮВАЛО: yields_new==true означає, що правило
+		# ще має що дати, і його не пустив сюди інструмент. Промовити його say тоді —
+		# збрехати гравцеві відкриттям, якого не було (28.07: банер про чотири шурупи
+		# з'являвся, а факт не писався, і записник лишався порожній).
 		for r in _case_rules():
 			var rr: Dictionary = r
 			if StringName(rr.get("zone", &"")) != StringName(zone_id): continue
 			var rt := StringName(rr.get("tool", &"*"))
 			if rt != tool and rt != &"*" and tool != &"*": continue
-			if RuleEngine.applicable(rr, facts, _flags()):
-				_play(String(rr["sfx"]) if rr.has("sfx") and aud.has(String(rr.get("sfx",""))) else "ui_soft")
-				_set_hint(String(rr.get("say", ""))); return
+			if not RuleEngine.applicable(rr, facts, _flags()): continue
+			if RuleEngine.yields_new(rr, facts, _flags(), zone_states): continue
+			_play(String(rr["sfx"]) if rr.has("sfx") and aud.has(String(rr.get("sfx",""))) else "ui_soft")
+			_set_hint(String(rr.get("say", ""))); return
+		# зона щось приховує, але не для цієї руки — сказати це, а не мовчати
+		for r2 in _case_rules():
+			var rr2: Dictionary = r2
+			if StringName(rr2.get("zone", &"")) != StringName(zone_id): continue
+			_play("ui_soft")
+			_set_hint(_t("Not the tool for this — try another from the tray."))
+			return
 		return
 	_apply_rule(rule)
 
@@ -1893,7 +1915,6 @@ const CHAPTERS := [
 	["9 · Evening — the room",        "evening"],
 	["10 · Darkness",                 "dark"],
 	["11 · The ledger",               "ledger"],
-	["12 · Case 2 — the secretaire", "case2"],
 ]
 
 # ── СТАН → ВИГЛЯД: рівно три входи, і четвертого нема ────────────────────────
@@ -2043,7 +2064,6 @@ func _build_chapters() -> void:
 		]],
 		["CASE 2 · THE SECRETAIRE", 0.565, [
 			["Frau Vogl at the counter", "client2"],
-			["The piece, floor to cornice", "case2"],
 		]],
 	]
 	for g in groups:
@@ -2577,10 +2597,13 @@ func _show_notebook() -> void:
 func _refresh_notebook() -> void:
 	if not screens.has("NOTEBOOK"):
 		var s0 := _screen("NOTEBOOK")
-		_paper_backdrop(s0, 0.18)   # та сама підкладка-стіл, що в паперів (аудит: «сіра пустка»)
+		var bd := _bg(s0, tex["case_desk"], true)   # підкладка-стіл (аудит: «сіра пустка»)
+		bd.modulate = Color(0.18, 0.169, 0.194)
+		bd.set_meta("keep", true)   # ← інакше прибирання нижче зносить її разом з текстом
 		s0.set_meta("built", true)
 	var s: Control = screens["NOTEBOOK"]
 	for c in s.get_children():
+		if c.has_meta("keep"): continue
 		if c is TextureRect or c is Label or c is Button: c.queue_free()
 	var t: Texture2D = tex["notebook_spread"]
 	var nh := H*0.96; var nw := nh*float(t.get_width())/float(t.get_height())
@@ -2676,11 +2699,11 @@ func _refresh_notebook() -> void:
 	if pcur < pcount - 1:
 		_txtbtn(s, "the later leaves  ⟩", Vector2(W*0.68, H*0.92), func():
 			notebook_page = pcur + 1; _refresh_notebook(), 0.024)
+	# «нічого не записано» СІДАЄ НА ЛІНІЮ під списком граф, а не в абсолютну точку
+	# зверху — там воно налазило на заголовок «Що бюро мусить сказати» (28.07)
 	if notebook_rows == 0:
-		var e := Label.new(); e.label_settings = _ls(fh, int(nh*0.024), Color(0.44,0.36,0.28))
-		e.text = _t("Nothing set down yet.")
-		e.position = pg.position + Vector2(nw*0.10, nh*0.10)
-		e.mouse_filter = Control.MOUSE_FILTER_IGNORE; s.add_child(e)
+		_lined_text(s, pg, NB_FIRST, NB_STEP, li, cols[col], col_w,
+			_t("Nothing set down yet."), fh, 0.56, Color(0.50,0.43,0.35))
 	_txtbtn(s, "←  put it away", Vector2(W*0.04, H*0.92), func(): _show(notebook_prev))
 
 # МАКРО-ПЛАН КЛЕЙМ (Віктор, 27.07: «на клеймі Діани не видно букви — в цьому і
@@ -3561,6 +3584,33 @@ func _tone_wood(root: Node) -> void:
 # ЕКРАН-ПЛИТА (стиль Strange Antiquities, 30.07): мальована річ на весь кадр,
 # зони кліку — у частках зображення. Жодного 3D: усе, що гравець роздивляється,
 # намальоване, а лупа і довідники працюють тим самим механізмом, що в справі 1.
+const BOX_FRAMES := ["box_closed", "box_a1", "box_a2", "box_open"]
+
+# Прокрутити кадри кришки. dir=+1 відкриває, −1 закриває; у кінці — веде на екран.
+func _box_animate(dir: int, on_end: Callable) -> void:
+	var host: Control = screens.get("C2PIECE", null) if dir > 0 else screens.get("C2OPEN", null)
+	var img: TextureRect = box_frame_img.get("C2PIECE" if dir > 0 else "C2OPEN", null)
+	if img == null or box_busy:
+		on_end.call(); return
+	box_busy = true
+	var seq: Array = BOX_FRAMES.duplicate()
+	if dir < 0: seq.reverse()
+	var tw := create_tween()
+	for i in seq.size():
+		var nm: String = seq[i]
+		tw.tween_callback(func():
+			if tex.has(nm): img.texture = tex[nm])
+		tw.tween_interval(0.11)
+	tw.tween_callback(func():
+		box_busy = false
+		# ОБИДВІ плити на крайній кадр: інакше друга лишається в старому стані
+		var last: String = seq[seq.size()-1]
+		for k in ["C2PIECE", "C2OPEN"]:
+			var im2: TextureRect = box_frame_img.get(k, null)
+			if im2 and tex.has(last): im2.texture = tex[last]
+		on_end.call())
+	_play("page_turn")
+
 func _plate_screen(scr: String, texname: String, back_to: String, back_lbl: String) -> Dictionary:
 	var s := _screen(scr)
 	_paper_backdrop(s, 0.10)
@@ -3578,14 +3628,25 @@ func _plate_screen(scr: String, texname: String, back_to: String, back_lbl: Stri
 		im.position = Vector2((W - iw) * 0.5, (H - ih) * 0.5)
 		im.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		s.add_child(im)
+	box_frame_img[scr] = im
 	_txtbtn(s, back_lbl, Vector2(W*0.04, H*0.92), func(): _show(back_to))
 	_txtbtn(s, "✎", Vector2(W*0.945, H*0.055), func(): _show_notebook(), 0.030)
 	_paper_catcher(scr, s, im)
+	_build_tool_tray(scr)   # лупа й викрутка мусять бути там, де річ
 	return {"s": s, "pg": im}
 
 func _build_case2_plates() -> void:
 	_plate_screen("C2PIECE", "box_closed", "C2DOCS", "←  set it aside")
-	_plate_screen("C2OPEN", "box_open", "C2PIECE", "←  close the box")
+	var po := _plate_screen("C2OPEN", "box_open", "C2PIECE", "←  close the box")
+	for cb in (po["s"] as Control).get_children():
+		if cb is Button and (cb as Button).text.find("close the box") >= 0:
+			for sig in (cb as Button).pressed.get_connections():
+				(cb as Button).pressed.disconnect(sig["callable"])
+			(cb as Button).pressed.connect(func():
+				ff_open = false
+				_box_animate(-1, func():
+					_set_hint("The lid closes; the box stands as it came in.")
+					_show("C2PIECE")))
 	_plate_screen("C2STAMP", "box_under", "C2PIECE", "←  set it right way up")
 	_plate_screen("C2GRAIN", "c2_endgrain", "C2OPEN", "←  step back")
 	_plate_screen("C2RECESS", "c2_recess", "C2OPEN", "←  step back")
@@ -4094,9 +4155,11 @@ func _case2_input(ev: InputEvent) -> void:
 func _c2_part_toggle(zone_id: String) -> bool:
 	match zone_id:
 		"z.sec.fallfront":
-			_play("goblet_set"); ff_open = true
-			_set_hint("The fall-front lets down on its hinges; the writing well stands open.")
-			_show("C2OPEN"); return true
+			ff_open = true
+			_box_animate(1, func():
+				_set_hint("The lid comes up on its hinges; the box stands open.")
+				_show("C2OPEN"))
+			return true
 		"z.sec.drawer_front":
 			_play("goblet_set")
 			_set_hint("The long drawer rides out on its runners.")
