@@ -87,8 +87,9 @@ for t in "walk a" "walk b" "walk c" "walk e" "walk p" "walk q" "chapters" "outco
     # виглядають як покриття, а насправді одна з них не перевіряється ніколи
     "outcomes") echo "$OUT" | grep -q "OUTCOMES_OK cases=5 unique_ids=4" || FAIL="$FAIL outcomes" ;;
     # жоден текст не має налазити на інший (вимога Віктора, 26.07)
-    # furnprobe: жодна зона не сміє дивитись нормаллю від своєї камери
-    "furnprobe") echo "$OUT" | grep -q "fails= 0" || echo "$OUT" | grep -q "fails=0" || FAIL="$FAIL zone-facing" ;;
+    # furnprobe: 2D-шлях справи 2 — жодної зони без екрана чи поза плитою, жодного
+    # екрана без виходу, і всі 12 фактів досяжні (стара проба 3D-мешів знята 30.07)
+    "furnprobe") echo "$OUT" | grep -qE "C2PROBE_OK bad_screen=0 bad_frame=0 no_exit=0 facts=12/12" || FAIL="$FAIL c2probe" ;;
     # walk q: записник гортається; 15 фактів справи 2 розкладено по аркушах
     "walk q")   echo "$OUT" | grep -q "WALK_Q_OK rows_first=10 rows_last=2 total=12" || FAIL="$FAIL walk-q" ;;
     # walk p: усі лінійовані папери будуються з живими фактами без падінь

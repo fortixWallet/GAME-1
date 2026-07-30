@@ -14,37 +14,52 @@ extends RefCounted
 const START_TOOLS := [&"tool.loupe", &"tool.rake", &"tool.screwdriver"]
 
 const ZONES := {
-	# --- корпус: екран FURN ---
+	# --- скринька на столі: екран C2PIECE (зони міряні по плиті) ---
 	&"z.sec.escutcheon": {
 		"kind": &"img", "screen": &"C2PIECE", "surface": &"box_closed",
-		"u": Vector2(0.50, 0.62), "shape": &"circle", "r": 0.045,
+		"u": Vector2(0.555, 0.715), "shape": &"circle", "r": 0.055,
 		"hint": "The keyhole escutcheon",
 		"tools": [&"tool.loupe", &"tool.eye"],
 	},
-	&"z.sec.doors": {
-		"kind": &"img", "screen": &"C2PIECE", "surface": &"box_closed",
-		"u": Vector2(0.50, 0.36), "shape": &"rect", "half": Vector2(0.20, 0.08),
-		"hint": "The upper doors",
-		"tools": [&"tool.hand", &"tool.eye"],
-	},
 	&"z.sec.fallfront": {
 		"kind": &"img", "screen": &"C2PIECE", "surface": &"box_closed",
-		"u": Vector2(0.50, 0.47), "shape": &"rect", "half": Vector2(0.22, 0.10),
-		"hint": "The fall-front — it lets down into a writing surface",
+		"u": Vector2(0.49, 0.458), "shape": &"rect", "half": Vector2(0.23, 0.17),
+		"hint": "The lid",
 		"tools": [&"tool.hand", &"tool.eye"],
 	},
 	&"z.sec.drawer_front": {
 		"kind": &"img", "screen": &"C2PIECE", "surface": &"box_closed",
-		"u": Vector2(0.50, 0.70), "shape": &"rect", "half": Vector2(0.22, 0.06),
-		"hint": "The lid of the box",
+		"u": Vector2(0.50, 0.755), "shape": &"rect", "half": Vector2(0.21, 0.035),
+		"hint": "The underside of the box",
 		"tools": [&"tool.hand", &"tool.eye"],
 	},
-	# --- писальний відділ (дошка відкинута): екран WELL ---
+	# --- скринька відкрита: екран C2OPEN ---
 	&"z.well.back_board": {
 		"kind": &"img", "screen": &"C2OPEN", "surface": &"box_open",
 		"u": Vector2(0.40, 0.26), "shape": &"rect", "half": Vector2(0.16, 0.15),
 		"hint": "The board in the lid — held by four screws",
 		"tools": [&"tool.eye", &"tool.loupe", &"tool.screwdriver"],
+	},
+	# --- дошку знято: входи в деталі з того самого середнього плану ---
+	&"z.void.mouth": {
+		"kind": &"img", "screen": &"C2OPEN", "surface": &"box_noboard",
+		"u": Vector2(0.41, 0.27), "shape": &"rect", "half": Vector2(0.16, 0.13),
+		"hint": "The cavity behind the board",
+		"tools": [&"tool.hand", &"tool.eye"],
+		"requires_state": {&"z.well.back_board": &"open"},
+	},
+	&"z.screws.loose": {
+		"kind": &"img", "screen": &"C2OPEN", "surface": &"box_noboard",
+		"u": Vector2(0.51, 0.824), "shape": &"rect", "half": Vector2(0.09, 0.045),
+		"hint": "The four screws, out on the pad",
+		"tools": [&"tool.hand", &"tool.eye"],
+		"requires_state": {&"z.well.back_board": &"open"},
+	},
+	&"z.void.rim": {
+		"kind": &"img", "screen": &"C2RECESS", "surface": &"c2_recess",
+		"u": Vector2(0.50, 0.11), "shape": &"rect", "half": Vector2(0.34, 0.09),
+		"hint": "The cut edge of the lining",
+		"tools": [&"tool.hand", &"tool.eye"],
 	},
 	&"z.void.lining": {
 		"kind": &"img", "screen": &"C2GRAIN", "surface": &"c2_endgrain",
@@ -86,19 +101,17 @@ const ZONES := {
 	&"z.doc.label_pigeonhole": {
 		"kind": &"img", "screen": &"C2OPEN", "surface": &"box_open",
 		"u": Vector2(0.60, 0.66), "shape": &"circle", "r": 0.05,
-		"hint": "A paper label in the pigeonhole",
+		"hint": "A paper label in the pen compartment",
 		"tools": [&"tool.loupe", &"tool.eye"],
 	},
 }
 
 const RULES := [
-	{"zone": &"z.sec.doors", "tool": &"tool.hand",
-	 "say": "The upper doors stand open: shelves, and nothing on them but dust."},
 	{"zone": &"z.sec.fallfront", "tool": &"tool.hand", "sets_flag": {&"ff_toggle": true},
-	 "say": "The fall-front lets down on its hinges; the writing well stands open."},
+	 "say": "The lid comes up on its hinges; the box stands open."},
 	{"zone": &"z.sec.drawer_front", "tool": &"tool.hand",
-	 "sets_state": {&"z.sec.drawer_front": &"out"}, "screen": &"DRAWER",
-	 "say": "The drawer comes out whole and rides up into both hands."},
+	 "sets_state": {&"z.sec.drawer_front": &"out"},
+	 "say": "The box lifts and turns over in both hands."},
 	{"zone": &"z.sec.escutcheon", "tool": &"tool.loupe",
 	 "facts": [&"f.escutcheon_bright"],
 	 "say": "Four scratches run from the keyhole to the lower left. Their metal is bright; the metal around them is brown."},
@@ -115,13 +128,13 @@ const RULES := [
 	{"zone": &"z.doc.register_gruber", "tool": &"*", "requires": [&"f.stamp_gruber"],
 	 "req_say": "A hundred workshops, column after column. Nothing yet to look for in them.",
 	 "facts": [&"f.reg_gruber_1822_1841"],
-	 "say": "GRUBER, Michael. Möbeltischler, Wien, Gumpendorf. Workshop stamp in use 1822–1841. Numbered his carcasses in chalk."},
+	 "say": "GRUBER, Michael. Möbeltischler, Wien, Gumpendorf. Workshop stamp in use 1822–1841. Numbered his work in chalk."},
 
 	{"zone": &"z.well.back_board", "tool": &"tool.eye",
 	 "facts": [&"f.board_screwed"],
-	 "say": "This board is held by four screws. Everywhere else the carcass is pinned with wooden dowels and square nails."},
+	 "say": "This board is held by four screws. Everywhere else the box is pinned with wooden dowels and square nails."},
 	{"zone": &"z.well.back_board", "tool": &"tool.loupe", "requires": [&"f.board_screwed"],
-	 "req_say": "Look it over plainly first — how is this board held to the carcass?",
+	 "req_say": "Look it over plainly first — how is this board held to the lid?",
 	 "facts": [&"f.screw_points"],
 	 "say": "The screws run to a sharp point. The thread is even from head to tip. Every slot passes through the centre of the head."},
 	{"zone": &"z.well.back_board", "tool": &"tool.loupe", "requires": [&"f.screw_points"],
@@ -142,10 +155,10 @@ const RULES := [
 
 	{"zone": &"z.void.lining", "tool": &"tool.loupe",
 	 "facts": [&"f.lining_fleck"],
-	 "say": "End grain of the lining: close, pale, crossed by fine bright flecks. End grain of the carcass boards beside it: coarse, resinous, no flecks."},
+	 "say": "End grain of the lining: close, pale, crossed by fine bright flecks. End grain of the walnut beside it: coarse, resinous, no flecks."},
 	{"zone": &"z.void.floor", "tool": &"tool.rake",
 	 "facts": [&"f.dust_rectangle"],
-	 "say": "Under a low light the floor is grey with settled dust, except one rectangle, 148 × 96 mm, clean to the wood. Its edges are sharp."},
+	 "say": "Under a low light the floor is grey with settled dust, except one rectangle clean to the wood. Its edges are sharp, and it is the size of a folded packet of papers."},
 	{"zone": &"z.doc.label_pigeonhole", "tool": &"tool.loupe",
 	 "facts": [&"f.trade_label"],
 	 "say": "A paper label, lifted at one corner: 'J. HALBERT — Möbel & Antiquitäten, Wien I. Repaired and fitted, 1867.'"},
@@ -156,12 +169,12 @@ const FACTS := {
 		"text": "Four scratches by the keyhole; their metal is bright, the metal around them brown."},
 	&"f.daybook_locksmith":    {"cite": "our own locksmith opened it on the 3rd", "tag": &"papers", "weight": 2,
 		"text": "Day-book, the 3rd: opened on arrival by Krenn, the bureau\'s locksmith. House keys surrendered with the piece."},
-	&"f.stamp_gruber":         {"cite": "the workshop stamp under the drawer", "tag": &"body", "weight": 2,
+	&"f.stamp_gruber":         {"cite": "the workshop stamp on the underside", "tag": &"body", "weight": 2,
 		"text": "Burnt into the box bottom: M. GRUBER · WIEN. Chalk number 367 beside it."},
 	&"f.reg_gruber_1822_1841": {"cite": "the register dates the stamp to 1822–1841", "tag": &"books", "weight": 2,
 		"text": "Register: Gruber, Michael, Möbeltischler, Wien-Gumpendorf. Stamp in use 1822–1841."},
-	&"f.board_screwed":        {"cite": "screws where the rest of the carcass is dowelled", "tag": &"body", "weight": 2,
-		"text": "Four screws hold the well\'s back board. The rest of the carcass is dowelled and square-nailed."},
+	&"f.board_screwed":        {"cite": "screws where the rest of the box is dowelled", "tag": &"body", "weight": 2,
+		"text": "Four screws hold the board in the lid. The rest of the box is dowelled and square-nailed."},
 	&"f.screw_points":         {"cite": "pointed screws with even thread", "tag": &"body", "weight": 3,
 		"text": "The screws end in a point; the thread is even head to tip; the slots run through the centre."},
 	&"f.ref_screw_points":     {"cite": "the screw book puts that screw after 1854", "tag": &"books", "weight": 3,
@@ -170,18 +183,18 @@ const FACTS := {
 		"text": "Three slots bright and torn at one edge; the wax around those heads cracked in a ring. The fourth head stands proud."},
 	&"f.board_lifted":         {"cite": "the recess behind the board", "tag": &"body", "weight": 2,
 		"text": "Behind the board there is a recess, lined, with no dust on its front lip."},
-	&"f.lining_fleck":         {"cite": "the lining is not the wood of the carcass", "tag": &"body", "weight": 3,
-		"text": "Lining end grain: close, pale, fine bright flecks. Carcass end grain beside it: coarse, resinous, no flecks."},
-	&"f.dust_rectangle":       {"cite": "a clean rectangle in the dust, 148 × 96", "tag": &"body", "weight": 3,
-		"text": "Dust on the floor of the recess everywhere but one rectangle, 148 × 96 mm, clean to the wood, sharp at the edges."},
+	&"f.lining_fleck":         {"cite": "the lining is not the wood of the box", "tag": &"body", "weight": 3,
+		"text": "Lining end grain: close, pale, fine bright flecks. The walnut beside it: coarse, resinous, no flecks."},
+	&"f.dust_rectangle":       {"cite": "a clean rectangle in the dust", "tag": &"body", "weight": 3,
+		"text": "Dust on the floor of the recess everywhere but one rectangle, clean to the wood, sharp at the edges — the size of a folded packet of papers."},
 	&"f.trade_label":          {"cite": "the dealer\'s label of 1867", "tag": &"papers", "weight": 2,
-		"text": "Paper label in the right pigeonhole: \'J. HALBERT — Möbel & Antiquitäten, Wien I. Repaired and fitted, 1867.\'"},
+		"text": "Paper label in the pen compartment: \'J. HALBERT — Möbel & Antiquitäten, Wien I. Repaired and fitted, 1867.\'"},
 }
 
 # ── АТЕСТАТ: 6 граф (case_02.md §6, канонічна таблиця) ───────────────────────
 const SLOTS := [
 	{"id": &"s.piece", "pre": "The piece is", "kind": &"CHOICE",
-	 "hint": "( look under the drawer, then in the register )",
+	 "hint": "( turn the box over, then look in the register )",
 	 "needs": [&"f.stamp_gruber", &"f.reg_gruber_1822_1841"],
 	 "opts": [
 		[&"o.vienna_1820s", "a Viennese walnut writing box of the 1820s, by the stamped workshop"],
@@ -192,7 +205,7 @@ const SLOTS := [
 	 "hint": "( whoever cut it left his screws and his timber )",
 	 "needs": [&"f.board_screwed", &"f.screw_points", &"f.ref_screw_points", &"f.lining_fleck"],
 	 "opts": [
-		[&"o.with_carcass", "with the carcass, by the workshop that made it"],
+		[&"o.with_carcass", "with the box, by the workshop that made it"],
 		[&"o.trade_later", "later, in a dealer\'s workshop, as a selling feature"],
 		[&"o.private_later", "later, by a hand working alone, in the house"],
 	]},
@@ -225,13 +238,13 @@ const OUTCOMES := [
 	 "when": {&"s.void_origin": &"o.private_later", &"s.last_opened": &"o.within_fortnight",
 			  &"s.lock_marks": &"o.our_locksmith"},
 	 "basis_any": [&"f.dust_rectangle", &"f.slot_burr"], "basis_weight": 5,
-	 "text": "The secretaire went out at nine, to a dealer in the Wollzeile, at the figure you set. At eleven a boy brought back the receipt, unsigned. Frau Vogl did not come for the money. The shipping office holds one ticket for Thursday, paid in full, in the name of her son. It was paid on the 4th — the day after the keys were given up, and three days before she came to you."},
+	 "text": "The writing box went out at nine, to a dealer in the Wollzeile, at the figure you set. At eleven a boy brought back the receipt, unsigned. Frau Vogl did not come for the money. The shipping office holds one ticket for Thursday, paid in full, in the name of her son. It was paid on the 4th — the day after the keys were given up, and three days before she came to you."},
 	{"id": &"out.locksmith_broken",
 	 "when": {&"s.lock_marks": &"o.forced"},
 	 "text": "A constable called at eight and took the piece to the station as evidence of a forced entry. Krenn the locksmith was sent for at nine and kept until two. He has worked for this bureau eleven years. The note says he did not argue. The bureau\'s contract with him is on the desk, unsigned for renewal. Frau Vogl\'s son sailed. She was not on the quay."},
 	{"id": &"out.sold_short",
 	 "when": {&"s.void_origin": &"o.with_carcass"},
-	 "text": "Sold at your figure: sixty gulden, walnut, sound, no faults recorded. A fortnight later the Wollzeile catalogue lists it: \'Biedermeier secretaire, Vienna, c. 1825, with concealed compartment behind the writing well — 260 gulden.\' Frau Vogl\'s rent was paid to the end of the month."},
+	 "text": "Sold at your figure: sixty gulden, walnut, sound, no faults recorded. A fortnight later the Wollzeile catalogue lists it: \'Biedermeier writing box, Vienna, c. 1825, with a concealed recess behind the board in the lid — 260 gulden.\' Frau Vogl\'s rent was paid to the end of the month."},
 	{"id": &"out.trade_fitting",
 	 "when": {&"s.void_origin": &"o.trade_later"},
 	 "basis_any": [&"f.trade_label"],
