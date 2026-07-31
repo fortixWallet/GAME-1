@@ -21,5 +21,8 @@
       "/private/tmp/claude-501/-Users-skydrows-Documents-Game-Game3",
       "/tmp/claude-501/-Users-skydrows-Documents-Game-Game3"
     ]
+  },
+  "env": {
+    "CLAUDE_CODE_MAX_WEB_SEARCHES_PER_SESSION": "2000"
   }
 }

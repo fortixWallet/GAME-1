@@ -425,6 +425,11 @@ func _dbg_case2() -> void:
 	_apply_zone("z.drawer.underside", &"tool.rake")
 	_apply_zone("z.doc.register_gruber")
 	_apply_zone("z.doc.label_pigeonhole", &"tool.loupe")
+	# дослідження предмета: кожна точка кожним інструментом
+	for zid in _case_zones():
+		var z: Dictionary = _case_zones()[zid]
+		for tl in z.get("tools", []):
+			_apply_zone(String(zid), StringName(tl))
 	# 8. атестат: 19 мм руками, правильні вироки, підстава
 	_choose(0, &"o.vienna_1820s")
 	var num_ok := true
@@ -1260,6 +1265,11 @@ func _dbg_furnprobe() -> void:
 	_apply_zone("z.sec.escutcheon", &"tool.loupe")
 	_apply_zone("z.doc.daybook_intake", &"tool.eye")
 	_apply_zone("z.doc.label_pigeonhole", &"tool.loupe")
+	# дослідження предмета: кожна точка кожним інструментом
+	for zid in _case_zones():
+		var z: Dictionary = _case_zones()[zid]
+		for tl in z.get("tools", []):
+			_apply_zone(String(zid), StringName(tl))
 	# допит: питання ставляться в тому ж порядку, що й гравцем
 	for q in _case_ask():
 		_ask_put(String((q as Dictionary)["id"]))

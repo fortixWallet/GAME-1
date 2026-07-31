@@ -33,6 +33,34 @@ const ZONES := {
 		"hint": "The underside of the box",
 		"tools": [&"tool.hand", &"tool.eye"],
 	},
+	# --- предмет можна ДОСЛІДЖУВАТИ: кожна точка відповідає кожному інструменту
+	# по-своєму (Віктор, 31.07: «в нас тільки одна халепа увесь час»). Виміряно:
+	# до цього жила 20 % пар зона×інструмент — гравець тицяв туди, куди велить
+	# драбина, тим, чим вона велить. Арт не додано: усе це вже на кадрі.
+	&"z.box.slope": {
+		"kind": &"img", "screen": &"C2OPEN", "surface": &"box_open",
+		"u": Vector2(0.50, 0.52), "shape": &"rect", "half": Vector2(0.15, 0.09),
+		"hint": "The writing slope",
+		"tools": [&"tool.eye", &"tool.loupe", &"tool.rake"],
+	},
+	&"z.box.inkwells": {
+		"kind": &"img", "screen": &"C2OPEN", "surface": &"box_open",
+		"u": Vector2(0.53, 0.685), "shape": &"rect", "half": Vector2(0.19, 0.055),
+		"hint": "The inkwells and the pen trough",
+		"tools": [&"tool.eye", &"tool.loupe", &"tool.rake"],
+	},
+	&"z.box.hinges": {
+		"kind": &"img", "screen": &"C2OPEN", "surface": &"box_open",
+		"u": Vector2(0.565, 0.415), "shape": &"rect", "half": Vector2(0.055, 0.035),
+		"hint": "The hinges of the lid",
+		"tools": [&"tool.eye", &"tool.loupe", &"tool.rake"],
+	},
+	&"z.box.corners": {
+		"kind": &"img", "screen": &"C2PIECE", "surface": &"box_closed",
+		"u": Vector2(0.78, 0.44), "shape": &"rect", "half": Vector2(0.075, 0.075),
+		"hint": "The brass corner mounts",
+		"tools": [&"tool.eye", &"tool.loupe", &"tool.rake"],
+	},
 	# --- скринька відкрита: екран C2OPEN ---
 	# клік будь-де по відкритій скриньці — закрити. Найбільша зона екрана, тож
 	# дошка, ніша й ярличок виграють у pick_2d як менші.
@@ -148,6 +176,58 @@ const RULES := [
 	 "facts": [&"f.ref_screw_points"],
 	 "say": "Hand-made screws: blunt end, filed thread of uneven pitch, slot off centre. Pointed screws that cut their own way: patented 1846, made in quantity in Birmingham from 1854."},
 
+	# --- дослідження предмета: одна точка, різні інструменти, різні відповіді ---
+	{"zone": &"z.box.slope", "tool": &"tool.eye",
+	 "say": "Green baize, worn pale in a patch the size of a forearm — right of centre. He wrote right-handed, and he wrote a great deal."},
+	{"zone": &"z.box.slope", "tool": &"tool.loupe",
+	 "say": "Ink specks, old and brown, scattered where a nib is shaken out. One long scratch where the pen was dragged, not lifted."},
+	{"zone": &"z.box.slope", "tool": &"tool.rake",
+	 "facts": [&"f.slope_impress"],
+	 "say": "Under low light the baize holds impressions pressed through from above: figures in columns, and one line of them ends in a total that was underlined twice."},
+
+	{"zone": &"z.box.inkwells", "tool": &"tool.eye",
+	 "say": "Two glass wells with brass collars, and a trough between them worn smooth at the right-hand end."},
+	{"zone": &"z.box.inkwells", "tool": &"tool.loupe",
+	 "say": "The right-hand well is crusted black to a third of its depth. The left is clean glass — filled once, if ever. A man with two wells who used one."},
+	{"zone": &"z.box.inkwells", "tool": &"tool.rake",
+	 "say": "Low light in the trough: two grooves, not one. A pen and something narrower, kept side by side for years."},
+
+	{"zone": &"z.box.hinges", "tool": &"tool.eye",
+	 "say": "Two brass butt hinges, let flush into the walnut, holding the lid."},
+	{"zone": &"z.box.hinges", "tool": &"tool.loupe",
+	 "facts": [&"f.hinge_original"],
+	 "say": "The hinge screws are blunt-ended, their slots cut off centre, their pitch uneven — hand-filed work, and they have never been turned. The hinges are as old as the box."},
+	{"zone": &"z.box.hinges", "tool": &"tool.rake",
+	 "say": "Raking light shows the seating: the timber under each hinge is the same colour as the timber around it. Nothing was ever moved here."},
+
+	{"zone": &"z.box.corners", "tool": &"tool.eye",
+	 "say": "Brass mounts at the corners, the campaign fashion — meant to take the knocks of travel."},
+	{"zone": &"z.box.corners", "tool": &"tool.loupe",
+	 "say": "Three are rubbed to a dull gold at the edge. The fourth keeps its lacquer in the corners, where a rubbed one would have none."},
+	{"zone": &"z.box.corners", "tool": &"tool.rake",
+	 "say": "Under low light the wood beneath the mounts is unfaded — the box stood out of the sun, or stood shut."},
+
+	# --- ті самі точки, інші інструменти: тепер відповідають усі ---
+	{"zone": &"z.sec.escutcheon", "tool": &"tool.eye",
+	 "say": "A brass escutcheon, and a keyhole worn to an oval by a key that was turned twice a day for a lifetime."},
+	{"zone": &"z.sec.escutcheon", "tool": &"tool.rake",
+	 "say": "Low light across the plate: the scratches all run the same way, from the keyhole down to the left. One hand, one habit, one angle."},
+
+	{"zone": &"z.void.lining", "tool": &"tool.eye",
+	 "say": "The recess is lined with a paler wood than the box, cut in and fitted — not the walnut of the carcass."},
+	{"zone": &"z.void.lining", "tool": &"tool.rake",
+	 "say": "Raking light along the lining: the joint between it and the walnut is tight, and the glue line is dark with age."},
+
+	{"zone": &"z.void.floor", "tool": &"tool.eye",
+	 "say": "The floor of the recess, grey with the dust of years."},
+	{"zone": &"z.void.floor", "tool": &"tool.loupe",
+	 "say": "The dust is fine and even — house dust, settled, not swept. Nobody cleaned in here; something simply lay on it."},
+
+	{"zone": &"z.drawer.underside", "tool": &"tool.loupe",
+	 "say": "The chalk beside the brand is the joiner\'s own numbering, in a hand that wrote the same figure a hundred times that year."},
+
+	{"zone": &"z.well.back_board", "tool": &"tool.rake",
+	 "say": "Low light across the board: the four screw heads sit at four slightly different depths. Whoever set them last was in a hurry."},
 	# руйнівна дія — з підтвердженням (відмова не карається)
 	{"zone": &"z.well.back_board", "tool": &"tool.screwdriver", "requires": [&"f.board_screwed"],
 	 "req_say": "Unscrew what? See first how the board is held.",
@@ -232,6 +312,10 @@ const FACTS := {
 		"text": "She says no one opened it since he died. Three of the four heads have been turned, and the wax around them is cracked."},
 	&"f.contra.papers":        {"cite": "she says she burned the papers; the dust says they lay in the recess", "tag": &"client", "weight": 3,
 		"text": "She says she burned his letters. In a recess she claims not to know, the dust holds the clean shape of a folded packet."},
+	&"f.slope_impress":        {"cite": "columns of figures pressed into the baize", "tag": &"body", "weight": 2,
+		"text": "Impressions pressed through into the writing baize: columns of figures, one total underlined twice. He kept accounts on this box."},
+	&"f.hinge_original":       {"cite": "the hinge screws are blunt and never turned", "tag": &"body", "weight": 3,
+		"text": "Hinge screws: blunt ends, off-centre slots, uneven pitch — hand-filed, and never turned since they were set. The hinges are original to the box."},
 	&"f.trade_label":          {"cite": "the dealer\'s label of 1867", "tag": &"papers", "weight": 2,
 		"text": "Paper label in the pen compartment: \'J. HALBERT — Möbel & Antiquitäten, Wien I. Repaired and fitted, 1867.\'"},
 }
