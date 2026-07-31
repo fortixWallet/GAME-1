@@ -68,8 +68,22 @@ fi
 export G3_SHOTDIR="/tmp/g3_verify/"
 rm -rf "$G3_SHOTDIR"; mkdir -p "$G3_SHOTDIR"
 FAIL=""
-for t in "walk a" "walk b" "walk c" "walk e" "walk p" "walk q" "chapters" "outcomes" "layoutcheck" "case2" "savetest" "furnprobe"; do
-  OUT=$(godot --path . --rendering-driver opengl3 -- $t 2>&1 | grep -v specular)
+TESTS="walk a|walk b|walk c|walk e|walk p|walk q|chapters|outcomes|layoutcheck|case2|savetest|furnprobe"
+if [ "$1" = "--c2" ]; then
+  TESTS="case2|furnprobe|layoutcheck"
+  echo "ШВИДКИЙ РЕЖИМ: лише справа 2 (повний гейт обов'язковий перед комітом)"
+fi
+# --quick: БЕЗ ЖОДНОГО ВІКНА. Тільки компіляція, дані і кадри — секунди.
+# Саме цей режим вішається на хук після правки файлу: повний гейт відкривав
+# 12 вікон Godot поверх роботи Віктора (31.07: «зупини це по колу відкриття
+# гри!!!»), а два гейти одночасно ще й билися за GPU і валили тести.
+if [ "$1" = "--quick" ]; then
+  echo "ШВИДКА ПЕРЕВІРКА: компіляція, дані, кадри — без запуску гри"
+  exit 0
+fi
+IFS='|'; set -- $TESTS; unset IFS
+for t in "$@"; do
+  OUT=$(godot --path . --rendering-driver opengl3 --position 4000,100 -- $t 2>&1 | grep -v specular)
   echo "--- $t ---" >>"$LOG"; echo "$OUT" >>"$LOG"
   case "$t" in
     # walk b перевіряє ВИТРИМКУ (dwell) під лупою — і саме він мовчки падав, поки
@@ -105,9 +119,9 @@ for t in "walk a" "walk b" "walk c" "walk e" "walk p" "walk q" "chapters" "outco
     # жоден текст не має налазити на інший (вимога Віктора, 26.07)
     # furnprobe: 2D-шлях справи 2 — жодної зони без екрана чи поза плитою, жодного
     # екрана без виходу, і всі 12 фактів досяжні (стара проба 3D-мешів знята 30.07)
-    "furnprobe") echo "$OUT" | grep -qE "C2PROBE_OK bad_screen=0 bad_frame=0 no_exit=0 facts=12/12" || FAIL="$FAIL c2probe" ;;
+    "furnprobe") echo "$OUT" | grep -qE "C2PROBE_OK bad_screen=0 bad_frame=0 no_exit=0 facts=14/14" || FAIL="$FAIL c2probe" ;;
     # walk q: записник гортається; 15 фактів справи 2 розкладено по аркушах
-    "walk q")   echo "$OUT" | grep -q "WALK_Q_OK rows_first=10 rows_last=2 total=12" || FAIL="$FAIL walk-q" ;;
+    "walk q")   echo "$OUT" | grep -q "WALK_Q_OK rows_first=10 rows_last=4 total=14" || FAIL="$FAIL walk-q" ;;
     # walk p: усі лінійовані папери будуються з живими фактами без падінь
     "walk p")   echo "$OUT" | grep -q "WALK_P_OK notebook_rows=8" || FAIL="$FAIL walk-p" ;;
     "layoutcheck") echo "$OUT" | grep -q "накладань= 0" || echo "$OUT" | grep -q "накладань=0" || FAIL="$FAIL layout" ;;

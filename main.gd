@@ -428,9 +428,9 @@ func _dbg_case2() -> void:
 	_choose(3, &"o.our_locksmith")
 	_toggle_basis(4, &"f.dust_rectangle"); _toggle_basis(4, &"f.slot_burr")
 	var filled: bool = _all_filled()
-	_do_verdict()
+	await _do_verdict()
 	var guard := 0
-	while not (screens.has("MORNING") and screens["MORNING"].visible) and guard < 600:
+	while not (screens.has("MORNING") and screens["MORNING"].visible) and guard < 300:
 		await RenderingServer.frame_post_draw; guard += 1
 	print("CASE2_OK neg_flag=", neg_flag, " screwed=", knocked, " looked=", measured,
 		  " neg_state=", neg_state, " confirm=", confirm_held, " opened=", opened,
@@ -1251,6 +1251,9 @@ func _dbg_furnprobe() -> void:
 	_apply_zone("z.sec.escutcheon", &"tool.loupe")
 	_apply_zone("z.doc.daybook_intake", &"tool.eye")
 	_apply_zone("z.doc.label_pigeonhole", &"tool.loupe")
+	# допит: питання ставляться в тому ж порядку, що й гравцем
+	for q in _case_ask():
+		_ask_put(String((q as Dictionary)["id"]))
 	var unreached: Array = []
 	for fid in ft:
 		if not facts.has(String(fid)): unreached.append(String(fid))
@@ -1942,6 +1945,7 @@ func _load_case(n: int) -> void:
 	case_id = n
 	CSLOTS = (CASE_DATA[n] as Object).get("SLOTS") if CASE_DATA.has(n) else []
 	facts.clear()                       # одне речення замість чотирнадцяти drop_fact
+	asked.clear(); ask_last = ""        # допит клієнтки — теж стан справи
 	zone_states.clear()
 	case_flags.clear()
 	pending_confirm = ""
@@ -3696,6 +3700,8 @@ func _build_case2_plates() -> void:
 		_set_hint("The box lifts and turns over in both hands.")
 		_show("C2STAMP"), 0.026)
 	_txtbtn(pc["s"], "Write the certificate  \u2192", Vector2(W*0.70, H*0.92), func(): _show("CERT"), 0.026)
+	# вона стоїть тут-таки, біля прилавка — не пішла
+	_txtbtn(pc["s"], "\u2196  speak to Frau Vogl", Vector2(W*0.20, H*0.92), func(): _show_ask(), 0.026)
 	var po := _plate_screen("C2OPEN", "box_open", "C2PIECE", "←  close the box")
 	for cb in (po["s"] as Control).get_children():
 		if cb is Button and (cb as Button).text.find("close the box") >= 0:
@@ -3709,6 +3715,112 @@ func _build_case2_plates() -> void:
 	_plate_screen("C2STAMP", "box_under", "C2PIECE", "←  set it right way up")
 	_plate_screen("C2RECESS", "c2_recess", "C2OPEN", "←  step back")
 	_plate_screen("C2SCREW", "screw_macro", "C2OPEN", "←  step back")
+
+# ── ДОПИТ КЛІЄНТКИ ───────────────────────────────────────────────────────────
+# Вона не йде після того, як віддала річ: стоїть біля прилавка і відповідає.
+# Дані 31.07: «клієнт біля прилавка» — 9.2 % позитиву Strange Antiquities проти
+# 0.0 % Obra Dinn і 0.2 % Golden Idol. Це рів бенчмарку, і він у нас лежав.
+#
+# Кожна відповідь або ЗВУЖУЄ (каже, куди глянути), або ЛАМАЄТЬСЯ об уже здобутий
+# факт — і тоді народжується факт-суперечність, який лягає в атестат як підстава.
+# Це та сама діегетична драбина (правило 6), тільки з обличчям.
+var asked := {}                  # id питання → true
+var ask_last := ""               # остання відповідь, щоб малювати її на екрані
+
+func _case_ask() -> Array:
+	if not CASE_DATA.has(case_id): return []
+	var a = (CASE_DATA[case_id] as Object).get("ASK")
+	return a if a is Array else []
+
+func _ask_available() -> Array:
+	# питання з'являється, коли гравець дозрів до нього: needs — уже здобуті факти
+	var out: Array = []
+	for q in _case_ask():
+		var qq: Dictionary = q
+		if asked.has(String(qq["id"])): continue
+		var ok := true
+		for f in qq.get("needs", []):
+			if not facts.has(String(f)): ok = false; break
+		if ok: out.append(qq)
+	return out
+
+func _ask_put(qid: String) -> void:
+	for q in _case_ask():
+		var qq: Dictionary = q
+		if String(qq["id"]) != qid: continue
+		asked[qid] = true
+		ask_last = _t(String(qq.get("say", "")))
+		# ВІДПОВІДЬ, ЩО ЛАМАЄТЬСЯ ОБ ФАКТ. Спіймана брехня — не «неправильна
+		# відповідь», а здобуток: він іде в атестат нарівні зі слідами на речі.
+		var br := String(qq.get("breaks", ""))
+		var gv := String(qq.get("gives", ""))
+		if br != "" and gv != "" and facts.has(br) and add_fact(gv):
+			_play("stamp_seal")
+			ask_last += "\n\n" + _t("— and that will not stand.")
+			_save_game()
+		else:
+			_play("page_turn")
+			var op := String(qq.get("opens", ""))
+			if op != "": ask_last += "\n\n" + _t(op)
+		_build_ask()
+		return
+
+func _build_ask() -> void:
+	var s: Control = screens.get("ASK", null)
+	if s == null:
+		s = _screen("ASK")
+		var bd := _bg(s, tex["case_desk"], true)
+		bd.modulate = Color(0.16, 0.15, 0.17)
+		bd.set_meta("keep", true)
+	for c in s.get_children():
+		if c.has_meta("keep"): continue
+		c.queue_free()
+	# вона сама — той самий гравюрний портрет, що в сцені приходу
+	if tex.has("client_vogl"):
+		var im := TextureRect.new(); im.texture = tex["client_vogl"]
+		im.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		im.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+		im.size = Vector2(W*0.30, H*0.78); im.position = Vector2(W*0.045, H*0.10)
+		im.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		im.modulate = Color(0.86, 0.83, 0.78)
+		s.add_child(im)
+	var head := Label.new()
+	head.label_settings = _ls(fb, int(H*0.030), Color(0.90,0.85,0.74))
+	head.text = _t("Frau Vogl waits at the counter.")
+	head.position = Vector2(W*0.40, H*0.10); head.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	s.add_child(head)
+	# її відповідь
+	if ask_last != "":
+		var ans := Label.new()
+		ans.label_settings = _ls(fr, int(H*0.026), Color(0.93,0.89,0.80))
+		ans.text = ask_last
+		ans.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		ans.size = Vector2(W*0.52, H*0.26); ans.position = Vector2(W*0.40, H*0.16)
+		ans.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		s.add_child(ans)
+	# питання, які можна поставити
+	var av := _ask_available()
+	var y := H*0.47
+	for q in av:
+		var qq: Dictionary = q
+		var qid := String(qq["id"])
+		_txtbtn(s, "\u2014  " + _t(String(qq["ask"])), Vector2(W*0.40, y),
+				func(): _ask_put(qid), 0.028)
+		y += H*0.075
+	if av.is_empty():
+		var e := Label.new()
+		e.label_settings = _ls(fr, int(H*0.024), Color(0.62,0.58,0.52))
+		e.text = _t("Nothing more to ask her — not until you have looked closer.")
+		e.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		e.size = Vector2(W*0.52, H*0.12); e.position = Vector2(W*0.40, y)
+		e.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		s.add_child(e)
+	_txtbtn(s, "\u2190  back to the piece", Vector2(W*0.04, H*0.92), func(): _show("C2PIECE"))
+	_txtbtn(s, "\u270e", Vector2(W*0.945, H*0.055), func(): _show_notebook(), 0.030)
+
+func _show_ask() -> void:
+	_build_ask()
+	_show("ASK")
 
 func _build_case2_papers() -> void:
 	# Папери й довідники справи 2. Були частиною _build_case2 (3D-секретер);

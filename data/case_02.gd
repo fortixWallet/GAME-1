@@ -166,6 +166,44 @@ const RULES := [
 	 "say": "A paper label, lifted at one corner: 'J. HALBERT — Möbel & Antiquitäten, Wien I. Repaired and fitted, 1867.'"},
 ]
 
+# ── ДОПИТ КЛІЄНТКИ (01.08) ────────────────────────────────────────────────────
+# Головне дієслово справи. Дані дослідження 31.07: «клієнт біля прилавка» хвалять
+# у 9.2 % позитивних відгуків Strange Antiquities і в 0.0–0.2 % чистих дедуктивок —
+# це рів бенчмарку, і в нас він лежав невикористаний. Друге: «історія/письмо/
+# персонажі» — найбільша окрема категорія похвали (25.8–33.0 %).
+#
+# Кожна репліка або ЗВУЖУЄ (називає недосліджену частину речі), або СУПЕРЕЧИТЬ
+# (ламається об уже здобутий факт і породжує факт-суперечність, який можна вписати
+# в атестат як підставу). Просто емоційних реплік тут нема — це була б декорація.
+#
+#   ask     — питання, як його ставить гравець
+#   say     — що вона відповідає
+#   opens   — підказка-звуження: яку зону варто глянути (порожньо = нічого)
+#   breaks  — факт, об який ця відповідь ламається
+#   gives   — факт-суперечність, що народжується, коли breaks уже здобуто
+#   needs   — питання з'являється лише коли цей факт уже є (порожньо = одразу)
+const ASK := [
+	{"id": &"q.provenance",
+	 "ask": "How did it come to you?",
+	 "say": "«He willed it to me. Twenty-two years I kept that house, and the box stood on his desk every one of them.»",
+	 "opens": "The box bottom, then — a joiner burns his name where nobody looks.",
+	 "needs": []},
+
+	{"id": &"q.opened",
+	 "ask": "Has anyone opened it since he died?",
+	 "say": "«No one. It came here as it stood on his desk. I have not had the key off my own neck.»",
+	 "breaks": &"f.slot_burr", "gives": &"f.contra.opened",
+	 "opens": "The screws in the lid, then. Wax cracks when a head is turned.",
+	 "needs": []},
+
+	{"id": &"q.papers",
+	 "ask": "Was there anything in it?",
+	 "say": "«Papers, letters, what a man keeps. I burned them. It is not decent to read a dead man\'s letters.»",
+	 "breaks": &"f.dust_rectangle", "gives": &"f.contra.papers",
+	 "opens": "",
+	 "needs": [&"f.board_lifted"]},
+]
+
 const FACTS := {
 	&"f.escutcheon_bright":    {"cite": "bright scratches at the lock", "tag": &"lock", "weight": 1,
 		"text": "Four scratches by the keyhole; their metal is bright, the metal around them brown."},
@@ -189,6 +227,10 @@ const FACTS := {
 		"text": "Lining end grain: close, pale, fine bright flecks. The walnut beside it: coarse, resinous, no flecks."},
 	&"f.dust_rectangle":       {"cite": "a clean rectangle in the dust", "tag": &"body", "weight": 3,
 		"text": "Dust on the floor of the recess everywhere but one rectangle, clean to the wood, sharp at the edges — the size of a folded packet of papers."},
+	&"f.contra.opened":        {"cite": "she says it was never opened; three screws say otherwise", "tag": &"client", "weight": 3,
+		"text": "She says no one opened it since he died. Three of the four heads have been turned, and the wax around them is cracked."},
+	&"f.contra.papers":        {"cite": "she says she burned the papers; the dust says they lay in the recess", "tag": &"client", "weight": 3,
+		"text": "She says she burned his letters. In a recess she claims not to know, the dust holds the clean shape of a folded packet."},
 	&"f.trade_label":          {"cite": "the dealer\'s label of 1867", "tag": &"papers", "weight": 2,
 		"text": "Paper label in the pen compartment: \'J. HALBERT — Möbel & Antiquitäten, Wien I. Repaired and fitted, 1867.\'"},
 }
