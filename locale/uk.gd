@@ -471,4 +471,7 @@ const T := {
 "She says no one opened it since he died. Three of the four heads have been turned, and the wax around them is cracked.": "Вона каже, після його смерті ніхто не відкривав. Три головки з чотирьох крутили, і віск довкола них тріснув.",
 "she says she burned the papers; the dust says they lay in the recess": "вона каже, що спалила папери; пил каже, що вони лежали в ніші",
 "She says she burned his letters. In a recess she claims not to know, the dust holds the clean shape of a folded packet.": "Вона каже, що спалила його листи. У ніші, про яку вона нібито не знає, пил тримає чистий обрис складеного пакунка.",
+"The screw comes out and goes into the tray. Three left.": "Шуруп виходить і лягає в тацю. Лишилось три.",
+"Another one out. %d left.": "Ще один вийшов. Лишилось %d.",
+"The last screw comes out. Behind the board there is a recess, lined, and no dust on its front lip.": "Останній шуруп виходить. За дошкою — ніша, обшита зсередини, і на її передній кромці нема пилу.",
 }

@@ -152,8 +152,9 @@ const RULES := [
 	{"zone": &"z.well.back_board", "tool": &"tool.screwdriver", "requires": [&"f.board_screwed"],
 	 "req_say": "Unscrew what? See first how the board is held.",
 	 "confirm": "Take a screwdriver to a client\'s furniture?  Click once more to do it.",
+	 "screws": true,
 	 "facts": [&"f.board_lifted"], "sets_state": {&"z.well.back_board": &"open"},
-	 "say": "The four screws come out. Behind the board there is a recess, lined, and no dust on its front lip."},
+	 "say": "The last screw comes out. Behind the board there is a recess, lined, and no dust on its front lip."},
 
 	{"zone": &"z.void.lining", "tool": &"tool.loupe",
 	 "facts": [&"f.lining_fleck"],

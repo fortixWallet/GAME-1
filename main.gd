@@ -409,7 +409,12 @@ func _dbg_case2() -> void:
 	# 5. викрутка: ПЕРШИЙ клік — питання, не дія; другий — дія
 	_apply_zone("z.well.back_board", &"tool.screwdriver")
 	var confirm_held: bool = not facts.has("f.board_lifted")
-	_apply_zone("z.well.back_board", &"tool.screwdriver")
+	# чотири шурупи — чотири кліки; між ними чекаємо кінця анімації шару
+	for _s in range(SCREW_SPOTS.size()):
+		_apply_zone("z.well.back_board", &"tool.screwdriver")
+		var g := 0
+		while screw_busy and g < 200:
+			await RenderingServer.frame_post_draw; g += 1
 	var opened: bool = facts.has("f.board_lifted") and zone_states.get(&"z.well.back_board", &"") == &"open"
 	# 6. порожнина: підкладка + пил
 	_apply_zone("z.void.lining", &"tool.loupe")
@@ -1243,7 +1248,11 @@ func _dbg_furnprobe() -> void:
 	_apply_zone("z.well.back_board", &"tool.loupe")
 	_apply_zone("z.doc.ref_screws", &"tool.eye")
 	_apply_zone("z.well.back_board", &"tool.screwdriver")
-	_apply_zone("z.well.back_board", &"tool.screwdriver")
+	for _s2 in range(SCREW_SPOTS.size()):
+		_apply_zone("z.well.back_board", &"tool.screwdriver")
+		var g2 := 0
+		while screw_busy and g2 < 200:
+			await RenderingServer.frame_post_draw; g2 += 1
 	_apply_zone("z.void.floor", &"tool.rake")
 	_apply_zone("z.void.lining", &"tool.loupe")
 	_apply_zone("z.drawer.underside", &"tool.rake")
@@ -1492,7 +1501,7 @@ func _load() -> void:
 	# справа 2 «Спадок удови»
 	for n3 in ["hub_day","hub_day_case","hub_lamp_off","hub_evening","hub_evening_figure","hub_night","hub_darkness","menu_door","client_woman","client_in_room","subtitle_band"]:
 		if ResourceLoader.exists(ART + n3 + ".png"): tex[n3] = load(ART + n3 + ".png")
-	for n2 in ["case2_desk","watch_wear","watch_chain","paper_receipt_1807","reg_page_h","marks_page_vienna","notebook_spread","mark_diana_macro","mark_maker_macro","tool_tray","hand_caliper","hand_screwdriver","hand_rake","wood_page","plain_book_page","dust_floor","client_vogl","screw_macro","board_face","cl1_p2","cl1_p3","cl1_p4","cl2_p2","cl2_p3","cl2_p4","cl2_door","sec_section","bureau_room","c2_piece","c2_open","c2_stamp","c2_endgrain","c2_recess","box_closed","box_a1","box_a2","box_open","box_under","box_noboard"]:
+	for n2 in ["case2_desk","watch_wear","watch_chain","paper_receipt_1807","reg_page_h","marks_page_vienna","notebook_spread","mark_diana_macro","mark_maker_macro","tool_tray","hand_caliper","hand_screwdriver","hand_rake","wood_page","plain_book_page","dust_floor","client_vogl","screw_macro","board_face","cl1_p2","cl1_p3","cl1_p4","cl2_p2","cl2_p3","cl2_p4","cl2_door","sec_section","bureau_room","c2_piece","c2_open","c2_stamp","c2_endgrain","c2_recess","box_closed","box_a1","box_a2","box_open","box_under","box_noboard","box_holes"]:
 		if ResourceLoader.exists(ART + n2 + ".png"): tex[n2] = load(ART + n2 + ".png")
 	# опційний арт (додано 24.07): чистий лист клієнтки
 	if ResourceLoader.exists(ART + "letter_client.png"):
@@ -1610,7 +1619,8 @@ var mesh_nodes := {}
 var screen_cams := {}
 var zone_states := {}    # id зони → StringName стану (sets_state правил; скидається _load_case)
 var case_flags := {}     # прапорці справи (sets_flag правил: простукав, відчинив…)
-var pending_confirm := ""  # зона, що чекає другого кліку на руйнівну дію
+var pending_confirm := ""
+var confirmed_once := {}   # руйнівну дію підтверджують ОДИН раз, не перед кожним шурупом  # зона, що чекає другого кліку на руйнівну дію
 var active_tool: StringName = &"*"     # обраний вимірювальний інструмент (крок 6)
 var unlocked_tools := {}               # tool id → true (unlocks правил; скидається _load_case)
 
@@ -1707,11 +1717,22 @@ func _apply_rule(rule: Dictionary) -> void:
 	# (клік деінде) не карається (case_02.md: «гейт входу в порожнину»)
 	if rule.has("confirm"):
 		var key := String(rule.get("zone", "")) + "|" + String(rule.get("tool", ""))
-		if pending_confirm != key:
+		if pending_confirm != key and not confirmed_once.has(key):
 			pending_confirm = key
 			_play("ui_soft"); _set_hint(String(rule["confirm"]))
 			return
+		confirmed_once[key] = true
 	pending_confirm = ""
+	# ЧОТИРИ ШУРУПИ = ЧОТИРИ ДІЇ. Правило віддає факт лише коли вийшов останній;
+	# перші три кліки — видима робота викрутки, і гравець рахує їх сам.
+	if bool(rule.get("screws", false)) and screws_out < SCREW_SPOTS.size() - 1:
+		if screw_busy: return
+		_c2_screw_out(func():
+			_c2_plate_sync()
+			_set_hint(_t("The screw comes out and goes into the tray. Three left.")
+				if screws_out == 1 else _t("Another one out. %d left.") % (SCREW_SPOTS.size() - screws_out)))
+		return
+	if bool(rule.get("screws", false)) and screw_busy: return
 	var got_new := false
 	for f in RuleEngine.facts_of(rule):
 		if add_fact(String(f)): got_new = true
@@ -1720,7 +1741,10 @@ func _apply_rule(rule: Dictionary) -> void:
 	if not st.is_empty(): _sync_case2_view()   # знята дошка зникає ОДРАЗУ, не після зміни екрана
 	if st.get(&"z.well.back_board", &"") == &"open":
 		_unscrew_board()
-		_c2_board_off()   # плита C2OPEN переходить у стан «дошку знято»
+		if bool(rule.get("screws", false)) and screws_out < SCREW_SPOTS.size():
+			_c2_screw_out(func(): _c2_board_off())   # останній виходить, тоді дошка
+		else:
+			_c2_board_off()
 	var sfl: Dictionary = rule.get("sets_flag", {})
 	for k in sfl:
 		if case_flags.get(k, null) != sfl[k]: got_new = true
@@ -1946,6 +1970,8 @@ func _load_case(n: int) -> void:
 	CSLOTS = (CASE_DATA[n] as Object).get("SLOTS") if CASE_DATA.has(n) else []
 	facts.clear()                       # одне речення замість чотирнадцяти drop_fact
 	asked.clear(); ask_last = ""        # допит клієнтки — теж стан справи
+	screws_out = 0; screw_busy = false  # шурупи назад у дошку
+	confirmed_once.clear()
 	zone_states.clear()
 	case_flags.clear()
 	pending_confirm = ""
@@ -3634,14 +3660,25 @@ const BOX_FRAMES := ["box_closed", "box_a1", "box_a2", "box_open"]
 # а клікав інше (Віктор, 30.07: «сцену 2 маєш поламану»).
 func _c2_plate_sync() -> void:
 	var opened: bool = zone_states.get(&"z.well.back_board", &"") == &"open"
+	# порожні гнізда показуємо, щойно вийшов ПЕРШИЙ шуруп: решта домальовується
+	# шарами поверх, тож кадр і шари завжди в одному стані
+	var mid: String = "box_holes" if (screws_out > 0 and tex.has("box_holes")) else "box_open"
 	var canon := {
 		"C2PIECE": "box_closed",
-		"C2OPEN": "box_noboard" if opened else "box_open",
+		"C2OPEN": "box_noboard" if opened else mid,
 	}
 	for k in canon:
 		var im: TextureRect = box_frame_img.get(k, null)
 		var nm: String = canon[k]
 		if im and tex.has(nm): im.texture = tex[nm]
+	# шар шурупів існує лише поки дошка на місці
+	if opened:
+		if screw_layer and is_instance_valid(screw_layer): screw_layer.queue_free()
+	elif screw_layer == null or not is_instance_valid(screw_layer):
+		_c2_screws_build()
+	else:
+		for i in screw_layer.get_child_count():
+			(screw_layer.get_child(i) as CanvasItem).visible = (i >= screws_out)
 
 func _box_animate(dir: int, on_end: Callable) -> void:
 	var host: Control = screens.get("C2PIECE", null) if dir > 0 else screens.get("C2OPEN", null)
@@ -3690,6 +3727,82 @@ func _plate_screen(scr: String, texname: String, back_to: String, back_lbl: Stri
 # Дошку знято: середній план мусить це ПОКАЗАТИ, інакше слово розходиться з кадром.
 # Плита C2OPEN отримує box_noboard — ту саму скриньку, ту саму камеру, ту саму лампу,
 # але з порожньою нішею в кришці, чотирма шурупами на сукні й дошкою, припертою збоку.
+
+# ── ШУРУПИ ВИКРУЧУЮТЬСЯ НА ОЧАХ ──────────────────────────────────────────────
+# Правило 18 без 3D: рухома частина — окремий ШАР, вирізаний із майстер-кадру
+# (AtlasTexture по колу), і рухається на місці. Так само влаштовані предмети в
+# Strange Antiquities — там це Spine, тут вистачає ієрархії вузлів Godot: рух
+# жорсткий (оберт + масштаб), деформації нема, тож зовнішній рушій не потрібен.
+#
+# Світло, патина і перспектива збігаються ЗА ПОБУДОВОЮ: головка і гніздо взяті
+# з двох кадрів, у яких камера збігається на 0.638 (tools/check_frames.py).
+#
+# Центри виміряні різницею box_open проти box_holes — де кадри розійшлись, там
+# і шуруп; не на око (правило 17).
+const SCREW_SPOTS := [Vector2(626, 126), Vector2(322, 175), Vector2(644, 301), Vector2(352, 357)]
+const SCREW_R := 17.0            # радіус вирізу в пікселях майстра 1200×896
+var screw_layer: Control
+var screws_out := 0
+var screw_busy := false
+
+func _screw_sprite(idx: int, frame: Rect2) -> TextureRect:
+	var at := AtlasTexture.new()
+	at.atlas = tex["box_open"]
+	var c: Vector2 = SCREW_SPOTS[idx]
+	at.region = Rect2(c.x - SCREW_R, c.y - SCREW_R, SCREW_R*2.0, SCREW_R*2.0)
+	var s := TextureRect.new()
+	s.texture = at
+	s.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	s.stretch_mode = TextureRect.STRETCH_SCALE
+	# з пікселів майстра в пікселі екрана — через рамку плити
+	var k := frame.size.x / 1200.0
+	var d := SCREW_R*2.0*k
+	s.size = Vector2(d, d)
+	s.pivot_offset = Vector2(d*0.5, d*0.5)
+	s.position = frame.position + Vector2(c.x - SCREW_R, c.y - SCREW_R)*k
+	s.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return s
+
+func _c2_screws_build() -> void:
+	var s: Control = screens.get("C2OPEN", null)
+	if s == null or not paper_frames.has("C2OPEN"): return
+	if screw_layer and is_instance_valid(screw_layer): screw_layer.queue_free()
+	screw_layer = Control.new()
+	screw_layer.set_anchors_preset(Control.PRESET_FULL_RECT)
+	screw_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	s.add_child(screw_layer)
+	var fr: Rect2 = (paper_frames["C2OPEN"] as Dictionary)["frame"]
+	for i in SCREW_SPOTS.size():
+		var sp := _screw_sprite(i, fr)
+		sp.visible = (i >= screws_out)
+		screw_layer.add_child(sp)
+
+# один шуруп виходить: обертається, росте (йде на глядача), гасне
+func _c2_screw_out(on_end: Callable) -> void:
+	if screw_busy or screws_out >= SCREW_SPOTS.size():
+		on_end.call(); return
+	# без шару (тест, виклик зони по id) шуруп однаково виходить — просто без
+	# анімації: стан гри не має залежати від того, чи намальовано екран
+	if screw_layer == null or not is_instance_valid(screw_layer) \
+			or screws_out >= screw_layer.get_child_count():
+		screws_out += 1
+		on_end.call(); return
+	screw_busy = true
+	var sp: TextureRect = screw_layer.get_child(screws_out) as TextureRect
+	var base := sp.size
+	var tw := create_tween().set_parallel(true)
+	tw.tween_property(sp, "rotation", TAU*3.0, 1.0).set_trans(Tween.TRANS_SINE)
+	tw.tween_property(sp, "size", base*1.62, 1.0)
+	tw.tween_property(sp, "pivot_offset", base*0.81, 1.0)
+	tw.tween_property(sp, "position", sp.position - base*0.31, 1.0)
+	tw.chain().tween_property(sp, "modulate:a", 0.0, 0.22)
+	tw.chain().tween_callback(func():
+		screws_out += 1
+		screw_busy = false
+		_play("goblet_set")
+		on_end.call())
+	_play("ui_soft")
+
 func _c2_board_off() -> void:
 	_c2_plate_sync()
 
