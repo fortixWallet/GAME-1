@@ -513,4 +513,6 @@ const T := {
 "The certificate went to the notary before noon, and the notary sent for the constable. The sale is stayed; the house is asked, room by room, who was alone with the open box in the days of mourning. Frau Vogl came at one. She did not ask about the money. She asked to keep the paper.": "Атестат пішов до нотаря ще до полудня, і нотар послав по констебля. Продаж зупинено; дім опитують, кімната за кімнатою, — хто лишався сам біля відкритої скриньки в дні жалоби. Пані Фоґль прийшла о першій. Вона не спитала про гроші. Вона попросила лишити їй папір.",
 "The piece sold, the money was paid out, and the ledger line closed. A month on, the nephew entered the estate unopposed; nothing in writing stood against him. Nothing came back.": "Річ продано, гроші виплачено, рядок у гросбусі закрито. За місяць небіж вступив у спадок без спротиву — жоден папір не стояв проти нього. Назад не повернулось нічого.",
 "«The writing box is mine — his will says so. Only the will is not found yet; the notary turns the house over for it. The box I can sell now, and the bureau is to say what it is worth.»": "«Скринька моя — так каже його заповіт. Тільки заповіту ще не знайшли; нотар перевертає дім за ним. Скриньку я можу продати вже, і бюро має сказати, чого вона варта.»",
+"←  the papers": "←  папери",
+"Noted:": "Занотовано:",
 }
