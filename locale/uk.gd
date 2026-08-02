@@ -522,4 +522,5 @@ const T := {
 "The stamp dates the box 1822–1841. Pointed screws of this make come after 1846. The board in the lid is held by iron that did not exist when the box was made.": "Тавро датує скриньку 1822–1841. Гострі шурупи такої роботи — після 1846. Дошку в кришці тримає залізо, якого ще не існувало, коли скриньку зробили.",
 "The stamp dates the box 1822–1841. Pointed screws of this make come after 1846. The board is held by iron younger than the box itself.": "Тавро датує скриньку 1822–1841. Гострі шурупи такої роботи — після 1846. Дошку тримає залізо, молодше за саму скриньку.",
 "the screw-book  →": "книга шурупів  →",
+"Still wanting: ": "Ще бракує: ",
 }

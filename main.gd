@@ -890,6 +890,34 @@ func _process(_delta: float) -> void:
 			if step != "": _set_hint(step)
 	if loupe_held and loupe_ui and not dbg_mode:
 		_loupe_frame()
+	# ЗНАННЯ ПРИХОДИТЬ ОЧИМА (Віктор 02.08: «в нотатки вносити, коли їх видно,
+	# а не коли натиснув»): витримка скла/лампи/погляду над деталлю дає факт сама.
+	# Руйнівне (викрутка) і підтвердження — ніколи; тільки спостереження.
+	if not dbg_mode and paper_frames.has(_shown()):
+		var probe_pos := Vector2.ZERO
+		var probe_tool: StringName = &""
+		if loupe_held and loupe_ui and loupe_ui.visible:
+			probe_pos = loupe_ui.position + Vector2(GLASS_CX*loupe_lw, GLASS_CY*loupe_lh)
+			probe_tool = &"tool.loupe"
+		elif active_tool == &"tool.rake" and hand_tool_ui and hand_tool_ui.visible:
+			probe_pos = get_viewport().get_mouse_position()
+			probe_tool = &"tool.rake"
+		elif active_tool == &"*":
+			probe_pos = get_viewport().get_mouse_position()
+			probe_tool = &"tool.eye"
+		if probe_tool != &"":
+			var zid := _pick_2d_at(_shown(), probe_pos)
+			var dkey := _shown() + "|" + zid + "|" + String(probe_tool)
+			if zid == "" or dkey != dwell_zone:
+				dwell_zone = dkey; dwell_t = 0.0
+			else:
+				dwell_t += _delta
+				if dwell_t >= (0.9 if probe_tool == &"tool.eye" else 0.6):
+					dwell_t = 0.0
+					var rl := RuleEngine.find(_case_rules(), StringName(zid), probe_tool,
+											  facts, _flags(), zone_states)
+					if not rl.is_empty() and not rl.has("screws") and not rl.has("confirm"):
+						_apply_zone(zid, probe_tool)
 	if hand_tool_ui and hand_tool_ui.visible and not dbg_mode:
 		# інструмент ЖИВЕ в руці: слідує за мишею (рух готового спрайта — правило 1)
 		hand_tool_ui.position = get_viewport().get_mouse_position() - hand_tool_ui.pivot_offset
@@ -1686,6 +1714,8 @@ var screen_cams := {}
 var zone_states := {}    # id зони → StringName стану (sets_state правил; скидається _load_case)
 var case_flags := {}     # прапорці справи (sets_flag правил: простукав, відчинив…)
 var pending_confirm := ""
+var dwell_zone := ""             # витримка погляду: екран|зона|інструмент
+var dwell_t := 0.0
 var confirmed_once := {}   # руйнівну дію підтверджують ОДИН раз, не перед кожним шурупом  # зона, що чекає другого кліку на руйнівну дію
 var active_tool: StringName = &"*"     # обраний вимірювальний інструмент (крок 6)
 var unlocked_tools := {}               # tool id → true (unlocks правил; скидається _load_case)
@@ -3250,14 +3280,17 @@ func _slot_display(i: int) -> String:
 
 # діегетична підказка закритої графи — чого БРАКУЄ, не що вписати
 func _slot_hint(sl: Dictionary) -> String:
-	if sl.has("hint"): return String(sl["hint"])   # підказка живе в ДАНИХ справи
-	match StringName(sl["id"]):
-		&"s.origin": return "( match the mark, then the register )"
-		&"s.fineness", &"s.not_before": return "( the handbook of marks will speak to this )"
-		&"s.marks": return "( run a finger over the top of the foot )"
-		&"s.provenance": return "( set down how the marks were struck, first )"
-		&"s.basis": return "( name the ruling above, first )"
-	return "( … )"
+	# «звідки вписувати дані» (Віктор 02.08): графа називає БРАКУЮЧІ спостереження
+	# тими САМИМИ словами, що стоять у нотатках праворуч — гравець звіряє очима
+	var ft := _case_facts_table()
+	var miss: Array = []
+	for f in sl.get("needs", []):
+		if not facts.has(String(f)):
+			var c := String((ft.get(f, {}) as Dictionary).get("cite", String(f)))
+			miss.append("\u00ab" + _t(c) + "\u00bb")
+	if not miss.is_empty():
+		return _t("Still wanting: ") + ", ".join(miss)
+	return _t(String(sl.get("hint", "")))
 
 func _clear_dependents(changed: StringName) -> void:
 	for j in CSLOTS.size():
@@ -3929,7 +3962,7 @@ func _plate_screen(scr: String, texname: String, back_to: String, back_lbl: Stri
 #
 # Центри виміряні різницею box_open проти box_holes — де кадри розійшлись, там
 # і шуруп; не на око (правило 17).
-const SCREW_SPOTS := [Vector2(626, 126), Vector2(322, 175), Vector2(644, 301), Vector2(352, 357)]
+const SCREW_SPOTS := [Vector2(615, 125), Vector2(325, 177), Vector2(633, 302), Vector2(353, 353)]
 const SCREW_HEAD_PX := 26.0
 const SCREW_RING_PX := 40.0
 # ГРАВЕЦЬ ОБИРАЄ, ЯКИЙ ШУРУП КРУТИТИ (Віктор 02.08: «крутиться не той, на який
@@ -4022,7 +4055,7 @@ func _c2_screw_out(idx: int, on_end: Callable) -> void:
 	var head: TextureRect = pr[1]
 	var base: Vector2 = head.size
 	var tw := create_tween().set_parallel(true)
-	tw.tween_property(head, "rotation", TAU*3.0, 1.0).set_trans(Tween.TRANS_SINE)
+	tw.tween_property(head, "rotation", -TAU*3.0, 1.0).set_trans(Tween.TRANS_SINE)
 	tw.tween_property(head, "size", base*1.7, 1.0)
 	tw.tween_property(head, "pivot_offset", base*0.85, 1.0)
 	tw.tween_property(head, "position", head.position - base*0.35, 1.0)
