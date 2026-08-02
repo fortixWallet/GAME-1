@@ -515,4 +515,6 @@ const T := {
 "«The writing box is mine — his will says so. Only the will is not found yet; the notary turns the house over for it. The box I can sell now, and the bureau is to say what it is worth.»": "«Скринька моя — так каже його заповіт. Тільки заповіту ще не знайшли; нотар перевертає дім за ним. Скриньку я можу продати вже, і бюро має сказати, чого вона варта.»",
 "←  the papers": "←  папери",
 "Noted:": "Занотовано:",
+"A paper label, lifted at one corner: 'J. HALBERT — Möbel & Antiquitäten, Wien I. Repariert u. eingerichtet 1867.'": "Паперовий ярличок, відклеєний на ріжку: «J. HALBERT — Möbel & Antiquitäten, Wien I. Repariert u. eingerichtet 1867».",
+"Paper label in the pen compartment: 'J. HALBERT — Möbel & Antiquitäten, Wien I. Repariert u. eingerichtet 1867.'": "Паперовий ярличок у відділенні для пер: «J. HALBERT — Möbel & Antiquitäten, Wien I. Repariert u. eingerichtet 1867».",
 }

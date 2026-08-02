@@ -136,7 +136,7 @@ const ZONES := {
 	},
 	&"z.doc.label_pigeonhole": {
 		"kind": &"img", "screen": &"C2OPEN", "surface": &"box_open",
-		"u": Vector2(0.60, 0.66), "shape": &"circle", "r": 0.05,
+		"u": Vector2(0.548, 0.675), "shape": &"rect", "half": Vector2(0.062, 0.048),
 		"hint": "A paper label in the pen compartment",
 		"tools": [&"tool.loupe", &"tool.eye"],
 	},
@@ -202,7 +202,7 @@ const RULES := [
 	{"zone": &"z.box.hinges", "tool": &"tool.eye",
 	 "say": "Two brass butt hinges, let flush into the walnut, holding the lid."},
 	{"zone": &"z.box.hinges", "tool": &"tool.loupe",
-	 "facts": [&"f.hinge_original"],
+	 "facts": [&"f.hinge_original"], "screen": &"M2HINGES",
 	 "say": "The hinge screws are blunt-ended, their slots cut off centre, their pitch uneven — hand-filed work, and they have never been turned. The hinges are as old as the box."},
 	{"zone": &"z.box.hinges", "tool": &"tool.rake",
 	 "say": "Raking light shows the seating: the timber under each hinge is the same colour as the timber around it. Nothing was ever moved here."},
@@ -250,8 +250,8 @@ const RULES := [
 	 "facts": [&"f.dust_rectangle"],
 	 "say": "Under a low light the floor is grey with settled dust, except one rectangle clean to the wood. Its edges are sharp, and it is the size of a folded packet of papers."},
 	{"zone": &"z.doc.label_pigeonhole", "tool": &"tool.loupe",
-	 "facts": [&"f.trade_label"],
-	 "say": "A paper label, lifted at one corner: 'J. HALBERT — Möbel & Antiquitäten, Wien I. Repaired and fitted, 1867.'"},
+	 "facts": [&"f.trade_label"], "screen": &"M2LABEL",
+	 "say": "A paper label, lifted at one corner: 'J. HALBERT — Möbel & Antiquitäten, Wien I. Repariert u. eingerichtet 1867.'"},
 ]
 
 # ── ДОПИТ КЛІЄНТКИ (01.08) ────────────────────────────────────────────────────
@@ -324,7 +324,7 @@ const FACTS := {
 	&"f.hinge_original":       {"cite": "the hinge screws are blunt and never turned", "tag": &"body", "weight": 3,
 		"text": "Hinge screws: blunt ends, off-centre slots, uneven pitch — hand-filed, and never turned since they were set. The hinges are original to the box."},
 	&"f.trade_label":          {"cite": "the dealer\'s label of 1867", "tag": &"papers", "weight": 2,
-		"text": "Paper label in the pen compartment: \'J. HALBERT — Möbel & Antiquitäten, Wien I. Repaired and fitted, 1867.\'"},
+		"text": "Paper label in the pen compartment: \'J. HALBERT — Möbel & Antiquitäten, Wien I. Repariert u. eingerichtet 1867.\'"},
 }
 
 # ── АТЕСТАТ: 6 граф (case_02.md §6, канонічна таблиця) ───────────────────────

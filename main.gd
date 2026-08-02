@@ -442,8 +442,8 @@ func _dbg_case2() -> void:
 	var filled: bool = _all_filled()
 	await _do_verdict()
 	var guard := 0
-	while not (screens.has("MORNING") and screens["MORNING"].visible) and guard < 300:
-		await RenderingServer.frame_post_draw; guard += 1
+	while not (screens.has("MORNING") and screens["MORNING"].visible) and guard < 200:
+		await get_tree().create_timer(0.05).timeout; guard += 1
 	print("CASE2_OK neg_flag=", neg_flag, " screwed=", knocked, " looked=", measured,
 		  " neg_state=", neg_state, " confirm=", confirm_held, " opened=", opened,
 		  " num19=", num_ok, " filled=", filled, " outcome=", last_outcome_id)
@@ -840,7 +840,7 @@ var last_fact_count := -1
 
 # Екрани, на яких гравець тримає РІЧ справи 2 (плити скриньки). Драбина підказок
 # і холостий таймер живуть саме тут, а не на покинутих 3D-екранах.
-const C2_SCREENS := ["C2PIECE", "C2OPEN", "C2STAMP", "C2RECESS", "C2SCREW", "M2SCREWS", "M2LOCK", "M2BAIZE", "M2WELLS"]
+const C2_SCREENS := ["C2PIECE", "C2OPEN", "C2STAMP", "C2RECESS", "C2SCREW", "M2SCREWS", "M2LOCK", "M2BAIZE", "M2WELLS", "M2LABEL", "M2HINGES"]
 
 func _c2_ladder() -> String:
 	if not facts.has("f.board_screwed"):
@@ -976,8 +976,8 @@ func _dbg_walk() -> void:
 		_refresh_cert(); await _shot(dir+"s2_cert_full.png", 3)
 		_do_verdict()
 		var guard2 := 0
-		while not (screens.has("MORNING") and screens["MORNING"].visible) and guard2 < 500:
-			await RenderingServer.frame_post_draw; guard2 += 1
+		while not (screens.has("MORNING") and screens["MORNING"].visible) and guard2 < 200:
+			await get_tree().create_timer(0.05).timeout; guard2 += 1
 		for _i in 8: await RenderingServer.frame_post_draw
 		await _shot(dir+"s2_morning.png", 2)
 		print("WALK_S2_OK outcome=", last_outcome_id)
@@ -1142,8 +1142,8 @@ func _dbg_walk() -> void:
 		for _i in 12: await RenderingServer.frame_post_draw
 		await _shot(dir+"19_seal_mid.png", 2)
 		var guard := 0
-		while not (screens.has("MORNING") and screens["MORNING"].visible) and guard < 500:
-			await RenderingServer.frame_post_draw; guard += 1
+		while not (screens.has("MORNING") and screens["MORNING"].visible) and guard < 200:
+			await get_tree().create_timer(0.05).timeout; guard += 1
 		for _i in 8: await RenderingServer.frame_post_draw
 		await _shot(dir+"20_morning.png", 2)
 		_show("LEDGER"); await _shot(dir+"21_ledger.png", 4)
@@ -1545,7 +1545,7 @@ func _load() -> void:
 	# справа 2 «Спадок удови»
 	for n3 in ["hub_day","hub_day_case","hub_lamp_off","hub_evening","hub_evening_figure","hub_night","hub_darkness","menu_door","client_woman","client_in_room","subtitle_band"]:
 		if ResourceLoader.exists(ART + n3 + ".png"): tex[n3] = load(ART + n3 + ".png")
-	for n2 in ["case2_desk","watch_wear","watch_chain","paper_receipt_1807","reg_page_h","marks_page_vienna","notebook_spread","mark_diana_macro","mark_maker_macro","tool_tray","hand_caliper","hand_screwdriver","hand_rake","wood_page","plain_book_page","dust_floor","client_vogl","screw_macro","board_face","cl1_p2","cl1_p3","cl1_p4","cl2_p2","cl2_p3","cl2_p4","cl2_door","sec_section","bureau_room","c2_piece","c2_open","c2_stamp","c2_endgrain","c2_recess","box_closed","box_a1","box_a2","box_open","box_under","box_noboard","box_holes","tool_tray_empty","glow_warm","tray_caliper","tray_screwdriver","tray_loupe","tray_rake","m2_screws","m2_lock","m2_baize","m2_wells","scr_head_0","scr_head_1","scr_head_2","scr_head_3","scr_ring_0","scr_ring_1","scr_ring_2","scr_ring_3"]:
+	for n2 in ["case2_desk","watch_wear","watch_chain","paper_receipt_1807","reg_page_h","marks_page_vienna","notebook_spread","mark_diana_macro","mark_maker_macro","tool_tray","hand_caliper","hand_screwdriver","hand_rake","wood_page","plain_book_page","dust_floor","client_vogl","screw_macro","board_face","cl1_p2","cl1_p3","cl1_p4","cl2_p2","cl2_p3","cl2_p4","cl2_door","sec_section","bureau_room","c2_piece","c2_open","c2_stamp","c2_endgrain","c2_recess","box_closed","box_a1","box_a2","box_open","box_under","box_noboard","box_holes","tool_tray_empty","glow_warm","tray_caliper","tray_screwdriver","tray_loupe","tray_rake","m2_screws","m2_lock","m2_baize","m2_wells","scr_head_0","scr_head_1","scr_head_2","scr_head_3","scr_ring_0","scr_ring_1","scr_ring_2","scr_ring_3","label_slip","m2_label","m2_hinges"]:
 		if ResourceLoader.exists(ART + n2 + ".png"): tex[n2] = load(ART + n2 + ".png")
 	# опційний арт (додано 24.07): чистий лист клієнтки
 	if ResourceLoader.exists(ART + "letter_client.png"):
@@ -2718,7 +2718,7 @@ func _apply_opt() -> void:
 # Вхід у макро — це НАХИЛ до речі зі склом: поточна плита летить у точку кліку
 # і розчиняється в деталі. Назад — зворотний рух у ту саму точку. Дія при цьому
 # завжди лишається на місці (шурупи крутяться на дошці) — макро лише погляд.
-const ZOOM_SCREENS := ["M2SCREWS", "M2LOCK", "M2BAIZE", "M2WELLS", "C2RECESS", "C2SCREW"]
+const ZOOM_SCREENS := ["M2SCREWS", "M2LOCK", "M2BAIZE", "M2WELLS", "M2LABEL", "M2HINGES", "C2RECESS", "C2SCREW"]
 var last_plate_click := Vector2.ZERO
 var zoom_origin := {}
 
@@ -2777,7 +2777,7 @@ func _unzoom(macro: String, back_to: String) -> void:
 # Права колонка: короткі цитати здобутих фактів, свіжі яскравіші. Це не заміна
 # записника — це його краєчок, що завжди лежить біля руки.
 const NOTES_SCREENS := ["C2PIECE", "C2OPEN", "C2STAMP", "C2RECESS", "C2SCREW",
-	"M2SCREWS", "M2LOCK", "M2BAIZE", "M2WELLS", "C2DOCS", "BOOK_WOOD", "BOOK_SCREWS",
+	"M2SCREWS", "M2LOCK", "M2BAIZE", "M2WELLS", "M2LABEL", "M2HINGES", "C2DOCS", "BOOK_WOOD", "BOOK_SCREWS",
 	"ASK", "DESK", "HANDS", "DOCS", "NEWS", "CATALOG", "BOOK_REG", "BOOK_MARKS",
 	"DOCS_RECEIPT", "MARKS_MACRO"]
 var notes_ui: Control
@@ -4024,6 +4024,21 @@ func _build_case2_plates() -> void:
 	_txtbtn(pc["s"], "\u2196  speak to Frau Vogl", Vector2(W*0.20, H*0.92), func(): _show_ask(), 0.026)
 	var po := _plate_screen("C2OPEN", "box_open", "C2PIECE", "←  close the box")
 	_txtbtn(po["s"], "the papers  \u2192", Vector2(W*0.25, H*0.92), func(): _show("C2DOCS"), 0.026)
+	# ярличок Halbert СПРАВДІ лежить у пеналі (Віктор: «що сказано — те видно»);
+	# спрайт вирізано з білого, тінь напівпрозора, кут пенала взято з референсу
+	if tex.has("label_slip") and paper_frames.has("C2OPEN"):
+		var lfr: Rect2 = (paper_frames["C2OPEN"] as Dictionary)["frame"]
+		var lt: Texture2D = tex["label_slip"]
+		var lw: float = lfr.size.x * 0.085
+		var lh2: float = lw * float(lt.get_height()) / float(lt.get_width())
+		var slip := TextureRect.new()
+		slip.texture = lt
+		slip.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		slip.stretch_mode = TextureRect.STRETCH_SCALE
+		slip.size = Vector2(lw, lh2)
+		slip.position = lfr.position + Vector2(lfr.size.x*0.548, lfr.size.y*0.678) - slip.size*0.5
+		slip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		(po["s"] as Control).add_child(slip)
 	for cb in (po["s"] as Control).get_children():
 		if cb is Button and (cb as Button).text.find("close the box") >= 0:
 			for sig in (cb as Button).pressed.get_connections():
@@ -4041,8 +4056,11 @@ func _build_case2_plates() -> void:
 	_plate_screen("M2LOCK", "m2_lock", "C2PIECE", "←  step back")
 	_plate_screen("M2BAIZE", "m2_baize", "C2OPEN", "←  step back")
 	_plate_screen("M2WELLS", "m2_wells", "C2OPEN", "←  step back")
+	_plate_screen("M2LABEL", "m2_label", "C2OPEN", "←  step back")
+	_plate_screen("M2HINGES", "m2_hinges", "C2OPEN", "←  step back")
 	for pair in [["M2SCREWS", "C2OPEN"], ["M2LOCK", "C2PIECE"], ["M2BAIZE", "C2OPEN"],
-				 ["M2WELLS", "C2OPEN"], ["C2RECESS", "C2OPEN"], ["C2SCREW", "C2OPEN"]]:
+				 ["M2WELLS", "C2OPEN"], ["M2LABEL", "C2OPEN"], ["M2HINGES", "C2OPEN"],
+				 ["C2RECESS", "C2OPEN"], ["C2SCREW", "C2OPEN"]]:
 		var ms: Control = screens[pair[0]]
 		for cb in ms.get_children():
 			if cb is Button and (cb as Button).position.x < W*0.2 and (cb as Button).position.y > H*0.85:
