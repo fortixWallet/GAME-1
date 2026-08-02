@@ -397,12 +397,12 @@ func _dbg_case2() -> void:
 	var knocked: bool = facts.has("f.board_screwed")
 	# 2. ЛУПА: вістря і різь → потім задерті шліци
 	_apply_zone("z.well.back_board", &"tool.loupe")
-	_apply_zone("z.well.back_board", &"tool.loupe")
+	_apply_zone("z.macro.screws", &"tool.loupe")
 	var measured: bool = facts.has("f.screw_points") and facts.has("f.slot_burr")
 	# 3. шурупи: око → лупа → лупа → довідник
 	_apply_zone("z.well.back_board", &"tool.eye")
 	_apply_zone("z.well.back_board", &"tool.loupe")
-	_apply_zone("z.well.back_board", &"tool.loupe")
+	_apply_zone("z.macro.screws", &"tool.loupe")
 	_apply_zone("z.doc.ref_screws")
 	# 4. НЕГАТИВ: порожнина недосяжна, поки дошка не знята (requires_state)
 	_apply_zone("z.void.floor", &"tool.rake")
@@ -836,7 +836,7 @@ var last_fact_count := -1
 
 # Екрани, на яких гравець тримає РІЧ справи 2 (плити скриньки). Драбина підказок
 # і холостий таймер живуть саме тут, а не на покинутих 3D-екранах.
-const C2_SCREENS := ["C2PIECE", "C2OPEN", "C2STAMP", "C2RECESS", "C2SCREW"]
+const C2_SCREENS := ["C2PIECE", "C2OPEN", "C2STAMP", "C2RECESS", "C2SCREW", "M2SCREWS", "M2LOCK", "M2BAIZE", "M2WELLS"]
 
 func _c2_ladder() -> String:
 	if not facts.has("f.board_screwed"):
@@ -1227,6 +1227,9 @@ func _dbg_pilot() -> void:
 		while box_busy and guard_anim < 240:
 			await RenderingServer.frame_post_draw; guard_anim += 1
 		for _i in 16: await RenderingServer.frame_post_draw
+		# наїзди в макро живуть у ЧАСІ (0.17–0.34 с), а кадри за вікном екрана
+		# летять без vsync — тож звіт чекає і час, не лише кадри (02.08)
+		await get_tree().create_timer(0.40).timeout
 		seq += 1
 		var shot_name := "p%03d.png" % seq
 		await _shot(dirp + shot_name, 2)
@@ -1277,7 +1280,7 @@ func _dbg_furnprobe() -> void:
 	# 3. механічний прохід наміченим ланцюгом: скільки фактів дається
 	_apply_zone("z.well.back_board", &"tool.eye")
 	_apply_zone("z.well.back_board", &"tool.loupe")
-	_apply_zone("z.well.back_board", &"tool.loupe")
+	_apply_zone("z.macro.screws", &"tool.loupe")
 	_apply_zone("z.doc.ref_screws", &"tool.eye")
 	_apply_zone("z.well.back_board", &"tool.screwdriver")
 	for _s2 in range(SCREW_SPOTS.size()):
@@ -1538,7 +1541,7 @@ func _load() -> void:
 	# справа 2 «Спадок удови»
 	for n3 in ["hub_day","hub_day_case","hub_lamp_off","hub_evening","hub_evening_figure","hub_night","hub_darkness","menu_door","client_woman","client_in_room","subtitle_band"]:
 		if ResourceLoader.exists(ART + n3 + ".png"): tex[n3] = load(ART + n3 + ".png")
-	for n2 in ["case2_desk","watch_wear","watch_chain","paper_receipt_1807","reg_page_h","marks_page_vienna","notebook_spread","mark_diana_macro","mark_maker_macro","tool_tray","hand_caliper","hand_screwdriver","hand_rake","wood_page","plain_book_page","dust_floor","client_vogl","screw_macro","board_face","cl1_p2","cl1_p3","cl1_p4","cl2_p2","cl2_p3","cl2_p4","cl2_door","sec_section","bureau_room","c2_piece","c2_open","c2_stamp","c2_endgrain","c2_recess","box_closed","box_a1","box_a2","box_open","box_under","box_noboard","box_holes","tool_tray_empty","glow_warm","tray_caliper","tray_screwdriver","tray_loupe","tray_rake"]:
+	for n2 in ["case2_desk","watch_wear","watch_chain","paper_receipt_1807","reg_page_h","marks_page_vienna","notebook_spread","mark_diana_macro","mark_maker_macro","tool_tray","hand_caliper","hand_screwdriver","hand_rake","wood_page","plain_book_page","dust_floor","client_vogl","screw_macro","board_face","cl1_p2","cl1_p3","cl1_p4","cl2_p2","cl2_p3","cl2_p4","cl2_door","sec_section","bureau_room","c2_piece","c2_open","c2_stamp","c2_endgrain","c2_recess","box_closed","box_a1","box_a2","box_open","box_under","box_noboard","box_holes","tool_tray_empty","glow_warm","tray_caliper","tray_screwdriver","tray_loupe","tray_rake","m2_screws","m2_lock","m2_baize","m2_wells"]:
 		if ResourceLoader.exists(ART + n2 + ".png"): tex[n2] = load(ART + n2 + ".png")
 	# опційний арт (додано 24.07): чистий лист клієнтки
 	if ResourceLoader.exists(ART + "letter_client.png"):
@@ -1684,6 +1687,7 @@ func _paper_catcher(screen_name: String, parent: Control, paper: Control) -> voi
 		if ev is InputEventMouseButton and (ev as InputEventMouseButton).pressed \
 				and (ev as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT:
 			var id := _pick_2d_at(screen_name, c.position + (ev as InputEventMouseButton).position)
+			last_plate_click = c.position + (ev as InputEventMouseButton).position
 			if id != "":
 				if _plate_click(id): return
 				# ОКО ЗАВЖДИ ПРИ ТОБІ. Без цього клік порожньою рукою йшов у рушій
@@ -1786,7 +1790,7 @@ func _apply_rule(rule: Dictionary) -> void:
 	for k in sfl:
 		if case_flags.get(k, null) != sfl[k]: got_new = true
 		case_flags[k] = sfl[k]
-	if rule.has("screen"): _show(String(rule["screen"]))
+	if rule.has("screen"): _show_zoomed(String(rule["screen"]))
 	for tl in rule.get("unlocks", []):
 		if not unlocked_tools.has(tl):
 			unlocked_tools[tl] = true
@@ -2692,6 +2696,65 @@ func _apply_opt() -> void:
 	if hint_label:
 		hint_label.label_settings.font_size = int(H * 0.030 * float(opt["text_scale"]))
 
+# ── НАЇЗД ЗАМІСТЬ ТЕЛЕПОРТУ (правила 14/18; Віктор 02.08: «не треба окремого
+# слайд-шоу») ─────────────────────────────────────────────────────────────────
+# Вхід у макро — це НАХИЛ до речі зі склом: поточна плита летить у точку кліку
+# і розчиняється в деталі. Назад — зворотний рух у ту саму точку. Дія при цьому
+# завжди лишається на місці (шурупи крутяться на дошці) — макро лише погляд.
+const ZOOM_SCREENS := ["M2SCREWS", "M2LOCK", "M2BAIZE", "M2WELLS", "C2RECESS", "C2SCREW"]
+var last_plate_click := Vector2.ZERO
+var zoom_origin := {}
+
+func _show_zoomed(target: String) -> void:
+	var cur := _shown()
+	if dbg_mode or target not in ZOOM_SCREENS or not paper_frames.has(cur):
+		_show(target); return
+	var src: Dictionary = paper_frames[cur]
+	var t2: Texture2D = src.get("tex", null)
+	if t2 == null: _show(target); return
+	var fr: Rect2 = src["frame"]
+	var focus := last_plate_click
+	if focus == Vector2.ZERO: focus = fr.get_center()
+	zoom_origin[target] = focus
+	var ov := TextureRect.new()
+	ov.texture = t2; ov.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	ov.stretch_mode = TextureRect.STRETCH_SCALE
+	ov.position = fr.position; ov.size = fr.size
+	ov.pivot_offset = focus - fr.position
+	ov.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(ov)
+	if hint_band: move_child(hint_band, get_child_count()-1)
+	if hint_label: move_child(hint_label, get_child_count()-1)
+	var tw := create_tween()
+	tw.tween_property(ov, "scale", Vector2(2.3, 2.3), 0.34).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tw.parallel().tween_property(ov, "position", fr.position + (fr.get_center() - focus)*1.15, 0.34).set_trans(Tween.TRANS_QUAD)
+	tw.parallel().tween_property(ov, "modulate:a", 0.0, 0.20).set_delay(0.14)
+	tw.tween_callback(func(): ov.queue_free())
+	get_tree().create_timer(0.17).timeout.connect(func(): _show(target))
+
+func _unzoom(macro: String, back_to: String) -> void:
+	if dbg_mode or not paper_frames.has(macro):
+		_show(back_to); return
+	var src: Dictionary = paper_frames[macro]
+	var t2: Texture2D = src.get("tex", null)
+	var fr: Rect2 = src["frame"]
+	_show(back_to)
+	if t2 == null: return
+	var focus: Vector2 = zoom_origin.get(macro, fr.get_center())
+	var ov := TextureRect.new()
+	ov.texture = t2; ov.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	ov.stretch_mode = TextureRect.STRETCH_SCALE
+	ov.position = fr.position; ov.size = fr.size
+	ov.pivot_offset = focus - fr.position
+	ov.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(ov)
+	if hint_band: move_child(hint_band, get_child_count()-1)
+	if hint_label: move_child(hint_label, get_child_count()-1)
+	var tw := create_tween()
+	tw.tween_property(ov, "scale", Vector2(0.42, 0.42), 0.30).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.parallel().tween_property(ov, "modulate:a", 0.0, 0.30)
+	tw.tween_callback(func(): ov.queue_free())
+
 func _show_notebook() -> void:
 	if _shown() != "NOTEBOOK": notebook_prev = _shown()
 	_refresh_notebook()
@@ -3426,7 +3489,7 @@ func _show_morning() -> void:
 # Річ сама викриває брехуна: знос голівки під ліву руку + свіжі подряпини на вушку.
 const CLIENT2_LINES := [
 	"The bell. A woman in a dark shawl comes in alone, carrying a walnut writing box in both arms as one carries something that is not quite one's own.\n\n\u00abFrau Vogl. I kept house for Herr F. Twenty-two years.\u00bb",
-	"\u00abThe writing box is mine, by his will. I mean to sell it, and the bureau is to say what it is worth.\u00bb",
+	"\u00abThe writing box is mine \u2014 his will says so. Only the will is not found yet; the notary turns the house over for it. The box I can sell now, and the bureau is to say what it is worth.\u00bb",
 	"\u00abMy son sails on Thursday. The ticket is forty-one gulden and I have nineteen. I am not asking you for a good price. I am asking you for a quick one.\u00bb",
 	"She sets the box on the blotter and steps back from it, wiping her right palm on her skirt.",
 	"She watches it the way one watches a room being emptied \u2014 and keeps her right hand inside the shawl.",
@@ -3867,6 +3930,19 @@ func _build_case2_plates() -> void:
 	_plate_screen("C2STAMP", "box_under", "C2PIECE", "←  set it right way up")
 	_plate_screen("C2RECESS", "c2_recess", "C2OPEN", "←  step back")
 	_plate_screen("C2SCREW", "screw_macro", "C2OPEN", "←  step back")
+	# макро-плити «Викраденого заповіту»: те, що гра раніше РОЗКАЗУВАЛА, тепер ВИДНО
+	_plate_screen("M2SCREWS", "m2_screws", "C2OPEN", "←  step back")
+	_plate_screen("M2LOCK", "m2_lock", "C2PIECE", "←  step back")
+	_plate_screen("M2BAIZE", "m2_baize", "C2OPEN", "←  step back")
+	_plate_screen("M2WELLS", "m2_wells", "C2OPEN", "←  step back")
+	for pair in [["M2SCREWS", "C2OPEN"], ["M2LOCK", "C2PIECE"], ["M2BAIZE", "C2OPEN"],
+				 ["M2WELLS", "C2OPEN"], ["C2RECESS", "C2OPEN"], ["C2SCREW", "C2OPEN"]]:
+		var ms: Control = screens[pair[0]]
+		for cb in ms.get_children():
+			if cb is Button and (cb as Button).position.x < W*0.2 and (cb as Button).position.y > H*0.85:
+				for con in (cb as Button).pressed.get_connections():
+					(cb as Button).pressed.disconnect(con["callable"])
+				(cb as Button).pressed.connect(_unzoom.bind(String(pair[0]), String(pair[1])))
 
 # ── ДОПИТ КЛІЄНТКИ ───────────────────────────────────────────────────────────
 # Вона не йде після того, як віддала річ: стоїть біля прилавка і відповідає.
@@ -3909,6 +3985,12 @@ func _ask_put(qid: String) -> void:
 		if br != "" and gv != "" and facts.has(br) and add_fact(gv):
 			_play("stamp_seal")
 			ask_last += "\n\n" + _t("— and that will not stand.")
+			_save_game()
+		elif br == "" and gv != "" and add_fact(gv):
+			# відповідь без суперечності, але з вагою: її слова стають фактом справи
+			_play("page_turn")
+			var op0 := String(qq.get("opens", ""))
+			if op0 != "": ask_last += "\n\n" + _t(op0)
 			_save_game()
 		else:
 			_play("page_turn")
@@ -4520,9 +4602,9 @@ func _c2_part_toggle(zone_id: String) -> bool:
 			_set_hint("The box lifts and turns over in both hands.")
 			_show("C2STAMP"); return true
 		"z.void.mouth":
-			_show("C2RECESS"); return true
+			_show_zoomed("C2RECESS"); return true
 		"z.screws.loose":
-			_show("C2SCREW"); return true
+			_show_zoomed("C2SCREW"); return true
 	return false
 
 func _toggle_fallfront() -> void:
