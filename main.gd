@@ -110,6 +110,7 @@ const FOOT_ZONE := Rect2(0.43, 0.55, 0.14, 0.18)   # частками екран
 var main_cam3: Camera3D
 var hallmark_node: Node3D
 var loupe_ui: Control
+var lamp_glow: TextureRect   # тепле сяйво лампи в руці — мальований оверлей, ADD
 var loupe_glass: ColorRect       # екранне збільшення (стіл)
 var loupe_vp: SubViewport        # 3D-в'юпорт зі спільним світом чаші
 var goblet_sv: SubViewport       # головний вьюпорт чаші (для звірки світів)
@@ -869,6 +870,32 @@ func _process(_delta: float) -> void:
 			if step != "": _set_hint(step)
 	if loupe_held and loupe_ui and not dbg_mode:
 		_loupe_frame()
+	if hand_tool_ui and hand_tool_ui.visible and not dbg_mode:
+		# інструмент ЖИВЕ в руці: слідує за мишею (рух готового спрайта — правило 1)
+		hand_tool_ui.position = get_viewport().get_mouse_position() - hand_tool_ui.pivot_offset
+	if active_tool == &"tool.rake" and hand_tool_ui and hand_tool_ui.visible and not dbg_mode:
+		# ЛАМПА СПРАВДІ СВІТИТЬСЯ: мальоване тепле сяйво (glow_warm, ADD) під
+		# вістрям, з ледь помітним живим мерехтінням гасу
+		if lamp_glow == null:
+			lamp_glow = TextureRect.new()
+			lamp_glow.texture = tex.get("glow_warm", null)
+			lamp_glow.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			lamp_glow.stretch_mode = TextureRect.STRETCH_SCALE
+			var gw: float = W*0.44
+			lamp_glow.size = Vector2(gw, gw*432.0/768.0)
+			lamp_glow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			var gm := CanvasItemMaterial.new()
+			gm.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+			lamp_glow.material = gm
+			add_child(lamp_glow)
+		if lamp_glow.get_index() > hand_tool_ui.get_index():
+			move_child(lamp_glow, hand_tool_ui.get_index())
+		var tt := float(Time.get_ticks_msec())*0.001
+		lamp_glow.visible = true
+		lamp_glow.position = get_viewport().get_mouse_position() - lamp_glow.size*0.5 + Vector2(0.0, H*0.04)
+		lamp_glow.modulate = Color(1.0, 0.84, 0.58, 0.50 + 0.05*sin(tt*9.0) + 0.03*sin(tt*23.0))
+	elif lamp_glow:
+		lamp_glow.visible = false
 
 func _dbg_autosolve() -> void:
 	dbg_mode = true
@@ -1511,7 +1538,7 @@ func _load() -> void:
 	# справа 2 «Спадок удови»
 	for n3 in ["hub_day","hub_day_case","hub_lamp_off","hub_evening","hub_evening_figure","hub_night","hub_darkness","menu_door","client_woman","client_in_room","subtitle_band"]:
 		if ResourceLoader.exists(ART + n3 + ".png"): tex[n3] = load(ART + n3 + ".png")
-	for n2 in ["case2_desk","watch_wear","watch_chain","paper_receipt_1807","reg_page_h","marks_page_vienna","notebook_spread","mark_diana_macro","mark_maker_macro","tool_tray","hand_caliper","hand_screwdriver","hand_rake","wood_page","plain_book_page","dust_floor","client_vogl","screw_macro","board_face","cl1_p2","cl1_p3","cl1_p4","cl2_p2","cl2_p3","cl2_p4","cl2_door","sec_section","bureau_room","c2_piece","c2_open","c2_stamp","c2_endgrain","c2_recess","box_closed","box_a1","box_a2","box_open","box_under","box_noboard","box_holes"]:
+	for n2 in ["case2_desk","watch_wear","watch_chain","paper_receipt_1807","reg_page_h","marks_page_vienna","notebook_spread","mark_diana_macro","mark_maker_macro","tool_tray","hand_caliper","hand_screwdriver","hand_rake","wood_page","plain_book_page","dust_floor","client_vogl","screw_macro","board_face","cl1_p2","cl1_p3","cl1_p4","cl2_p2","cl2_p3","cl2_p4","cl2_door","sec_section","bureau_room","c2_piece","c2_open","c2_stamp","c2_endgrain","c2_recess","box_closed","box_a1","box_a2","box_open","box_under","box_noboard","box_holes","tool_tray_empty","glow_warm","tray_caliper","tray_screwdriver","tray_loupe","tray_rake"]:
 		if ResourceLoader.exists(ART + n2 + ".png"): tex[n2] = load(ART + n2 + ".png")
 	# опційний арт (додано 24.07): чистий лист клієнтки
 	if ResourceLoader.exists(ART + "letter_client.png"):
@@ -1827,6 +1854,7 @@ func _refresh_tool_row() -> void:
 		tool_row.add_child(b); x += b.get_minimum_size().x + W*0.03
 
 func _pick_tool(tl: StringName) -> void:
+	if case_id == 2 and not unlocked_tools.has(tl): return   # штангеля в цій справі нема
 	active_tool = (&"*" if active_tool == tl else tl)   # повторний клік — відкласти
 	_play("ui_soft"); _refresh_tool_row(); _refresh_tray_marks()
 	if active_tool == &"*": _set_hint("Set down. The bare hand again.")
@@ -1991,6 +2019,7 @@ func _load_case(n: int) -> void:
 		var st0 = (CASE_DATA[n] as Object).get("START_TOOLS")
 		if st0 is Array:
 			for tl0 in st0: unlocked_tools[tl0] = true
+	_refresh_tray_marks()   # таця показує лише інструменти цієї справи
 	num_buf = ""
 	cvals = []
 	for sl in CSLOTS:
@@ -4227,7 +4256,7 @@ func _build_case2() -> void:
 	to_btn.add_theme_constant_override("outline_size", 8)
 func _build_tool_tray(scr: String) -> void:
 	var host: Control = screens[scr]
-	var t: Texture2D = tex["tool_tray"]
+	var t: Texture2D = tex.get("tool_tray_empty", tex["tool_tray"])
 	var th := H*0.205
 	var twd := th*float(t.get_width())/float(t.get_height())
 	var tray := TextureRect.new(); tray.texture = t
@@ -4242,33 +4271,41 @@ func _build_tool_tray(scr: String) -> void:
 		if not unlocked_tools.has(tl) and case_id == 2: continue
 		var x0 := tray.position.x + twd*float(spot[1])
 		var x1 := tray.position.x + twd*float(spot[2])
-		var hl := TextureRect.new()
-		var felt := AtlasTexture.new(); felt.atlas = t
-		var fw: float = float(t.get_width()); var fh: float = float(t.get_height())
-		felt.region = Rect2(fw*0.262, fh*0.30, fw*0.078, fh*0.44)   # чисте сукно таці
-		hl.texture = felt
-		hl.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		hl.stretch_mode = TextureRect.STRETCH_SCALE
-		hl.size = Vector2(x1 - x0, th*0.80); hl.position = Vector2(x0, tray.position.y + th*0.10)
-		hl.mouse_filter = Control.MOUSE_FILTER_IGNORE; hl.visible = false
-		host.add_child(hl)
-		(tray_marks[scr] as Dictionary)[tl] = hl
+		# ПІДСТАВКА ОКРЕМО, ІНСТРУМЕНТИ ЗВЕРХУ (Віктор, 02.08): основа — порожня
+		# таця з відбитками на сукні; кожен інструмент — власний вирізаний спрайт.
+		# Взяв у руку — спрайт зник, під ним СПРАВЖНЄ порожнє гніздо, не латка.
+		var names := {&"tool.caliper": "tray_caliper", &"tool.screwdriver": "tray_screwdriver",
+					  &"tool.loupe": "tray_loupe", &"tool.rake": "tray_rake"}
+		var hint_txt := String(spot[3])
+		var sp := TextureRect.new()
+		if tex.has(String(names.get(tl, ""))): sp.texture = tex[String(names[tl])]
+		sp.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		sp.stretch_mode = TextureRect.STRETCH_SCALE
+		sp.size = Vector2(x1 - x0, th); sp.position = Vector2(x0, tray.position.y)
+		sp.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		host.add_child(sp)
+		(tray_marks[scr] as Dictionary)[tl] = sp
 		var b := Button.new(); b.flat = true; b.modulate.a = 0
 		b.position = Vector2(x0, tray.position.y); b.size = Vector2(x1 - x0, th)
 		b.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-		b.mouse_entered.connect(_set_hint.bind(String(spot[3])))
-		b.mouse_exited.connect(_set_hint.bind(""))
+		var ty := tray.position.y
+		b.mouse_entered.connect(func():
+			_set_hint(hint_txt)
+			if sp.visible: sp.position.y = ty - H*0.008; sp.modulate = Color(1.07, 1.06, 1.0))
+		b.mouse_exited.connect(func():
+			_set_hint("")
+			sp.position.y = ty; sp.modulate = Color(1, 1, 1))
 		b.pressed.connect(_pick_tool.bind(tl))
 		host.add_child(b)
 
 func _refresh_tray_marks() -> void:
-	# інструмент, який гравець тримає, ЗНИКАЄ зі свого гнізда: поверх нього лягає
-	# виріз порожнього сукна тієї самої таці (Віктор, 31.07: «із набору інструментів
-	# мають зникати»). Так видно, що саме в руці, без жодного напису.
+	# спрайт інструмента видно, коли він НЕ в руці; взятий зникає з таці,
+	# і під ним відкривається справжнє порожнє гніздо з відбитком на сукні
 	for scr in tray_marks:
 		for tl in (tray_marks[scr] as Dictionary):
 			var nd = (tray_marks[scr] as Dictionary)[tl]
-			if nd is CanvasItem: (nd as CanvasItem).visible = (active_tool == tl)
+			var allowed: bool = case_id != 2 or unlocked_tools.has(tl)
+			if nd is CanvasItem: (nd as CanvasItem).visible = (active_tool != tl) and allowed
 
 # МОМЕНТ ВІДКРИТТЯ (правило 14): дошка знята — камера повільно входить у зазор,
 # тримає подих на чистому прямокутнику в пилюці, відступає. Без жодного тексту.
