@@ -517,4 +517,9 @@ const T := {
 "Noted:": "Занотовано:",
 "A paper label, lifted at one corner: 'J. HALBERT — Möbel & Antiquitäten, Wien I. Repariert u. eingerichtet 1867.'": "Паперовий ярличок, відклеєний на ріжку: «J. HALBERT — Möbel & Antiquitäten, Wien I. Repariert u. eingerichtet 1867».",
 "Paper label in the pen compartment: 'J. HALBERT — Möbel & Antiquitäten, Wien I. Repariert u. eingerichtet 1867.'": "Паперовий ярличок у відділенні для пер: «J. HALBERT — Möbel & Antiquitäten, Wien I. Repariert u. eingerichtet 1867».",
+"The screws run to a sharp point. The thread is even from head to tip. A screw of this make has a birthday — the screw-book among the papers will give it.": "Шурупи сходять на гостре вістря, різь рівна від головки до кінчика. Шуруп такої роботи має день народження — книга шурупів серед паперів його назве.",
+"the board is held by screws younger than the box": "дошку тримають шурупи, молодші за скриньку",
+"The stamp dates the box 1822–1841. Pointed screws of this make come after 1846. The board in the lid is held by iron that did not exist when the box was made.": "Тавро датує скриньку 1822–1841. Гострі шурупи такої роботи — після 1846. Дошку в кришці тримає залізо, якого ще не існувало, коли скриньку зробили.",
+"The stamp dates the box 1822–1841. Pointed screws of this make come after 1846. The board is held by iron younger than the box itself.": "Тавро датує скриньку 1822–1841. Гострі шурупи такої роботи — після 1846. Дошку тримає залізо, молодше за саму скриньку.",
+"the screw-book  →": "книга шурупів  →",
 }

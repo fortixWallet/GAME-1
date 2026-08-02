@@ -1796,6 +1796,14 @@ func _apply_rule(rule: Dictionary) -> void:
 	var got_new := false
 	for f in RuleEngine.facts_of(rule):
 		if add_fact(String(f)): got_new = true
+	# СИНТЕЗ (Віктор 02.08: «не зрозуміло, як із шурупами вияснити»): щойно
+	# реєстр дав вік скриньки, а книга — вік шурупів, детектив каже висновок
+	# САМ. Це не відповідь атестата — це думка вголос, як усі факти.
+	if case_id == 2 and facts.has("f.ref_screw_points") and facts.has("f.reg_gruber_1822_1841") \
+			and add_fact("f.syn_late_screws"):
+		got_new = true
+		_play("stamp_seal")
+		call_deferred("_set_hint", "The stamp dates the box 1822\u20131841. Pointed screws of this make come after 1846. The board is held by iron younger than the box itself.")
 	var st: Dictionary = rule.get("sets_state", {})
 	for zid in st: zone_states[zid] = st[zid]
 	if not st.is_empty(): _sync_case2_view()   # знята дошка зникає ОДРАЗУ, не після зміни екрана
@@ -4056,6 +4064,8 @@ func _build_case2_plates() -> void:
 	_plate_screen("M2LOCK", "m2_lock", "C2PIECE", "←  step back")
 	_plate_screen("M2BAIZE", "m2_baize", "C2OPEN", "←  step back")
 	_plate_screen("M2WELLS", "m2_wells", "C2OPEN", "←  step back")
+	_txtbtn(screens["M2SCREWS"], "the screw-book  \u2192", Vector2(W*0.68, H*0.92),
+			func(): _show("BOOK_SCREWS"), 0.026)
 	_plate_screen("M2LABEL", "m2_label", "C2OPEN", "←  step back")
 	_plate_screen("M2HINGES", "m2_hinges", "C2OPEN", "←  step back")
 	for pair in [["M2SCREWS", "C2OPEN"], ["M2LOCK", "C2PIECE"], ["M2BAIZE", "C2OPEN"],
