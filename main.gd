@@ -111,6 +111,7 @@ const FOOT_ZONE := Rect2(0.43, 0.55, 0.14, 0.18)   # частками екран
 var main_cam3: Camera3D
 var hallmark_node: Node3D
 var loupe_ui: Control
+var c2open_tex_name := "box_open"   # який кадр зараз на C2OPEN (для HD-лупи)
 var lamp_glow: TextureRect   # тепле сяйво лампи в руці — мальований оверлей, ADD
 var loupe_glass: ColorRect       # екранне збільшення (стіл)
 var loupe_vp: SubViewport        # 3D-в'юпорт зі спільним світом чаші
@@ -398,12 +399,12 @@ func _dbg_case2() -> void:
 	var knocked: bool = facts.has("f.board_screwed")
 	# 2. ЛУПА: вістря і різь → потім задерті шліци
 	_apply_zone("z.well.back_board", &"tool.loupe")
-	_apply_zone("z.macro.screws", &"tool.loupe")
+	_apply_zone("z.well.back_board", &"tool.loupe")
 	var measured: bool = facts.has("f.screw_points") and facts.has("f.slot_burr")
 	# 3. шурупи: око → лупа → лупа → довідник
 	_apply_zone("z.well.back_board", &"tool.eye")
 	_apply_zone("z.well.back_board", &"tool.loupe")
-	_apply_zone("z.macro.screws", &"tool.loupe")
+	_apply_zone("z.well.back_board", &"tool.loupe")
 	_apply_zone("z.doc.ref_screws")
 	# 4. НЕГАТИВ: порожнина недосяжна, поки дошка не знята (requires_state)
 	_apply_zone("z.void.floor", &"tool.rake")
@@ -673,12 +674,28 @@ func _loupe_frame() -> void:
 # скло над ПЛИТОЮ/ПАПЕРОМ: аркуш вписаний у свій прямокутник один-в-один,
 # тож uv рахується прямо з нього. Джерело — оригінальна текстура, не екран,
 # тому під склом видно деталі, яких на екрані просто нема.
+# HD-варіант поточної плити: ті САМІ кадри, подвійна роздільність, деталі вживлені.
+# Скло — не «окрема картинка», воно чесно збільшує саму скриньку.
+func _plate_hd() -> Texture2D:
+	var nm := ""
+	match _shown():
+		"C2PIECE": nm = "box_closed"
+		"C2STAMP": nm = "box_under"
+		"C2OPEN": nm = c2open_tex_name
+	if nm != "" and tex.has(nm + "_hd"): return tex[nm + "_hd"]
+	return null
+
 func _glass_plate(gc: Vector2) -> void:
 	var d: Dictionary = paper_frames.get(_shown(), {})
 	var t2: Texture2D = d.get("tex", null)
 	var nd0 = d.get("node", null)
 	if nd0 is TextureRect and is_instance_valid(nd0) and (nd0 as TextureRect).texture:
 		t2 = (nd0 as TextureRect).texture   # дошку зняли — скло показує зняту, не стару
+	var zoomv := 2.1
+	var hd := _plate_hd()
+	if hd != null:
+		t2 = hd            # ті самі пікселі сцени, вчетверо більше деталі
+		zoomv = 3.0
 	if t2 == null: return
 	var fr: Rect2 = d["frame"]
 	if fr.size.x <= 1.0 or fr.size.y <= 1.0: return
@@ -687,9 +704,8 @@ func _glass_plate(gc: Vector2) -> void:
 	var gr: float = GLASS_R*loupe_lw*2.0
 	mat.set_shader_parameter("center", Vector2((gc.x-fr.position.x)/fr.size.x,
 											   (gc.y-fr.position.y)/fr.size.y))
-	const PLATE_ZOOM := 2.1
-	mat.set_shader_parameter("span", Vector2(gr/(fr.size.x*PLATE_ZOOM),
-											 gr/(fr.size.y*PLATE_ZOOM)))
+	mat.set_shader_parameter("span", Vector2(gr/(fr.size.x*zoomv),
+											 gr/(fr.size.y*zoomv)))
 
 # скло над столом: екранна точка gc → uv в ОРИГІНАЛІ case_desk (інверсія COVERED-мапінгу)
 func _glass_desk(gc: Vector2) -> void:
@@ -840,7 +856,7 @@ var last_fact_count := -1
 
 # Екрани, на яких гравець тримає РІЧ справи 2 (плити скриньки). Драбина підказок
 # і холостий таймер живуть саме тут, а не на покинутих 3D-екранах.
-const C2_SCREENS := ["C2PIECE", "C2OPEN", "C2STAMP", "C2RECESS", "C2SCREW", "M2SCREWS", "M2LOCK", "M2BAIZE", "M2WELLS", "M2LABEL", "M2HINGES"]
+const C2_SCREENS := ["C2PIECE", "C2OPEN", "C2STAMP"]
 
 func _c2_ladder() -> String:
 	if not facts.has("f.board_screwed"):
@@ -1284,7 +1300,7 @@ func _dbg_furnprobe() -> void:
 	# 3. механічний прохід наміченим ланцюгом: скільки фактів дається
 	_apply_zone("z.well.back_board", &"tool.eye")
 	_apply_zone("z.well.back_board", &"tool.loupe")
-	_apply_zone("z.macro.screws", &"tool.loupe")
+	_apply_zone("z.well.back_board", &"tool.loupe")
 	_apply_zone("z.doc.ref_screws", &"tool.eye")
 	_apply_zone("z.well.back_board", &"tool.screwdriver")
 	for _s2 in range(SCREW_SPOTS.size()):
@@ -1545,7 +1561,7 @@ func _load() -> void:
 	# справа 2 «Спадок удови»
 	for n3 in ["hub_day","hub_day_case","hub_lamp_off","hub_evening","hub_evening_figure","hub_night","hub_darkness","menu_door","client_woman","client_in_room","subtitle_band"]:
 		if ResourceLoader.exists(ART + n3 + ".png"): tex[n3] = load(ART + n3 + ".png")
-	for n2 in ["case2_desk","watch_wear","watch_chain","paper_receipt_1807","reg_page_h","marks_page_vienna","notebook_spread","mark_diana_macro","mark_maker_macro","tool_tray","hand_caliper","hand_screwdriver","hand_rake","wood_page","plain_book_page","dust_floor","client_vogl","screw_macro","board_face","cl1_p2","cl1_p3","cl1_p4","cl2_p2","cl2_p3","cl2_p4","cl2_door","sec_section","bureau_room","c2_piece","c2_open","c2_stamp","c2_endgrain","c2_recess","box_closed","box_a1","box_a2","box_open","box_under","box_noboard","box_holes","tool_tray_empty","glow_warm","tray_caliper","tray_screwdriver","tray_loupe","tray_rake","m2_screws","m2_lock","m2_baize","m2_wells","scr_head_0","scr_head_1","scr_head_2","scr_head_3","scr_ring_0","scr_ring_1","scr_ring_2","scr_ring_3","label_slip","m2_label","m2_hinges"]:
+	for n2 in ["case2_desk","watch_wear","watch_chain","paper_receipt_1807","reg_page_h","marks_page_vienna","notebook_spread","mark_diana_macro","mark_maker_macro","tool_tray","hand_caliper","hand_screwdriver","hand_rake","wood_page","plain_book_page","dust_floor","client_vogl","screw_macro","board_face","cl1_p2","cl1_p3","cl1_p4","cl2_p2","cl2_p3","cl2_p4","cl2_door","sec_section","bureau_room","c2_piece","c2_open","c2_stamp","c2_endgrain","c2_recess","box_closed","box_a1","box_a2","box_open","box_under","box_noboard","box_holes","tool_tray_empty","glow_warm","tray_caliper","tray_screwdriver","tray_loupe","tray_rake","scr_head_0","scr_head_1","scr_head_2","scr_head_3","scr_ring_0","scr_ring_1","scr_ring_2","scr_ring_3","label_slip","box_open_hd","box_holes_hd","box_noboard_hd","box_closed_hd","box_under_hd"]:
 		if ResourceLoader.exists(ART + n2 + ".png"): tex[n2] = load(ART + n2 + ".png")
 	# опційний арт (додано 24.07): чистий лист клієнтки
 	if ResourceLoader.exists(ART + "letter_client.png"):
@@ -2726,7 +2742,7 @@ func _apply_opt() -> void:
 # Вхід у макро — це НАХИЛ до речі зі склом: поточна плита летить у точку кліку
 # і розчиняється в деталі. Назад — зворотний рух у ту саму точку. Дія при цьому
 # завжди лишається на місці (шурупи крутяться на дошці) — макро лише погляд.
-const ZOOM_SCREENS := ["M2SCREWS", "M2LOCK", "M2BAIZE", "M2WELLS", "M2LABEL", "M2HINGES", "C2RECESS", "C2SCREW"]
+const ZOOM_SCREENS := []   # 02.08, закон Віктора: усе дослідження — на скриньці
 var last_plate_click := Vector2.ZERO
 var zoom_origin := {}
 
@@ -2785,7 +2801,7 @@ func _unzoom(macro: String, back_to: String) -> void:
 # Права колонка: короткі цитати здобутих фактів, свіжі яскравіші. Це не заміна
 # записника — це його краєчок, що завжди лежить біля руки.
 const NOTES_SCREENS := ["C2PIECE", "C2OPEN", "C2STAMP", "C2RECESS", "C2SCREW",
-	"M2SCREWS", "M2LOCK", "M2BAIZE", "M2WELLS", "M2LABEL", "M2HINGES", "C2DOCS", "BOOK_WOOD", "BOOK_SCREWS",
+	"C2DOCS", "BOOK_WOOD", "BOOK_SCREWS",
 	"ASK", "DESK", "HANDS", "DOCS", "NEWS", "CATALOG", "BOOK_REG", "BOOK_MARKS",
 	"DOCS_RECEIPT", "MARKS_MACRO"]
 var notes_ui: Control
@@ -2804,27 +2820,27 @@ func _refresh_quick_notes() -> void:
 			cites.append(_t(String((ft[StringName(fid)] as Dictionary).get("cite", fid))))
 	if cites.is_empty(): return
 	var head := Label.new()
-	head.label_settings = _ls(fb, int(H*0.017), Color(0.62, 0.53, 0.38))
+	head.label_settings = _ls(fb, int(H*0.021), Color(0.66, 0.56, 0.40))
 	head.text = _t("Noted:")
 	head.position = Vector2(W*0.845, H*0.105)
 	head.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	notes_ui.add_child(head)
 	var y := H*0.135
-	var start_i: int = maxi(0, cites.size() - 9)
+	var start_i: int = maxi(0, cites.size() - 7)
 	for i in range(start_i, cites.size()):
 		var age: int = cites.size() - 1 - i
 		var l := Label.new()
-		l.label_settings = _ls(fh, int(H*0.0165),
-			Color(0.88, 0.83, 0.72, 1.0 if age == 0 else maxf(0.45, 0.9 - 0.09*age)))
+		l.label_settings = _ls(fh, int(H*0.0215),
+			Color(0.90, 0.85, 0.74, 1.0 if age == 0 else maxf(0.5, 0.92 - 0.09*age)))
 		l.label_settings.shadow_color = Color(0, 0, 0, 0.85)
 		l.label_settings.shadow_offset = Vector2(1.2, 1.2)
 		l.text = "\u2014 " + String(cites[i])
 		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		l.size = Vector2(W*0.148, H*0.058)
+		l.size = Vector2(W*0.152, H*0.072)
 		l.position = Vector2(W*0.845, y)
 		l.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		notes_ui.add_child(l)
-		y += H*0.062
+		y += H*0.076
 
 func _show_notebook() -> void:
 	if _shown() != "NOTEBOOK": notebook_prev = _shown()
@@ -3840,6 +3856,7 @@ func _c2_plate_sync() -> void:
 		"C2PIECE": "box_closed",
 		"C2OPEN": "box_noboard" if opened else mid,
 	}
+	c2open_tex_name = String(canon["C2OPEN"])
 	for k in canon:
 		var im: TextureRect = box_frame_img.get(k, null)
 		var nm: String = canon[k]
@@ -3990,9 +4007,11 @@ func _c2_screw_out(idx: int, on_end: Callable) -> void:
 		for nd in _screw_nodes(idx): (nd as CanvasItem).visible = false
 		var im0: TextureRect = box_frame_img.get("C2OPEN", null)
 		if im0 and tex.has("box_holes"): im0.texture = tex["box_holes"]
+		c2open_tex_name = "box_holes"
 		on_end.call(); return
 	var im: TextureRect = box_frame_img.get("C2OPEN", null)
 	if im and tex.has("box_holes"): im.texture = tex["box_holes"]
+	c2open_tex_name = "box_holes"
 	if screw_layer == null or not is_instance_valid(screw_layer): _c2_screws_build()
 	var pr := _screw_nodes(idx)
 	if pr.is_empty():
@@ -4057,35 +4076,10 @@ func _build_case2_plates() -> void:
 					_set_hint("The lid closes; the box stands as it came in.")
 					_show("C2PIECE")))
 	_plate_screen("C2STAMP", "box_under", "C2PIECE", "←  set it right way up")
-	_plate_screen("C2RECESS", "c2_recess", "C2OPEN", "←  step back")
-	_plate_screen("C2SCREW", "screw_macro", "C2OPEN", "←  step back")
-	# макро-плити «Викраденого заповіту»: те, що гра раніше РОЗКАЗУВАЛА, тепер ВИДНО
-	_plate_screen("M2SCREWS", "m2_screws", "C2OPEN", "←  step back")
-	_plate_screen("M2LOCK", "m2_lock", "C2PIECE", "←  step back")
-	_plate_screen("M2BAIZE", "m2_baize", "C2OPEN", "←  step back")
-	_plate_screen("M2WELLS", "m2_wells", "C2OPEN", "←  step back")
-	_txtbtn(screens["M2SCREWS"], "the screw-book  \u2192", Vector2(W*0.68, H*0.92),
-			func(): _show("BOOK_SCREWS"), 0.026)
-	_plate_screen("M2LABEL", "m2_label", "C2OPEN", "←  step back")
-	_plate_screen("M2HINGES", "m2_hinges", "C2OPEN", "←  step back")
-	for pair in [["M2SCREWS", "C2OPEN"], ["M2LOCK", "C2PIECE"], ["M2BAIZE", "C2OPEN"],
-				 ["M2WELLS", "C2OPEN"], ["M2LABEL", "C2OPEN"], ["M2HINGES", "C2OPEN"],
-				 ["C2RECESS", "C2OPEN"], ["C2SCREW", "C2OPEN"]]:
-		var ms: Control = screens[pair[0]]
-		for cb in ms.get_children():
-			if cb is Button and (cb as Button).position.x < W*0.2 and (cb as Button).position.y > H*0.85:
-				for con in (cb as Button).pressed.get_connections():
-					(cb as Button).pressed.disconnect(con["callable"])
-				(cb as Button).pressed.connect(_unzoom.bind(String(pair[0]), String(pair[1])))
+	# 02.08, закон Віктора: ЖОДНИХ окремих картинок — усе дослідження на скриньці.
+	# Макро-екрани знято; лупа читає HD-майстри тих самих кадрів (деталі вживлені).
 
-# ── ДОПИТ КЛІЄНТКИ ───────────────────────────────────────────────────────────
-# Вона не йде після того, як віддала річ: стоїть біля прилавка і відповідає.
-# Дані 31.07: «клієнт біля прилавка» — 9.2 % позитиву Strange Antiquities проти
-# 0.0 % Obra Dinn і 0.2 % Golden Idol. Це рів бенчмарку, і він у нас лежав.
-#
-# Кожна відповідь або ЗВУЖУЄ (каже, куди глянути), або ЛАМАЄТЬСЯ об уже здобутий
-# факт — і тоді народжується факт-суперечність, який лягає в атестат як підстава.
-# Це та сама діегетична драбина (правило 6), тільки з обличчям.
+# стан допиту (оголошення жили між плитами і зрізались разом із макро 02.08)
 var asked := {}                  # id питання → true
 var ask_last := ""               # остання відповідь, щоб малювати її на екрані
 
@@ -4735,10 +4729,6 @@ func _c2_part_toggle(zone_id: String) -> bool:
 			_play("goblet_set")
 			_set_hint("The box lifts and turns over in both hands.")
 			_show("C2STAMP"); return true
-		"z.void.mouth":
-			_show_zoomed("C2RECESS"); return true
-		"z.screws.loose":
-			_show_zoomed("C2SCREW"); return true
 	return false
 
 func _toggle_fallfront() -> void:
