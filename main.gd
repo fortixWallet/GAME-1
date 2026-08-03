@@ -1220,7 +1220,10 @@ func _dbg_pilot() -> void:
 	await _shot(dirp + "p000.png", 4)
 	var f0 := FileAccess.open(done_path, FileAccess.WRITE)
 	f0.store_string("ready 0 screen=MENU shot=p000.png"); f0.close()
+	var _hb := 0
 	while true:
+		_hb += 1
+		if _hb % 20 == 1: print("PILOT_TICK ", _hb, " see=", FileAccess.file_exists(cmd_path), " dir=", OS.get_user_data_dir())
 		await get_tree().create_timer(0.15).timeout
 		# згорнуте вікно зупиняє рендер → await frame_post_draw висить вічно
 		# (сесія 28.07 замерзла рівно так). Пілот сам розгортає вікно.
@@ -3379,6 +3382,9 @@ func _refresh_cert() -> void:
 		elif not _slot_filled(i):
 			var hnt := Label.new(); hnt.label_settings = _ls(fr, int(ph*0.015), Color(0.56,0.49,0.40))
 			hnt.text = _t(_slot_hint(sl))
+			# довгий перелік «Ще бракує» ЗАГОРТАЄТЬСЯ в межах аркуша, а не тікає на стіл
+			hnt.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			hnt.size = Vector2(pw*0.62, ph*0.052)
 			hnt.position = Vector2(pw*0.195, ph*(yyi+0.018)); hnt.mouse_filter = Control.MOUSE_FILTER_IGNORE; opt_layer.add_child(hnt)
 			# клік по зачиненій графі — підказка СПАЛАХУЄ (тиша = «зламано», плейтест 27.07)
 			var poke := Button.new(); poke.flat = true; poke.modulate.a = 0
@@ -3417,6 +3423,10 @@ func _build_cert_panel() -> void:
 		var d := Label.new(); d.label_settings = _ls(fr, int(H*0.024), Color(0.82,0.77,0.67))
 		d.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART; d.size = Vector2(cert_panel.size.x, H*0.3)
 		d.text = _t("Set down each line of the attribution.\nClick any line on the left to fill or change it.")
+		if case_id == 2:
+			# «для чого цей папір» (Віктор 03.08: «вона хоче ціну — що мені
+			# вказувати?») — призначення атестата сказано просто на ньому
+			d.text += "\n\n" + _t("The bureau does not write a price. It writes what the piece attests — and a bureau seal weighs more with the notary than any oath. Say what was in the box, and when it left.")
 		cert_panel.add_child(d); return
 	var sl: Dictionary = CSLOTS[i]
 	var head := Label.new(); head.label_settings = _ls(fr, int(H*0.03), Color(0.72,0.61,0.43))
@@ -4256,17 +4266,17 @@ func _build_case2_papers() -> void:
 	d2.add_child(slip)
 	var bw := _paper_screen("BOOK_WOOD", "wood_page", "C2DOCS", "←  back to the papers")
 	_ptext(bw, "OF TIMBER, BY THE END GRAIN", 0.28, 0.030, 0.020)
-	_ptext(bw, "SPRUCE — the case wood", 0.635, 0.115, 0.017, Color(0.24,0.17,0.10), false, 0.885)
-	_ptext(bw, "abrupt rings, resin channels;", 0.635, 0.155, 0.014, Color(0.24,0.17,0.10), false, 0.885)
-	_ptext(bw, "no rays across the grain.", 0.635, 0.185, 0.014, Color(0.24,0.17,0.10), false, 0.885)
-	_ptext(bw, "Coarse, resinous. The stock", 0.635, 0.215, 0.014, Color(0.24,0.17,0.10), false, 0.885)
-	_ptext(bw, "of every Vienna case.", 0.635, 0.245, 0.014, Color(0.24,0.17,0.10), false, 0.885)
+	_ptext(bw, "WALNUT — the box wood", 0.635, 0.115, 0.017, Color(0.24,0.17,0.10), false, 0.885)
+	_ptext(bw, "open scattered pores, dark;", 0.635, 0.155, 0.014, Color(0.24,0.17,0.10), false, 0.885)
+	_ptext(bw, "no bright rays across it.", 0.635, 0.185, 0.014, Color(0.24,0.17,0.10), false, 0.885)
+	_ptext(bw, "The cabinet wood of Vienna —", 0.635, 0.215, 0.014, Color(0.24,0.17,0.10), false, 0.885)
+	_ptext(bw, "what good boxes are made of.", 0.635, 0.245, 0.014, Color(0.24,0.17,0.10), false, 0.885)
 	_ptext(bw, "BEECH", 0.635, 0.585, 0.017, Color(0.24,0.17,0.10), false, 0.885)
 	_ptext(bw, "fine even pores, crossed by", 0.635, 0.625, 0.014, Color(0.24,0.17,0.10), false, 0.885)
 	_ptext(bw, "broad bright rays — the", 0.635, 0.655, 0.014, Color(0.24,0.17,0.10), false, 0.885)
 	_ptext(bw, "joiner\u2019s \u00abfleck\u00bb. Close, pale.", 0.635, 0.685, 0.014, Color(0.24,0.17,0.10), false, 0.885)
-	_ptext(bw, "Cheap, strong; a wood for", 0.635, 0.715, 0.014, Color(0.24,0.17,0.10), false, 0.885)
-	_ptext(bw, "work that is not meant to show.", 0.635, 0.745, 0.014, Color(0.24,0.17,0.10), false, 0.885)
+	_ptext(bw, "The joiner’s hidden stock —", 0.635, 0.715, 0.014, Color(0.24,0.17,0.10), false, 0.885)
+	_ptext(bw, "for work not meant to show.", 0.635, 0.745, 0.014, Color(0.24,0.17,0.10), false, 0.885)
 	# аудит 27.07: проза на бухгалтерській сітці = «перекреслений текст»; сторінка
 	# довідника — ЧИСТИЙ аркуш (plain_book_page), верстка вільна
 	var bs := _paper_screen("BOOK_SCREWS", "plain_book_page", "C2DOCS", "←  back to the papers")

@@ -202,7 +202,7 @@ const RULES := [
 	 "say": "Low light across the plate: the scratches all run the same way, from the keyhole down to the left. One hand, one habit, one angle."},
 
 	{"zone": &"z.void.lining", "tool": &"tool.eye",
-	 "say": "The recess is lined with a paler wood than the box, cut in and fitted — not the walnut of the carcass."},
+	 "say": "The recess is lined with a paler wood than the box, cut in and fitted — not the walnut of the box itself."},
 	{"zone": &"z.void.lining", "tool": &"tool.rake",
 	 "say": "Raking light along the lining: the joint between it and the walnut is tight, and the glue line is dark with age."},
 
@@ -232,7 +232,7 @@ const RULES := [
 
 	{"zone": &"z.void.lining", "tool": &"tool.loupe",
 	 "facts": [&"f.lining_fleck"],
-	 "say": "Under the glass the seam tells it plainly: the lining is close, pale wood — beech, joiner\'s stock — set into walnut that is coarser and darker. Two different timbers, one box."},
+	 "say": "Under the glass the seam tells it plainly: a close, pale timber set into the walnut — not the same wood at all. Which wood it is, the timber page among the papers will name."},
 	{"zone": &"z.void.floor", "tool": &"tool.rake",
 	 "facts": [&"f.dust_rectangle"],
 	 "say": "Under a low light the floor is grey with settled dust, except one rectangle clean to the wood. Its edges are sharp, and it is the size of a folded packet of papers."},
@@ -271,6 +271,12 @@ const ASK := [
 	 "opens": "The screws in the lid, then. Wax cracks when a head is turned.",
 	 "needs": []},
 
+	{"id": &"q.price",
+	 "ask": "You came for a price. What should my paper say?",
+	 "say": "\u00abWrite what you see, Herr Gutachter. Your seal weighs more with the notary than my oath does. If the paper says the will WAS in that box \u2014 and that it was taken \u2014 then the sale can wait, and the house will be turned over room by room.\u00bb",
+	 "opens": "",
+	 "needs": [&"f.dust_rectangle"]},
+
 	{"id": &"q.locked",
 	 "ask": "When did you lock the box?",
 	 "say": "«The day I decided to sell it. Until then it stood open on his desk — it always stood open. And when I turned the key at last, it stuck fast — your own locksmith had to coax it round.»",
@@ -299,7 +305,7 @@ const FACTS := {
 	&"f.board_lifted":         {"cite": "the recess behind the board", "tag": &"body", "weight": 2,
 		"text": "Behind the board there is a recess, lined, with no dust on its front lip."},
 	&"f.lining_fleck":         {"cite": "the lining is not the wood of the box", "tag": &"body", "weight": 3,
-		"text": "Lining end grain: close, pale, fine bright flecks. The walnut beside it: coarse, resinous, no flecks."},
+		"text": "The lining is a close, pale timber set into the walnut — a second wood inside the box. The timber page names it: beech, the joiner\'s hidden stock."},
 	&"f.dust_rectangle":       {"cite": "a clean rectangle in the dust", "tag": &"body", "weight": 3,
 		"text": "Dust on the floor of the recess everywhere but one rectangle, clean to the wood, sharp at the edges — the size of a folded packet of papers."},
 	&"f.contra.opened":        {"cite": "she says it was never opened; three screws say otherwise", "tag": &"client", "weight": 3,
