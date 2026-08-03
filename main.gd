@@ -4238,7 +4238,7 @@ func _build_case2_papers() -> void:
 	paper.position = Vector2((W-lw)*0.5, (H-lh)*0.5 - H*0.02); paper.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	d2.add_child(paper)
 	var t2 := Label.new()
-	t2.text = _t("THE CLIENT — Frau Anna Vogl\n«He willed it to me. My son sails on Thursday;\nthe ticket is forty-one gulden and I have nineteen.\nI am not asking a good price — a quick one.»\n\nDAY-BOOK — the 3rd\nSecretaire, walnut, estate of Herr F.\nOpened on arrival by Krenn, our locksmith\n— lock seized. House keys surrendered with the piece.\n\nREGISTER OF WORKSHOPS (Möbeltischler, Wien)\nDANHAUSER, Josef — Wien — stamp 1804–1838\nGRUBER, Michael — Wien-Gumpendorf — stamp 1822–1841\nSCHMIDT & SOHN — Leopoldstadt — stamp 1835–1867\nHALBERT, J. — Wien I — dealer, no stamp, from 1861")
+	t2.text = _t("THE CLIENT — Frau Anna Vogl\n«He willed it to me. My son sails on Thursday;\nthe ticket is forty-one gulden and I have nineteen.\nI am not asking a good price — a quick one.»\n\nDAY-BOOK — the 3rd\nSecretaire, walnut, estate of Herr F.\nLock seized when first turned in years;\nfreed on arrival by Krenn, our locksmith.\nHouse keys surrendered with the piece.\n\nREGISTER OF WORKSHOPS (Möbeltischler, Wien)\nDANHAUSER, Josef — Wien — stamp 1804–1838\nGRUBER, Michael — Wien-Gumpendorf — stamp 1822–1841\nSCHMIDT & SOHN — Leopoldstadt — stamp 1835–1867\nHALBERT, J. — Wien I — dealer, no stamp, from 1861")
 	t2.label_settings = _ls(fr, _fit_text(fr, t2.text, int(lh*0.026), lw*0.76), Color(0.20,0.14,0.09))
 	t2.position = paper.position + Vector2(lw*0.12, lh*0.10); t2.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	d2.add_child(t2)

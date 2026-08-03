@@ -141,7 +141,7 @@ const RULES := [
 	 "say": "Four scratches run from the keyhole to the lower left. Their metal is bright; the metal around them is brown."},
 
 	{"zone": &"z.doc.daybook_intake", "tool": &"*", "facts": [&"f.daybook_locksmith"],
-	 "say": "Intake, the 3rd: 'Writing box, walnut, from the estate of Herr F. Opened on arrival by Krenn, our locksmith — lock seized. House keys surrendered with the piece.'"},
+	 "say": "Intake, the 3rd: 'Writing box, walnut, estate of Herr F. Lock seized — turned for the first time in years, by the look of it; her own key would not move it. Freed on arrival by Krenn, our locksmith. House keys surrendered with the piece.'"},
 
 	{"zone": &"z.drawer.underside", "tool": &"tool.eye",
 	 "facts": [&"f.stamp_gruber"],
@@ -273,7 +273,7 @@ const ASK := [
 
 	{"id": &"q.locked",
 	 "ask": "When did you lock the box?",
-	 "say": "«The day I decided to sell it. Until then it stood open on his desk — it always stood open.»",
+	 "say": "«The day I decided to sell it. Until then it stood open on his desk — it always stood open. And when I turned the key at last, it stuck fast — your own locksmith had to coax it round.»",
 	 "gives": &"f.window_mourning",
 	 "opens": "Then whoever emptied the recess needed no key. The house was open, and so was the box.",
 	 "needs": [&"f.dust_rectangle"]},
@@ -283,7 +283,7 @@ const FACTS := {
 	&"f.escutcheon_bright":    {"cite": "bright scratches at the lock", "tag": &"lock", "weight": 1,
 		"text": "Four scratches by the keyhole; their metal is bright, the metal around them brown."},
 	&"f.daybook_locksmith":    {"cite": "our own locksmith opened it on the 3rd", "tag": &"papers", "weight": 2,
-		"text": "Day-book, the 3rd: opened on arrival by Krenn, the bureau\'s locksmith. House keys surrendered with the piece."},
+		"text": "Day-book, the 3rd: the lock had seized — first turned in years, her key would not move it. Krenn, the bureau\'s locksmith, freed it on intake. A lock that seizes is a lock that was never used: the box lived open."},
 	&"f.stamp_gruber":         {"cite": "the workshop stamp on the underside", "tag": &"body", "weight": 2,
 		"text": "Burnt into the box bottom: M. GRUBER · WIEN. Chalk number 367 beside it."},
 	&"f.reg_gruber_1822_1841": {"cite": "the register dates the stamp to 1822–1841", "tag": &"books", "weight": 2,
