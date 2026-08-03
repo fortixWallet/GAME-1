@@ -393,19 +393,16 @@ func _dbg_case2() -> void:
 	_load_case(2)
 	# 0. НЕГАТИВ: лупа по дошці ДО огляду оком мовчить (requires f.board_screwed)
 	_apply_zone("z.well.back_board", &"tool.loupe")
-	var neg_flag: bool = not facts.has("f.screw_points")
+	var neg_flag: bool = not facts.has("f.slot_burr")
 	# 1. ОКО: чотири шурупи там, де решта корпуса на шкантах
 	_apply_zone("z.well.back_board", &"tool.eye")
 	var knocked: bool = facts.has("f.board_screwed")
-	# 2. ЛУПА: вістря і різь → потім задерті шліци
+	# 2. ЛУПА по головках: кручені шліци (вістря ще СХОВАНЕ в дереві)
 	_apply_zone("z.well.back_board", &"tool.loupe")
-	_apply_zone("z.well.back_board", &"tool.loupe")
-	var measured: bool = facts.has("f.screw_points") and facts.has("f.slot_burr")
-	# 3. шурупи: око → лупа → лупа → довідник
-	_apply_zone("z.well.back_board", &"tool.eye")
-	_apply_zone("z.well.back_board", &"tool.loupe")
-	_apply_zone("z.well.back_board", &"tool.loupe")
+	# 2б. НЕГАТИВ ФІЗИКИ: довідник ДО викручування мовчить — нема шурупа в руці
 	_apply_zone("z.doc.ref_screws")
+	var neg_book: bool = not facts.has("f.ref_screw_points")
+	if not neg_book: print("  ФІЗИКА ЗЛАМАНА: книга дала дату до викручування")
 	# 4. НЕГАТИВ: порожнина недосяжна, поки дошка не знята (requires_state)
 	_apply_zone("z.void.floor", &"tool.rake")
 	var neg_state: bool = not facts.has("f.dust_rectangle")
@@ -419,6 +416,11 @@ func _dbg_case2() -> void:
 		while screw_busy and g < 200:
 			await RenderingServer.frame_post_draw; g += 1
 	var opened: bool = facts.has("f.board_lifted") and zone_states.get(&"z.well.back_board", &"") == &"open"
+	# 5б. ГОСТРІСТЬ — лише на викручених; тоді книга
+	_apply_zone("z.screws.loose", &"tool.loupe")
+	_apply_zone("z.doc.ref_screws")
+	var measured: bool = facts.has("f.screw_points") and facts.has("f.slot_burr") \
+		and facts.has("f.ref_screw_points") and neg_book
 	# 6. порожнина: підкладка + пил
 	_apply_zone("z.void.lining", &"tool.loupe")
 	_apply_zone("z.void.floor", &"tool.rake")
@@ -861,16 +863,18 @@ const C2_SCREENS := ["C2PIECE", "C2OPEN", "C2STAMP"]
 func _c2_ladder() -> String:
 	if not facts.has("f.board_screwed"):
 		return "Open the box and look at how the board in the lid is held."
-	if not facts.has("f.screw_points"):
-		return "Those screws are worth the glass. Take up the loupe and look at one closely."
-	if not facts.has("f.ref_screw_points"):
-		return "A screw like that has a date. The chapter on screws is among the papers."
+	if not facts.has("f.slot_burr"):
+		return "Those heads are worth the glass. Hold the loupe over them — have they been turned?"
 	if not facts.has("f.board_lifted"):
-		return "Four screws hold that board, and the rest of the box is dowelled. Take the screwdriver from the tray and put it to the board — those screws come out."
+		return "Three heads turned, one sealed. Take the screwdriver from the tray and draw them — the wood is hiding their points."
+	if not facts.has("f.screw_points"):
+		return "The screws lie free on the baize. Now the glass can see what the wood was hiding — their points."
+	if not facts.has("f.ref_screw_points"):
+		return "A screw like that has a birthday. The chapter on screws is among the papers."
 	if not facts.has("f.dust_rectangle"):
 		return "The recess is open. Take the lamp and lay its light low across the floor of it."
 	if not facts.has("f.lining_fleck"):
-		return "That lining is not the wood of the box. Its cut edge under the glass will say what it is."
+		return "The recess is lined with paler wood. Put the glass on its right-hand seam, where pale meets walnut."
 	if not facts.has("f.stamp_gruber"):
 		return "Turn the box over. A joiner burns his name where nobody is meant to look."
 	if not facts.has("f.reg_gruber_1822_1841"):
@@ -1336,6 +1340,9 @@ func _dbg_furnprobe() -> void:
 		var g2 := 0
 		while screw_busy and g2 < 200:
 			await RenderingServer.frame_post_draw; g2 += 1
+	# ФІЗИКА: гострість — лише на викручених; тоді довідник дає дату
+	_apply_zone("z.screws.loose", &"tool.loupe")
+	_apply_zone("z.doc.ref_screws", &"tool.eye")
 	_apply_zone("z.void.floor", &"tool.rake")
 	_apply_zone("z.void.lining", &"tool.loupe")
 	_apply_zone("z.drawer.underside", &"tool.rake")
