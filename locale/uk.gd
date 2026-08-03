@@ -560,4 +560,9 @@ const T := {
 "The night is short in this trade.": "Ніч у цьому ремеслі коротка.",
 "morning  →": "ранок  →",
 "The bell. Someone at the door — with a burden carried in both arms.": "Дзвінок. Хтось під дверима — з ношею в обох руках.",
+"«The writing box is mine — his will says so. Only the will is not found yet; the notary turns the house over for it. Sell the box for me: your house names the worth, finds the buyer, and pays the owner. That is what a bureau is for.»": "«Скринька моя — так каже його заповіт. Тільки заповіту ще не знайшли; нотар перевертає дім за ним. Продайте скриньку за мене: ваша контора називає ціну, знаходить покупця і розраховується з власником. Для того ж бюро і є.»",
+"The bureau does not write a price. It writes what the piece attests — and a bureau seal weighs more with the notary than any oath. The price the house sets AFTER the seal, from what this paper says. Say what was in the box, and when it left.": "Бюро не пише ціни. Воно пише, що річ засвідчує, — а печатка бюро важить у нотаря більше за будь-яку клятву. Ціну контора ставить ПІСЛЯ печатки — з того, що скаже цей папір. Скажи, що лежало в скриньці і коли воно зникло.",
+"↺  restart the case": "↺  почати справу спочатку",
+"↺  restart — click again": "↺  спочатку — клікни ще раз",
+"exit to the menu  →": "вихід у меню  →",
 }

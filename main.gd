@@ -2703,6 +2703,20 @@ func _build_settings() -> void:
 	head.size = Vector2(W, H*0.06); head.position = Vector2(0, H*0.055)
 	head.mouse_filter = Control.MOUSE_FILTER_IGNORE; s.add_child(head)
 	_txtbtn(s, "←  back", Vector2(W*0.04, H*0.92), func(): _close_settings())
+	# Віктор 03.08: «додай повторити з початку справу, і вихід в головне меню»
+	var rb := _txtbtn(s, "↺  restart the case", Vector2(W*0.30, H*0.92), func(): pass, 0.028)
+	rb.name = "restart_btn"
+	rb.pressed.connect(func():
+		if rb.get_meta("armed", false):
+			_restart_case()
+		else:
+			rb.set_meta("armed", true)
+			rb.text = _t("↺  restart — click again")
+			_play("ui_soft"))
+	_txtbtn(s, "exit to the menu  →", Vector2(W*0.66, H*0.92), func():
+		settings_prev = ""
+		if loupe_held: _drop_loupe()
+		_show("MENU"), 0.028)
 	_refresh_settings()
 
 # один рядок налаштування: підпис ліворуч, значення і стрілки праворуч
@@ -2769,6 +2783,23 @@ func _cycle_int(key: String, d: int, lo: int, hi: int) -> void:
 func _cycle_f(key: String, d: float, lo: float, hi: float) -> void:
 	opt[key] = snappedf(clampf(float(opt[key]) + d, lo, hi), 0.05)
 	_apply_opt(); _save_opt(); _refresh_settings(); _play("ui_soft")
+
+# почати ПОТОЧНУ справу спочатку — з приходу клієнтки; сейв перезаписується
+func _restart_case() -> void:
+	var cid := case_id
+	settings_prev = ""
+	if loupe_held: _drop_loupe()
+	if cid == 2:
+		_start_case2()
+	else:
+		_load_case(1)
+		client_seen = true
+		client_line = 0
+		_client_show()
+		_play("door_bell")
+		_show("CLIENT")
+	_refresh_quick_notes()
+	_save_game()
 
 func _open_settings() -> void:
 	if not screens.has("SETTINGS"): _build_settings()
@@ -3456,7 +3487,7 @@ func _build_cert_panel() -> void:
 		if case_id == 2:
 			# «для чого цей папір» (Віктор 03.08: «вона хоче ціну — що мені
 			# вказувати?») — призначення атестата сказано просто на ньому
-			d.text += "\n\n" + _t("The bureau does not write a price. It writes what the piece attests — and a bureau seal weighs more with the notary than any oath. Say what was in the box, and when it left.")
+			d.text += "\n\n" + _t("The bureau does not write a price. It writes what the piece attests — and a bureau seal weighs more with the notary than any oath. The price the house sets AFTER the seal, from what this paper says. Say what was in the box, and when it left.")
 		cert_panel.add_child(d); return
 	var sl: Dictionary = CSLOTS[i]
 	var head := Label.new(); head.label_settings = _ls(fr, int(H*0.03), Color(0.72,0.61,0.43))
@@ -3656,7 +3687,7 @@ func _show_morning() -> void:
 # Річ сама викриває брехуна: знос голівки під ліву руку + свіжі подряпини на вушку.
 const CLIENT2_LINES := [
 	"The bell. A woman in a dark shawl comes in alone, carrying a walnut writing box in both arms as one carries something that is not quite one's own.\n\n\u00abFrau Vogl. I kept house for Herr F. Twenty-two years.\u00bb",
-	"\u00abThe writing box is mine \u2014 his will says so. Only the will is not found yet; the notary turns the house over for it. The box I can sell now, and the bureau is to say what it is worth.\u00bb",
+	"\u00abThe writing box is mine \u2014 his will says so. Only the will is not found yet; the notary turns the house over for it. Sell the box for me: your house names the worth, finds the buyer, and pays the owner. That is what a bureau is for.\u00bb",
 	"\u00abMy son sails on Thursday. The ticket is forty-one gulden and I have nineteen. I am not asking you for a good price. I am asking you for a quick one.\u00bb",
 	"She sets the box on the blotter and steps back from it, wiping her right palm on her skirt.",
 	"She watches it the way one watches a room being emptied \u2014 and keeps her right hand inside the shawl.",
