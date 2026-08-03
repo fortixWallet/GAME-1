@@ -1,6 +1,6 @@
 # Game2 «Бюро атрибуції» — правила (читати першим)
 
-Порядок: цей файл → **`_src/STAN_31_07.md` ← ПОТОЧНИЙ СТАН, читати другим** → `_src/ENGINE_SPEC_ADDENDUM.md` (рушій і кроки) → `_src/TECHNICAL_PLAYBOOK.md` → `_src/PROGRESS.md` (🗄 історичний, 22.07 — рецепти, не стан) → `_src/DESIGN.md` → `_src/CONTENT.md` → `_src/ASSETS.md` → `_src/TECH.md` → `_src/PLAN.md` → `_src/PIPELINE.md` → project memory.
+Порядок: цей файл → **`_src/STAN_31_07.md` ← ПОТОЧНИЙ СТАН, читати другим** → **`_src/SCENARIO.md` (хребет усієї історії: акти, попередник, фінал)** → `_src/ENGINE_SPEC_ADDENDUM.md` (рушій і кроки) → `_src/TECHNICAL_PLAYBOOK.md` → `_src/PROGRESS.md` (🗄 історичний, 22.07 — рецепти, не стан) → `_src/DESIGN.md` → `_src/CONTENT.md` → `_src/ASSETS.md` → `_src/TECH.md` → `_src/PLAN.md` → `_src/PIPELINE.md` → project memory.
 
 **СТАН (31.07):** справа 1 і справа 2 проходяться від початку до вироку. Гейт зелений — 13 перевірок. Річ справи 2 — **писальна скринька на мальованих плитах**, не секретер; 3D-секретер прибрано з гри назовсім (єдина 3D-модель — чаша справи 1). Мова інтерфейсу — українська. Подробиці, хронологія, відкриті питання і всі граблі тижня — **`_src/STAN_31_07.md`**.
 
