@@ -121,7 +121,7 @@ for t in "$@"; do
     # екрана без виходу, і всі 12 фактів досяжні (стара проба 3D-мешів знята 30.07)
     "furnprobe") echo "$OUT" | grep -qE "C2PROBE_OK bad_screen=0 bad_frame=0 no_exit=0 facts=15/15" || FAIL="$FAIL c2probe" ;;
     # walk q: записник гортається; 15 фактів справи 2 розкладено по аркушах
-    "walk q")   echo "$OUT" | grep -q "WALK_Q_OK rows_first=10 rows_last=5 total=15" || FAIL="$FAIL walk-q" ;;
+    "walk q")   echo "$OUT" | grep -q "WALK_Q_OK rows_first=9 rows_last=6 total=15" || FAIL="$FAIL walk-q" ;;
     # walk p: усі лінійовані папери будуються з живими фактами без падінь
     "walk p")   echo "$OUT" | grep -q "WALK_P_OK notebook_rows=8" || FAIL="$FAIL walk-p" ;;
     "layoutcheck") echo "$OUT" | grep -q "накладань= 0" || echo "$OUT" | grep -q "накладань=0" || FAIL="$FAIL layout" ;;

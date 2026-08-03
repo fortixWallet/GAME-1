@@ -551,4 +551,13 @@ const T := {
 "The bureau does not write a price. It writes what the piece attests — and a bureau seal weighs more with the notary than any oath. Say what was in the box, and when it left.": "Бюро не пише ціни. Воно пише, що річ засвідчує, — а печатка бюро важить у нотаря більше за будь-яку клятву. Скажи, що лежало в скриньці і коли воно зникло.",
 "You came for a price. What should my paper say?": "Ви прийшли по ціну. Що має сказати мій папір?",
 "«Write what you see, Herr Gutachter. Your seal weighs more with the notary than my oath does. If the paper says the will WAS in that box — and that it was taken — then the sale can wait, and the house will be turned over room by room.»": "«Пишіть, що бачите, пане експерте. Ваша печатка важить у нотаря більше, ніж моя клятва. Якщо папір скаже, що заповіт У СКРИНЬЦІ БУВ — і що його забрано, — продаж почекає, а дім перетрусять кімната за кімнатою.»",
+"evening falls  →": "вечоріє  →",
+"Case the first — a silver goblet, brought in by a woman who would not meet your eye.\nThe attribution is written, the wax is set. It cannot be lifted.": "Справа перша — срібний келих, який принесла жінка, що не дивилась в очі.\nАтрибуцію написано, віск поставлено. Його не підняти.",
+"Case the second — a walnut writing box, and the widow who did not know what it kept.\nThe attribution is written. What it attests is on its way to the notary.": "Справа друга — горіхова писальна скринька, і вдова, що не знала, що та береже.\nАтрибуцію написано. Те, що вона засвідчує, вже їде до нотаря.",
+"put out the lamp  →": "згасити лампу  →",
+"The second seal lies beside the first. The week has only begun.\n\n( Case the third is on the bench. )": "Друга печатка лягає поруч із першою. Тиждень лише почався.\n\n( Справа третя — на верстаку. )",
+"→  the bureau door": "→  двері бюро",
+"The night is short in this trade.": "Ніч у цьому ремеслі коротка.",
+"morning  →": "ранок  →",
+"The bell. Someone at the door — with a burden carried in both arms.": "Дзвінок. Хтось під дверима — з ношею в обох руках.",
 }

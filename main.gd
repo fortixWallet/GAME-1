@@ -112,6 +112,7 @@ var main_cam3: Camera3D
 var hallmark_node: Node3D
 var loupe_ui: Control
 var c2open_tex_name := "box_open"   # який кадр зараз на C2OPEN (для HD-лупи)
+var c2piece_landed := false          # перший показ речі: плита «лягає» на стіл
 var lamp_glow: TextureRect   # тепле сяйво лампи в руці — мальований оверлей, ADD
 var loupe_glass: ColorRect       # екранне збільшення (стіл)
 var loupe_vp: SubViewport        # 3D-в'юпорт зі спільним світом чаші
@@ -1668,6 +1669,19 @@ func _show(name: String) -> void:
 	if case_id == 2 and name in ["WELL", "DRAWER"] and sec_pivot:
 		sec_yaw = 0.0; sec_pivot.rotation.y = 0.0   # деталь-кадри дивляться на фасад
 	if case_id == 2 and name in ["C2PIECE", "C2OPEN"] and not box_busy: _c2_plate_sync()
+	if case_id == 2 and name == "C2PIECE" and not c2piece_landed and not dbg_mode:
+		# МОНТАЖНИЙ СТИК (правило 14): панель «ставить скриньку на сукно» →
+		# та сама скринька ДОЛІТАЄ на стіл, а не з'являється зі зрізу
+		c2piece_landed = true
+		var im0: TextureRect = box_frame_img.get("C2PIECE", null)
+		if im0:
+			var home := im0.position
+			im0.position = home + Vector2(0, -H*0.03)
+			im0.modulate.a = 0.0
+			var tw0 := create_tween()
+			tw0.tween_property(im0, "position", home, 0.38).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+			tw0.parallel().tween_property(im0, "modulate:a", 1.0, 0.30)
+			tw0.tween_callback(func(): _play("goblet_set"))
 	if case_id == 2 and name == "C2OPEN" and not dbg_mode and add_fact("f.board_screwed"):
 		# перший погляд на відкриту скриньку і Є оглядом: чотири шурупи видно
 		# одразу, вимагати окремого кліку «оком» — зайве (Віктор, 02.08)
@@ -2092,6 +2106,7 @@ func _load_case(n: int) -> void:
 	CSLOTS = (CASE_DATA[n] as Object).get("SLOTS") if CASE_DATA.has(n) else []
 	facts.clear()                       # одне речення замість чотирнадцяти drop_fact
 	asked.clear(); ask_last = ""        # допит клієнтки — теж стан справи
+	c2piece_landed = false
 	for i in screws_removed.size(): screws_removed[i] = false
 	screw_busy = false                  # шурупи назад у дошку
 	confirmed_once.clear()
@@ -2203,6 +2218,20 @@ func _goto(key: String) -> void:
 			_load_case(2); client_seen = true; _show("C2PIECE")
 		"client2":
 			_start_case2()
+		"morn2":
+			# кінцівка справи 2 зі станом «усе знайдено, вирок правильний»
+			_load_case(2)
+			client_seen = true
+			for f in ["f.board_screwed","f.slot_burr","f.board_lifted","f.screw_points",
+					  "f.ref_screw_points","f.dust_rectangle","f.lining_fleck","f.stamp_gruber",
+					  "f.reg_gruber_1822_1841","f.escutcheon_bright","f.daybook_locksmith",
+					  "f.trade_label","f.contra.opened","f.window_mourning","f.syn_late_screws"]:
+				add_fact(f)
+			cvals[0] = &"o.vienna_1820s"; cvals[1] = &"o.private_later"
+			cvals[2] = &"o.within_fortnight"; cvals[3] = &"o.our_locksmith"
+			cvals[4] = [&"f.dust_rectangle", &"f.slot_burr"]
+			sealed = true; seals_set = 2
+			_show_morning()
 		_:
 			_show("MENU")
 
@@ -2228,6 +2257,7 @@ func _build_chapters() -> void:
 		]],
 		["CASE 2 · THE WRITING BOX", 0.565, [
 			["Frau Vogl at the counter", "client2"],
+			["Next morning — the verdict", "morn2"],
 		]],
 	]
 	for g in groups:
@@ -3615,7 +3645,7 @@ func _show_morning() -> void:
 		var head := Label.new(); head.label_settings = _ls(fb, int(H*0.03), Color(0.72,0.60,0.40))
 		head.text = _t("The next morning."); head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		head.size = Vector2(W, H*0.05); head.position = Vector2(0, H*0.15); head.mouse_filter = Control.MOUSE_FILTER_IGNORE; s.add_child(head)
-		_txtbtn(s, "close the ledger  →", Vector2(W*0.62, H*0.8), func(): _evening())
+		_txtbtn(s, "evening falls  →", Vector2(W*0.62, H*0.8), func(): _evening())
 	var mt: Label = screens["MORNING"].get_node("mtext")
 	mt.text = _outcome_text()
 	_show("MORNING")
@@ -4922,14 +4952,58 @@ func _build_ledger() -> void:
 
 func _show_ledger() -> void:
 	var b: Label = screens["LEDGER"].get_node("ltext")
-	b.text = _t("Case the first — a silver goblet, brought in by a woman who would not meet your eye.\n\nThe attribution is written, the wax is set. It cannot be lifted.\n\nThe bureau's door will open again tomorrow.")
+	# ГРОСБУХ РОСТЕ РАЗОМ З ІСТОРІЄЮ (Віктор 03.08: «об'єднуй дві справи»):
+	# рядок на кожну закриту справу; лічильник печаток — той самий, мета-сюжетний
+	var txt := _t("Case the first — a silver goblet, brought in by a woman who would not meet your eye.\nThe attribution is written, the wax is set. It cannot be lifted.")
+	if case_id == 2 and sealed:
+		txt += "\n\n" + _t("Case the second — a walnut writing box, and the widow who did not know what it kept.\nThe attribution is written. What it attests is on its way to the notary.")
+	b.text = txt
 	var sc: Label = screens["LEDGER"].get_node("sealcount")
 	sc.text = _t("Seals set this week:  %d") % seals_set
 	var nx: Button = screens["LEDGER"].get_node_or_null("nextcase")
 	if nx: nx.queue_free()
-	var nb := _txtbtn(screens["LEDGER"], "←  back to the room", Vector2(W*0.62, H*0.80), func(): _enter_hub())
+	var nb: Button
+	if case_done and case_id == 1:
+		nb = _txtbtn(screens["LEDGER"], "put out the lamp  →", Vector2(W*0.62, H*0.80), func(): _night_bridge())
+	elif case_id == 2 and sealed:
+		nb = _txtbtn(screens["LEDGER"], "put out the lamp  →", Vector2(W*0.62, H*0.80), func(): _night_bridge())
+	else:
+		nb = _txtbtn(screens["LEDGER"], "←  back to the room", Vector2(W*0.62, H*0.80), func(): _enter_hub())
 	nb.name = "nextcase"
 	_play("page_turn")
+
+# ── НІЧ: монтажний стик між днями (правило 14 — не різати навпростець) ────────
+func _night_bridge() -> void:
+	var s: Control
+	if screens.has("NIGHT"):
+		s = screens["NIGHT"]
+		for c in s.get_children(): c.queue_free()
+	else:
+		s = _screen("NIGHT")
+	var bg := _bg(s, tex.get("hub_darkness", tex["case_desk"]), true)
+	bg.modulate = Color(0.30, 0.30, 0.36)
+	var card := Label.new()
+	card.label_settings = _ls(fr, int(H*0.032), Color(0.82, 0.79, 0.72))
+	card.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	card.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	card.size = Vector2(W*0.6, H*0.3); card.position = Vector2(W*0.2, H*0.34)
+	card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	s.add_child(card)
+	if case_id == 2 and sealed:
+		card.text = _t("The second seal lies beside the first. The week has only begun.\n\n( Case the third is on the bench. )")
+		_txtbtn(s, "→  the bureau door", Vector2(W*0.44, H*0.78), func(): _show("MENU"))
+	else:
+		card.text = _t("The night is short in this trade.")
+		_txtbtn(s, "morning  →", Vector2(W*0.46, H*0.78), func(): _second_morning())
+	_show("NIGHT")
+	_play("ui_soft")
+
+# ранок другого дня: дзвінок кличе до дверей — далі веде сам гравець
+func _second_morning() -> void:
+	tod = "day"; lamp_on = true
+	_enter_hub()
+	_play("door_bell")
+	_hub_say("The bell. Someone at the door — with a burden carried in both arms.")
 
 func _ctext(parent: Control, txt: String, font: FontFile, sz: int, col: Color, center: Vector2) -> void:
 	var l := Label.new(); l.label_settings = _ls(font, sz, col); l.text = txt
