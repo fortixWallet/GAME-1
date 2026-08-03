@@ -24,5 +24,20 @@
   },
   "env": {
     "CLAUDE_CODE_MAX_WEB_SEARCHES_PER_SESSION": "2000"
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/skydrows/Documents/Game/Game3/.claude/hooks_quick_gd.sh",
+            "timeout": 90,
+            "statusMessage": "Швидка перевірка .gd…"
+          }
+        ]
+      }
+    ]
   }
 }
