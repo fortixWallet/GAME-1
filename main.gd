@@ -268,6 +268,8 @@ func _ready() -> void:
 		_dbg_cablock()
 	if "haas" in OS.get_cmdline_user_args():
 		_dbg_haas()
+	if "sealrit" in OS.get_cmdline_user_args():
+		_dbg_sealrit()
 	if "walk" in OS.get_cmdline_user_args():
 		_dbg_walk()
 	if "chapters" in OS.get_cmdline_user_args():
@@ -891,6 +893,7 @@ func _c2_ladder() -> String:
 	return ""
 
 func _process(_delta: float) -> void:
+	_seal_tick(_delta)
 	if _shown() in C2_SCREENS and not dbg_mode:
 		if facts.size() != last_fact_count:
 			last_fact_count = facts.size(); idle_t = 0.0
@@ -2112,6 +2115,8 @@ const CHAPTERS := [
 # CSLOTS, тож після справи 2 атестат справи 1 показував чужі графи.
 
 func _load_case(n: int) -> void:
+	seal_stage = ""; seal_hold = false; seal_pour = 0.0
+	seal_puddle = null; seal_wax = null
 	case_id = n
 	CSLOTS = (CASE_DATA[n] as Object).get("SLOTS") if CASE_DATA.has(n) else []
 	facts.clear()                       # одне речення замість чотирнадцяти drop_fact
@@ -3584,8 +3589,10 @@ func _refresh_cert() -> void:
 			var hs := Button.new(); hs.name = "stamp_hs"; hs.flat = true; hs.modulate.a = 0
 			hs.position = Vector2(med.x-pw*0.11, med.y-pw*0.11); hs.size = Vector2(pw*0.22, pw*0.22)
 			hs.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-			hs.mouse_entered.connect(_set_hint.bind("Press the seal — once set, it cannot be lifted."))
-			hs.pressed.connect(func(): _do_verdict())
+			hs.mouse_entered.connect(_set_hint.bind("Hold the wax over the medallion — let it pour."))
+			hs.button_down.connect(_seal_hold_start)
+			hs.button_up.connect(_seal_hold_stop)
+			hs.pressed.connect(_seal_press)
 			cert_layer.add_child(hs)
 		var seal_note := Label.new(); seal_note.label_settings = _ls(fr, int(H*0.024), Color(0.86,0.66,0.42))
 		seal_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART; seal_note.size = Vector2(cert_panel.size.x, H*0.2)
@@ -3593,7 +3600,7 @@ func _refresh_cert() -> void:
 		# до 8 рядків, ~0.5H), фіксовані 0.42H друкувались ПОВЕРХ списку — спіймано
 		# оком на кадрі 18_cert_full і підтверджено думкою про layoutcheck у гейті
 		seal_note.position = Vector2(0, H*0.72 if active_slot >= 0 else H*0.30)
-		seal_note.text = _t("The attribution is written.\nPress the wax seal to close the case — once set, it cannot be lifted.")
+		seal_note.text = _t("The attribution is written.\nHold the wax to the medallion; when it has pooled, press the stamp — once set, it cannot be lifted.")
 		cert_panel.add_child(seal_note)
 
 # права панель: вміст залежить від ТИПУ активної графи
@@ -3790,14 +3797,7 @@ func _do_verdict() -> void:
 	if cert_layer.has_node("stamp_hs"): cert_layer.get_node("stamp_hs").queue_free()
 	_set_hint("")
 	await _verdict_anim()
-	_case_closed()
-	# ВІДПОВІДЬ ЧУЄ КЛІЄНТ (Віктор 04.08): вона стоїть поруч — реакція одразу,
-	# ранок потім. Текст реакції живе в наслідку (data, "react").
-	var rc := _outcome_field("react")
-	var wait_s := 1.7
-	if rc != "":
-		_set_hint(rc); wait_s = 3.6
-	var t := create_tween(); t.tween_interval(wait_s); t.tween_callback(_show_morning)
+	_verdict_finish()
 
 # ---------- НАСТУПНИЙ РАНОК (наслідок) ----------
 func _show_morning() -> void:
@@ -4837,6 +4837,40 @@ func _cab_body_click() -> void:
 
 # тест руками: кільця клікаються, невірний код НЕ відкриває, вірний відкриває
 # шлях гравця через папери Гааса: хвиля 0 → справа → ранок 2 → картка → дзвінок
+# ритуал печатки руками: швидкий клік НЕ печатає; утримання наливає; прес печатає
+func _dbg_sealrit() -> void:
+	dbg_mode = false
+	await get_tree().process_frame
+	_goto("cert2")
+	await get_tree().create_timer(0.3).timeout
+	var med: Vector2 = cert_layer.get_meta("medallion")
+	var pt: Vector2 = cert_layer.position + med
+	print("SEALRIT медальйон=", pt, " стадія=", seal_stage)
+	# негатив: короткий клік — віск ледь почав, печатки нема
+	await _click_at(pt)
+	await get_tree().create_timer(0.3).timeout
+	var neg_ok := not sealed and seal_stage == "pour" and seal_pour < 1.0
+	# утримання: прес без реліза
+	var ev := InputEventMouseButton.new()
+	ev.button_index = MOUSE_BUTTON_LEFT; ev.pressed = true
+	ev.position = pt; ev.global_position = pt
+	get_viewport().push_input(ev, true)
+	await get_tree().create_timer(1.8).timeout
+	var poured := seal_stage == "stamp" and not sealed
+	await _shot(_shotdir() + "seal_poured.png", 2)
+	var ev2 := InputEventMouseButton.new()
+	ev2.button_index = MOUSE_BUTTON_LEFT; ev2.pressed = false
+	ev2.position = pt; ev2.global_position = pt
+	get_viewport().push_input(ev2, true)
+	await get_tree().process_frame
+	# прес штампа
+	await _click_at(pt)
+	await get_tree().create_timer(1.6).timeout
+	var pressed_ok := sealed and seal_stage == "done"
+	await _shot(_shotdir() + "seal_done.png", 2)
+	print("SEALRIT_OK quickclick_no_seal=", neg_ok, " poured=", poured, " stamped=", pressed_ok)
+	get_tree().quit()
+
 func _dbg_haas() -> void:
 	dbg_mode = false
 	var dir := _shotdir(); DirAccess.make_dir_recursive_absolute(dir)
@@ -5460,6 +5494,100 @@ func _ctext(parent: Control, txt: String, font: FontFile, sz: int, col: Color, c
 	l.size = Vector2(center.x*2, sz*1.4); l.position = Vector2(0, center.y - sz*0.7); parent.add_child(l)
 
 # анімація печатки: віск ллється → штамп пласко згори → печатка в центр
+# ── РИТУАЛ ПЕЧАТКИ (Р8.1): віск ллється, ПОКИ ГРАВЕЦЬ ТРИМАЄ; штамп тисне
+# ГРАВЕЦЬ. Авто-шлях (_do_verdict → _verdict_anim) лишається тестам і dbg.
+var seal_stage := ""            # "" → pour → stamp → done
+var seal_hold := false
+var seal_pour := 0.0
+var seal_puddle: TextureRect = null
+var seal_wax: TextureRect = null
+const SEAL_POUR_TIME := 1.4
+
+func _seal_hold_start() -> void:
+	if sealed or seal_stage == "done" or seal_stage == "stamp": return
+	if seal_stage == "":
+		seal_stage = "pour"
+		var med: Vector2 = cert_layer.get_meta("medallion")
+		var sd: float = cert_layer.size.x*0.16
+		seal_puddle = TextureRect.new(); seal_puddle.texture = tex["seal_cut"]
+		seal_puddle.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		seal_puddle.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		seal_puddle.size = Vector2(sd, sd); seal_puddle.pivot_offset = seal_puddle.size*0.5
+		seal_puddle.position = med - seal_puddle.size*0.5
+		seal_puddle.scale = Vector2(0.2, 0.2); seal_puddle.modulate = Color(1,1,1,0)
+		cert_layer.add_child(seal_puddle)
+		seal_wax = TextureRect.new(); seal_wax.texture = tex["wax_stick"]
+		seal_wax.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		seal_wax.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var wxt: Texture2D = tex["wax_stick"]
+		var ww: float = cert_layer.size.x*0.10
+		seal_wax.size = Vector2(ww, ww*float(wxt.get_height())/float(wxt.get_width()))
+		seal_wax.pivot_offset = Vector2(seal_wax.size.x*0.5, seal_wax.size.y*0.9)
+		seal_wax.position = med - Vector2(seal_wax.size.x*0.5, seal_wax.size.y + cert_layer.size.y*0.03)
+		seal_wax.rotation = deg_to_rad(-18.0)
+		seal_wax.modulate.a = 0.0
+		cert_layer.add_child(seal_wax)
+		create_tween().tween_property(seal_wax, "modulate:a", 1.0, 0.18)
+	seal_hold = true
+	_set_hint("Hold \u2014 the wax is pouring.")
+
+func _seal_hold_stop() -> void:
+	seal_hold = false
+
+func _seal_tick(delta: float) -> void:
+	if seal_stage != "pour" or not seal_hold or seal_puddle == null: return
+	seal_pour = minf(seal_pour + delta/SEAL_POUR_TIME, 1.0)
+	seal_puddle.modulate.a = minf(seal_pour*2.5, 1.0)
+	var sc := 0.2 + 0.38*seal_pour
+	seal_puddle.scale = Vector2(sc, sc)
+	if seal_wax:
+		seal_wax.rotation = deg_to_rad(-18.0 - 4.0*sin(seal_pour*9.0))
+	if seal_pour >= 1.0:
+		seal_stage = "stamp"
+		seal_hold = false
+		var tw := create_tween()
+		tw.tween_property(seal_wax, "modulate:a", 0.0, 0.3)
+		tw.tween_callback(func():
+			if seal_wax: seal_wax.queue_free(); seal_wax = null)
+		_set_hint("Now the stamp \u2014 press it true. Once set, it cannot be lifted.")
+
+func _seal_press() -> void:
+	# спрацьовує лише коли віск наллято: до того press = кінець утримання
+	if seal_stage != "stamp" or sealed: return
+	seal_stage = "done"
+	sealed = true; seals_set += 1
+	_save_game()
+	_set_hint("")
+	if cert_layer.has_node("stamp_hs"): cert_layer.get_node("stamp_hs").queue_free()
+	var med: Vector2 = cert_layer.get_meta("medallion")
+	var sp: Texture2D = tex["stamp_top_cut"]
+	var stamp := TextureRect.new(); stamp.texture = sp
+	stamp.expand_mode = TextureRect.EXPAND_IGNORE_SIZE; stamp.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var st: float = cert_layer.size.x*0.30
+	stamp.size = Vector2(st, st*float(sp.get_height())/float(sp.get_width()))
+	stamp.pivot_offset = stamp.size*0.5
+	var s_down := med - stamp.size*0.5
+	var s_up := s_down + Vector2(0, -cert_layer.size.y*0.5)
+	stamp.position = s_up; stamp.modulate.a = 0; cert_layer.add_child(stamp)
+	var tw := create_tween()
+	tw.tween_property(stamp, "modulate:a", 1.0, 0.15)
+	tw.tween_property(stamp, "position", s_down, 0.30).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tw.tween_callback(func(): _play("stamp_seal"))
+	tw.tween_property(seal_puddle, "scale", Vector2(1.06, 1.06), 0.12)
+	tw.tween_property(seal_puddle, "scale", Vector2(1.0, 1.0), 0.1)
+	tw.tween_property(stamp, "position", s_up, 0.4).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.parallel().tween_property(stamp, "modulate:a", 0.0, 0.4)
+	tw.tween_callback(func(): _verdict_finish())
+
+func _verdict_finish() -> void:
+	_case_closed()
+	# ВІДПОВІДЬ ЧУЄ КЛІЄНТ: вона стоїть поруч — реакція одразу, ранок потім
+	var rc := _outcome_field("react")
+	var wait_s := 1.7
+	if rc != "":
+		_set_hint(rc); wait_s = 3.6
+	var t := create_tween(); t.tween_interval(wait_s); t.tween_callback(_show_morning)
+
 func _verdict_anim() -> void:
 	var med: Vector2 = cert_layer.get_meta("medallion")
 	var wx: Texture2D = tex["wax_stick"]; var se: Texture2D = tex["seal_cut"]; var sp: Texture2D = tex["stamp_top_cut"]

@@ -597,4 +597,10 @@ const T := {
 "\u2190  lay it back on the desk": "←  покласти назад на стіл",
 "The marks \u2014": "Клейма —",
 "\u2014 A.H.": "— А.Г.",
+
+# ─ Ритуал печатки (Р8.1) ─
+"Hold the wax over the medallion \u2014 let it pour.": "Тримай віск над медальйоном — хай наллється.",
+"Hold \u2014 the wax is pouring.": "Тримай — віск ллється.",
+"Now the stamp \u2014 press it true. Once set, it cannot be lifted.": "Тепер штамп — притисни рівно. Поставлену не знімеш.",
+"The attribution is written.\nHold the wax to the medallion; when it has pooled, press the stamp \u2014 once set, it cannot be lifted.": "Атрибуцію написано.\nТримай віск біля медальйона; коли наллється — притисни штамп. Поставлену печатку не знімеш.",
 }

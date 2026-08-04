@@ -68,7 +68,7 @@ fi
 export G3_SHOTDIR="/tmp/g3_verify/"
 rm -rf "$G3_SHOTDIR"; mkdir -p "$G3_SHOTDIR"
 FAIL=""
-TESTS="walk a|walk b|walk c|walk e|walk p|walk q|chapters|outcomes|layoutcheck|case2|savetest|furnprobe|cablock|haas"
+TESTS="walk a|walk b|walk c|walk e|walk p|walk q|chapters|outcomes|layoutcheck|case2|savetest|furnprobe|cablock|haas|sealrit"
 if [ "$1" = "--c2" ]; then
   TESTS="case2|furnprobe|layoutcheck"
   echo "ШВИДКИЙ РЕЖИМ: лише справа 2 (повний гейт обов'язковий перед комітом)"
@@ -118,6 +118,8 @@ for t in "$@"; do
     # папери Гааса: хвиля 0 на столі й читається; ранок 2 — двері чекають картку,
     # після картки — дзвінок (SH-петля «між ніччю і дзвінком»)
     "haas")     echo "$OUT" | grep -q "HAAS_OK wave0_bg=true wave0_open=true wave0_done=true card_waiting=true door_gated=true card_open=true bell_after=true" || FAIL="$FAIL haas" ;;
+    # ритуал печатки: короткий клік НЕ печатає · утримання наливає · прес печатає
+    "sealrit")  echo "$OUT" | grep -q "SEALRIT_OK quickclick_no_seal=true poured=true stamped=true" || FAIL="$FAIL sealrit" ;;
     # чотири наслідки мусять давати чотири РІЗНИХ тексти: дві однакові гілки
     # виглядають як покриття, а насправді одна з них не перевіряється ніколи
     "outcomes") echo "$OUT" | grep -q "OUTCOMES_OK cases=5 unique_ids=4" || FAIL="$FAIL outcomes" ;;
