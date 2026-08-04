@@ -204,6 +204,7 @@ func _ready() -> void:
 	_build_cablock()
 	_build_haas_papers()
 	_build_intro()
+	_build_counter()
 	_load_case(1)          # один вхід у стан замість ручного присвоєння CSLOTS
 	# верхня підказка (діегетична — на мальованій стрічці нема, тож тонкий текст)
 	# мальована стрічка під верхнім рядком: текст на строкатому кадрі без підложки
@@ -271,6 +272,8 @@ func _ready() -> void:
 		_dbg_haas()
 	if "intro" in OS.get_cmdline_user_args():
 		_dbg_intro()
+	if "counter" in OS.get_cmdline_user_args():
+		_dbg_counter()
 	if "sealrit" in OS.get_cmdline_user_args():
 		_dbg_sealrit()
 	if "walk" in OS.get_cmdline_user_args():
@@ -693,6 +696,7 @@ func _loupe_frame() -> void:
 func _plate_hd() -> Texture2D:
 	var nm := ""
 	match _shown():
+		"COUNTER": nm = "counter_spoon_back" if counter_state == "back" else ("" if counter_state == "paid" else "counter_spoon")
 		"C2PIECE": nm = "box_closed"
 		"C2STAMP": nm = "box_under"
 		"C2OPEN": nm = c2open_tex_name
@@ -1612,7 +1616,7 @@ func _load() -> void:
 	# справа 2 «Спадок удови»
 	for n3 in ["hub_day","hub_day_case","hub_lamp_off","hub_evening","hub_evening_figure","hub_night","hub_darkness","menu_door","client_woman","client_in_room","subtitle_band"]:
 		if ResourceLoader.exists(ART + n3 + ".png"): tex[n3] = load(ART + n3 + ".png")
-	for n2 in ["case2_desk","watch_wear","watch_chain","paper_receipt_1807","reg_page_h","marks_page_vienna","notebook_spread","mark_diana_macro","mark_maker_macro","tool_tray","hand_caliper","hand_screwdriver","hand_rake","wood_page","plain_book_page","dust_floor","client_vogl","screw_macro","board_face","cl1_p2","cl1_p3","cl1_p4","cl2_p2","cl2_p3","cl2_p4","cl2_door","sec_section","bureau_room","c2_piece","c2_open","c2_stamp","c2_endgrain","c2_recess","box_closed","box_a1","box_a2","box_open","box_under","box_noboard","box_holes","tool_tray_empty","glow_warm","tray_caliper","tray_screwdriver","tray_loupe","tray_rake","scr_head_0","scr_head_1","scr_head_2","scr_head_3","scr_ring_0","scr_ring_1","scr_ring_2","scr_ring_3","label_slip","box_open_hd","box_holes_hd","box_noboard_hd","box_closed_hd","box_under_hd","cablock_closed","cablock_open","cablock_drawer","hub_day_paper","goblet_domes_macro","goblet_church_macro","lbox_closed","lbox_key","lbox_mid","lbox_open","hub_day_casket","wax_bar"]:
+	for n2 in ["case2_desk","watch_wear","watch_chain","paper_receipt_1807","reg_page_h","marks_page_vienna","notebook_spread","mark_diana_macro","mark_maker_macro","tool_tray","hand_caliper","hand_screwdriver","hand_rake","wood_page","plain_book_page","dust_floor","client_vogl","screw_macro","board_face","cl1_p2","cl1_p3","cl1_p4","cl2_p2","cl2_p3","cl2_p4","cl2_door","sec_section","bureau_room","c2_piece","c2_open","c2_stamp","c2_endgrain","c2_recess","box_closed","box_a1","box_a2","box_open","box_under","box_noboard","box_holes","tool_tray_empty","glow_warm","tray_caliper","tray_screwdriver","tray_loupe","tray_rake","scr_head_0","scr_head_1","scr_head_2","scr_head_3","scr_ring_0","scr_ring_1","scr_ring_2","scr_ring_3","label_slip","box_open_hd","box_holes_hd","box_noboard_hd","box_closed_hd","box_under_hd","cablock_closed","cablock_open","cablock_drawer","hub_day_paper","goblet_domes_macro","goblet_church_macro","lbox_closed","lbox_key","lbox_mid","lbox_open","hub_day_casket","wax_bar","counter_spoon","counter_spoon_back","counter_paid","counter_spoon_hd","counter_spoon_back_hd"]:
 		if ResourceLoader.exists(ART + n2 + ".png"): tex[n2] = load(ART + n2 + ".png")
 	# опційний арт (додано 24.07): чистий лист клієнтки
 	if ResourceLoader.exists(ART + "letter_client.png"):
@@ -2105,6 +2109,7 @@ const CHAPTERS := [
 	["14 · Haas — the unsealed paper", "haas0"],
 	["15 · Haas — morning card",      "card1"],
 	["16 · The letter (intro)",       "intro"],
+	["17 · The counter — first client","counter"],
 ]
 
 # ── СТАН → ВИГЛЯД: рівно три входи, і четвертого нема ────────────────────────
@@ -2237,6 +2242,11 @@ func _goto(key: String) -> void:
 			_load_case(2); client_seen = true; _show("C2PIECE")
 		"client2":
 			_start_case2()
+		"counter":
+			counter_state = "face"; counter_verdict = ""; 
+			if counter_plate: counter_plate.texture = tex["counter_spoon"]
+			if counter_regcard: counter_regcard.visible = false
+			_show("COUNTER")
 		"intro":
 			intro_done = false
 			lbox_stage = "locked"
@@ -2306,6 +2316,7 @@ func _build_chapters() -> void:
 	var groups := [
 		["CASE 1 · THE SILVER GOBLET", 0.075, [
 			["The letter (intro)", "intro"],
+			["The counter \u2014 first client", "counter"],
 			["Haas — the unsealed paper", "haas0"],
 			["Morning — the door", "door"], ["The client at the counter", "client"],
 			["The desk — fresh case", "desk"], ["The goblet in your hands", "hands"],
@@ -4942,6 +4953,37 @@ func _dbg_sealrit() -> void:
 	get_tree().quit()
 
 # вступ v3: лист → скринька (ключ→засувка→кришка→конверт) → заповіт → дзвінок
+# атом прилавка: переворот → реєстр → вердикт → оплата; помилка мовчазна
+func _dbg_counter() -> void:
+	dbg_mode = false
+	await get_tree().process_frame
+	_goto("counter")
+	await get_tree().create_timer(0.3).timeout
+	print("COUNTER стан=", counter_state, " помилок=", counter_mistakes)
+	# штамп ДО перевороту — не приймається
+	await _click_at(Vector2(W*0.74, H*0.935)); await get_tree().create_timer(0.3).timeout
+	var early_block := counter_state == "face"
+	# переворот
+	await _click_at(Vector2(W*0.54, H*0.78)); await get_tree().create_timer(0.6).timeout
+	var flipped := counter_state == "back"
+	# реєстр-картка
+	await _click_at(Vector2(W*0.09, H*0.875)); await get_tree().create_timer(0.3).timeout
+	var reg_on := counter_regcard.visible
+	await _shot(_shotdir() + "counter_compare.png", 2)
+	# вердикт FALSE (вірний)
+	await _click_at(Vector2(W*0.74, H*0.935)); await get_tree().create_timer(0.8).timeout
+	var paid := counter_state == "paid" and counter_mistakes == 0
+	await _shot(_shotdir() + "counter_paid.png", 2)
+	# негатив: свіжий атом, вердикт SOUND (хибний) — мовчазна помилка
+	_goto("counter")
+	await get_tree().create_timer(0.3).timeout
+	await _click_at(Vector2(W*0.54, H*0.78)); await get_tree().create_timer(0.6).timeout
+	await _click_at(Vector2(W*0.74, H*0.875)); await get_tree().create_timer(0.8).timeout
+	var wrong_counted := counter_state == "paid" and counter_mistakes == 1
+	print("COUNTER_OK early_block=", early_block, " flipped=", flipped, " register=", reg_on,
+		" paid_correct=", paid, " wrong_silent=", wrong_counted)
+	get_tree().quit()
+
 func _dbg_intro() -> void:
 	dbg_mode = false
 	await get_tree().process_frame
@@ -4987,6 +5029,7 @@ func _dbg_haas() -> void:
 	dbg_mode = false
 	var dir := _shotdir(); DirAccess.make_dir_recursive_absolute(dir)
 	await get_tree().process_frame
+	intro_done = true      # тест ранків: вступ вважається пройденим
 	_load_case(1)
 	_enter_hub()
 	await get_tree().create_timer(0.3).timeout
@@ -5592,6 +5635,86 @@ func _intro_finish() -> void:
 	_enter_hub()
 	_play("door_bell")
 	_hub_say("The bell. Someone is waiting at the door.")
+
+# ── АТОМ МАЛОЇ АТЕСТАЦІЇ (паспорт §АТОМ, еталон потоку) ─────────────────────
+# Один екран: клієнтка · річ · лупа · реєстр-картка · вердикт-штамп · оплата.
+# Помилка НЕ зупиняє: лягає в counter_mistakes і виявиться ранковою поштою.
+var counter_state := "face"        # face → back → paid
+var counter_verdict := ""
+var counter_mistakes := 0
+var counter_plate: TextureRect = null
+var counter_regcard: TextureRect = null
+
+func _build_counter() -> void:
+	var s := _screen("COUNTER")
+	var t: Texture2D = tex["counter_spoon"]
+	counter_plate = _bg(s, t)
+	# питання клієнтки — постійно вгорі, її словами (закон 23)
+	var q := Label.new(); q.label_settings = _ls(fh, int(H*0.034), Color(0.92,0.88,0.78))
+	q.text = _t("\u00abIt was my grandmother's. Is it real?\u00bb")
+	q.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	q.size = Vector2(W*0.7, H*0.06); q.position = Vector2(W*0.15, H*0.025)
+	q.mouse_filter = Control.MOUSE_FILTER_IGNORE; s.add_child(q)
+	# ложка: клік — перевернути (стан на місці)
+	var sp := Button.new(); sp.flat = true; sp.modulate.a = 0.0
+	sp.position = Vector2(W*0.40, H*0.68); sp.size = Vector2(W*0.28, H*0.20)
+	sp.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	sp.mouse_entered.connect(_set_hint.bind("The spoon. Turn it over."))
+	sp.pressed.connect(_counter_flip)
+	s.add_child(sp)
+	# реєстр-картка: чіткий еталон Діани поруч із річчю (порівняння на екрані)
+	counter_regcard = TextureRect.new()
+	var at := AtlasTexture.new(); at.atlas = tex["marks_page_vienna"]
+	# медальйон Діани — нижня половина сторінки (виміряно оком по 896x1200)
+	at.region = Rect2(180, 1300, 700, 800)
+	counter_regcard.texture = at
+	counter_regcard.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	counter_regcard.stretch_mode = TextureRect.STRETCH_SCALE
+	counter_regcard.size = Vector2(W*0.18, W*0.18*800.0/700.0)
+	counter_regcard.position = Vector2(W*0.12, H*0.52)
+	counter_regcard.rotation = deg_to_rad(-2.0)
+	counter_regcard.visible = false
+	counter_regcard.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	s.add_child(counter_regcard)
+	_txtbtn(s, "\u25a4  the register", Vector2(W*0.045, H*0.86), func():
+		_play("page_turn"); counter_regcard.visible = not counter_regcard.visible, 0.027)
+	_txtbtn(s, "\u25e6  the glass", Vector2(W*0.045, H*0.92), func(): _pickup_loupe(), 0.027)
+	# вердикт: два штампи (після перевороту)
+	_txtbtn(s, "\u2714  SOUND \u2014 as marked", Vector2(W*0.70, H*0.86), func(): _counter_stamp("sound"), 0.027)
+	_txtbtn(s, "\u2716  FALSE \u2014 the mark lies", Vector2(W*0.70, H*0.92), func(): _counter_stamp("false"), 0.027)
+
+func _counter_flip() -> void:
+	if counter_state == "paid" or box_busy: return
+	box_busy = true
+	_play("ui_soft")
+	counter_state = "back" if counter_state == "face" else "face"
+	var tw := create_tween()
+	tw.tween_interval(0.10)
+	tw.tween_callback(func():
+		counter_plate.texture = tex["counter_spoon_back" if counter_state == "back" else "counter_spoon"])
+	tw.tween_interval(0.20)
+	tw.tween_callback(func():
+		box_busy = false
+		if counter_state == "back":
+			_set_hint("On the flat of the handle \u2014 a punch. Bring the glass close, and the register."))
+
+func _counter_stamp(v: String) -> void:
+	if counter_state == "paid" or counter_state == "face": 
+		if counter_state == "face": _set_hint("Turn the piece first \u2014 the answer is on its back.")
+		return
+	counter_verdict = v
+	counter_state = "paid"
+	# помилка мовчазна: скарга прийде ранковою поштою, не зараз (закон потоку)
+	if v == "sound": counter_mistakes += 1
+	_play("stamp_seal")
+	_drop_loupe()
+	var tw := create_tween()
+	tw.tween_interval(0.35)
+	tw.tween_callback(func():
+		counter_plate.texture = tex["counter_paid"]
+		counter_regcard.visible = false
+		_play("goblet_set")
+		_set_hint("Two kronen on the baize. The bell will ring again."))
 
 func _build_haas_papers() -> void:
 	# ХВИЛЯ 0: незакритий атестат №1430 — бланк той самий, рука його

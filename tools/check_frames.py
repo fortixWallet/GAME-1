@@ -30,9 +30,10 @@ ART = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 
 # групи кадрів одного предмета: (еталон, [решта станів])
 GROUPS = [
     ("box_closed", ["box_a1", "box_a2", "box_open", "box_noboard", "box_under"]),
-    ("cablock_closed", ["cablock_open", "cablock_drawer"]),
+    ("cablock_closed", ["cablock_open", "cablock_drawer", "dial_hands"]),
     ("lbox_closed", ["lbox_key", "lbox_mid", "lbox_open"]),
     ("hub_day", ["hub_day_paper", "hub_day_casket"]),
+    ("counter_spoon", ["counter_spoon_back", "counter_paid"]),
 ]
 MIN_MATCH = 0.30
 MAX_SHIFT = 2

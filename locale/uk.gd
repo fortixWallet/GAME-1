@@ -622,4 +622,16 @@ const T := {
 "\u2014 T.H.": "— Т.Г.",
 "fold it into your coat  \u2192": "сховати за пазуху  →",
 "The bell. Someone is waiting at the door.": "Дзвінок. Хтось чекає під дверима.",
+
+# ─ Атом прилавка ─
+"\u00abIt was my grandmother's. Is it real?\u00bb": "«Бабусина. Справжня?»",
+"The spoon. Turn it over.": "Ложка. Переверни її.",
+"On the flat of the handle \u2014 a punch. Bring the glass close, and the register.": "На пласкому живця — пунсон. Піднеси скло — і реєстр.",
+"Turn the piece first \u2014 the answer is on its back.": "Спершу переверни річ — відповідь на її звороті.",
+"Two kronen on the baize. The bell will ring again.": "Дві крони на сукні. Дзвінок ще пролунає.",
+"\u25a4  the register": "▤  реєстр",
+"\u25e6  the glass": "◦  скло",
+"\u2714  SOUND \u2014 as marked": "✔  СПРАВЖНЯ — як б'є клеймо",
+"\u2716  FALSE \u2014 the mark lies": "✖  ПІДРОБКА — клеймо бреше",
+"The counter \u2014 first client": "Прилавок — перший клієнт",
 }

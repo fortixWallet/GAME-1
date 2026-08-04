@@ -80,7 +80,7 @@ fi
 export G3_SHOTDIR="/tmp/g3_verify/"
 rm -rf "$G3_SHOTDIR"; mkdir -p "$G3_SHOTDIR"
 FAIL=""
-TESTS="walk a|walk b|walk c|walk e|walk p|walk q|chapters|outcomes|layoutcheck|case2|savetest|furnprobe|cablock|haas|sealrit|intro"
+TESTS="walk a|walk b|walk c|walk e|walk p|walk q|chapters|outcomes|layoutcheck|case2|savetest|furnprobe|cablock|haas|sealrit|intro|counter"
 if [ "$1" = "--c2" ]; then
   TESTS="case2|furnprobe|layoutcheck"
   echo "ШВИДКИЙ РЕЖИМ: лише справа 2 (повний гейт обов'язковий перед комітом)"
@@ -135,6 +135,8 @@ for t in "$@"; do
     # вступ v3: лист читається · скринька в хабі · двері замкнені вступом ·
     # ключ→засувка→кришка→конверт→заповіт · після — дзвінок і аркуш хвилі 0
     "intro")    echo "$OUT" | grep -q "INTRO_OK letter1=true casket_bg=true door_gated=true screen_lbox=true key=true latch=true lid=true letter2=true done_bell_paper=true" || FAIL="$FAIL intro" ;;
+    # атом прилавка: ранній штамп блоковано · переворот · реєстр · вірний платить · хибний мовчки в лічильник
+    "counter")  echo "$OUT" | grep -q "COUNTER_OK early_block=true flipped=true register=true paid_correct=true wrong_silent=true" || FAIL="$FAIL counter" ;;
     # чотири наслідки мусять давати чотири РІЗНИХ тексти: дві однакові гілки
     # виглядають як покриття, а насправді одна з них не перевіряється ніколи
     "outcomes") echo "$OUT" | grep -q "OUTCOMES_OK cases=5 unique_ids=4" || FAIL="$FAIL outcomes" ;;
