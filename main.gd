@@ -1609,7 +1609,7 @@ func _load() -> void:
 	# справа 2 «Спадок удови»
 	for n3 in ["hub_day","hub_day_case","hub_lamp_off","hub_evening","hub_evening_figure","hub_night","hub_darkness","menu_door","client_woman","client_in_room","subtitle_band"]:
 		if ResourceLoader.exists(ART + n3 + ".png"): tex[n3] = load(ART + n3 + ".png")
-	for n2 in ["case2_desk","watch_wear","watch_chain","paper_receipt_1807","reg_page_h","marks_page_vienna","notebook_spread","mark_diana_macro","mark_maker_macro","tool_tray","hand_caliper","hand_screwdriver","hand_rake","wood_page","plain_book_page","dust_floor","client_vogl","screw_macro","board_face","cl1_p2","cl1_p3","cl1_p4","cl2_p2","cl2_p3","cl2_p4","cl2_door","sec_section","bureau_room","c2_piece","c2_open","c2_stamp","c2_endgrain","c2_recess","box_closed","box_a1","box_a2","box_open","box_under","box_noboard","box_holes","tool_tray_empty","glow_warm","tray_caliper","tray_screwdriver","tray_loupe","tray_rake","scr_head_0","scr_head_1","scr_head_2","scr_head_3","scr_ring_0","scr_ring_1","scr_ring_2","scr_ring_3","label_slip","box_open_hd","box_holes_hd","box_noboard_hd","box_closed_hd","box_under_hd","cablock_closed","cablock_open","cablock_drawer","hub_day_paper"]:
+	for n2 in ["case2_desk","watch_wear","watch_chain","paper_receipt_1807","reg_page_h","marks_page_vienna","notebook_spread","mark_diana_macro","mark_maker_macro","tool_tray","hand_caliper","hand_screwdriver","hand_rake","wood_page","plain_book_page","dust_floor","client_vogl","screw_macro","board_face","cl1_p2","cl1_p3","cl1_p4","cl2_p2","cl2_p3","cl2_p4","cl2_door","sec_section","bureau_room","c2_piece","c2_open","c2_stamp","c2_endgrain","c2_recess","box_closed","box_a1","box_a2","box_open","box_under","box_noboard","box_holes","tool_tray_empty","glow_warm","tray_caliper","tray_screwdriver","tray_loupe","tray_rake","scr_head_0","scr_head_1","scr_head_2","scr_head_3","scr_ring_0","scr_ring_1","scr_ring_2","scr_ring_3","label_slip","box_open_hd","box_holes_hd","box_noboard_hd","box_closed_hd","box_under_hd","cablock_closed","cablock_open","cablock_drawer","hub_day_paper","goblet_domes_macro","goblet_church_macro"]:
 		if ResourceLoader.exists(ART + n2 + ".png"): tex[n2] = load(ART + n2 + ".png")
 	# опційний арт (додано 24.07): чистий лист клієнтки
 	if ResourceLoader.exists(ART + "letter_client.png"):
@@ -2599,7 +2599,8 @@ func _build_hands() -> void:
 	# макро доступне, щойно клейма знайдені (дрібні гліфи — тільки тут)
 	var macro_btn := _txtbtn(s, "◉  study the marks up close", Vector2(W*0.55, H*0.78),
 		func():
-			if found_marks: _show("MARKS_MACRO")
+			if found_marks or facts.has("f.domes") or facts.has("f.church_mark"):
+				_refresh_marks_macro(); _show("MARKS_MACRO")
 			else: _set_hint("Nothing under the strong glass yet. Turn the piece over and CLICK the punches under the foot through the lens."), 0.026)
 
 func _toggle_raking() -> void:
@@ -3150,23 +3151,45 @@ func _build_marks_macro() -> void:
 	head.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	head.size = Vector2(W, H*0.06); head.position = Vector2(0, H*0.045)
 	head.mouse_filter = Control.MOUSE_FILTER_IGNORE; s.add_child(head)
-	var cards := [
-		["mark_maker_macro", "the maker's shield", 0.235],
-		["mark_diana_macro", "the assay head — a numeral before the chin,\na letter INSIDE the outline", 0.625],
-	]
-	for c in cards:
-		var t: Texture2D = tex[String(c[0])]
-		var chh := H*0.62; var cw := chh*float(t.get_width())/float(t.get_height())
+	var lay := Control.new(); lay.name = "macro_cards"
+	lay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	lay.mouse_filter = Control.MOUSE_FILTER_IGNORE; s.add_child(lay)
+
+# картки ростуть із знахідками (правило 22: кожен показаний факт має свій кадр)
+func _refresh_marks_macro() -> void:
+	var s: Control = screens["MARKS_MACRO"]
+	var lay: Control = s.get_node("macro_cards")
+	for c in lay.get_children(): c.queue_free()
+	var cards := []
+	if found_marks:
+		cards.append(["mark_maker_macro", "the maker's shield"])
+		cards.append(["mark_diana_macro", "the assay head — a numeral before the chin,\na letter INSIDE the outline"])
+	if facts.has("f.domes"):
+		cards.append(["goblet_domes_macro", "two domes behind the punches —\nalike to the shoulder"])
+	if facts.has("f.church_mark"):
+		cards.append(["goblet_church_macro", "under the grinding, a chalice —\na church's mark, effaced"])
+	var n := cards.size()
+	if n == 0: return
+	var chh: float = H * (0.62 if n <= 2 else 0.34)
+	for i in n:
+		var t: Texture2D = tex[String(cards[i][0])]
+		var cw := chh*float(t.get_width())/float(t.get_height())
+		var cx: float
+		var cy: float
+		if n <= 2:
+			cx = W*(0.235 + 0.39*float(i)); cy = H*0.14
+		else:
+			cx = W*(0.28 + 0.44*float(i % 2)); cy = H*(0.115 + 0.40*float(i / 2))
 		var im := TextureRect.new(); im.texture = t
 		im.expand_mode = TextureRect.EXPAND_IGNORE_SIZE; im.stretch_mode = TextureRect.STRETCH_SCALE
-		im.size = Vector2(cw, chh); im.position = Vector2(W*float(c[2]) - cw*0.5, H*0.14)
-		im.mouse_filter = Control.MOUSE_FILTER_IGNORE; s.add_child(im)
-		var lb := Label.new(); lb.label_settings = _ls(fr, int(H*0.024), Color(0.86,0.80,0.66))
+		im.size = Vector2(cw, chh); im.position = Vector2(cx - cw*0.5, cy)
+		im.mouse_filter = Control.MOUSE_FILTER_IGNORE; lay.add_child(im)
+		var lb := Label.new(); lb.label_settings = _ls(fr, int(H*(0.024 if n <= 2 else 0.019)), Color(0.86,0.80,0.66))
 		lb.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		lb.text = String(c[1]); lb.size = Vector2(W*0.36, H*0.09)
-		lb.position = Vector2(W*float(c[2]) - W*0.18, H*0.785)
-		lb.mouse_filter = Control.MOUSE_FILTER_IGNORE; s.add_child(lb)
-	_txtbtn(s, "←  back to the piece", Vector2(W*0.04, H*0.92), func(): _show("HANDS"))
+		lb.text = _t(String(cards[i][1])); lb.size = Vector2(W*0.36, H*0.08)
+		lb.position = Vector2(cx - W*0.18, cy + chh + H*0.006)
+		lb.mouse_filter = Control.MOUSE_FILTER_IGNORE; lay.add_child(lb)
+		_txtbtn(s, "←  back to the piece", Vector2(W*0.04, H*0.92), func(): _show("HANDS"))
 	_txtbtn(s, "Mark catalogue  →", Vector2(W*0.70, H*0.92), func(): _show("CATALOG"))
 
 # ТЕКСТ НА ЛІНІЙОВАНОМУ ПАПЕРІ — ЄДИНИЙ дозволений спосіб (закон 27.07,
