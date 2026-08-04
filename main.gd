@@ -201,6 +201,7 @@ func _ready() -> void:
 	# нижче як довідку по камерах і завісах, але він більше не виконується.
 	_build_case2_papers()
 	_build_case2_plates()
+	_build_cablock()
 	_load_case(1)          # один вхід у стан замість ручного присвоєння CSLOTS
 	# верхня підказка (діегетична — на мальованій стрічці нема, тож тонкий текст)
 	# мальована стрічка під верхнім рядком: текст на строкатому кадрі без підложки
@@ -262,6 +263,8 @@ func _ready() -> void:
 		_dbg_loupe()
 	if "autosolve" in OS.get_cmdline_user_args():
 		_dbg_autosolve()
+	if "cablock" in OS.get_cmdline_user_args():
+		_dbg_cablock()
 	if "walk" in OS.get_cmdline_user_args():
 		_dbg_walk()
 	if "chapters" in OS.get_cmdline_user_args():
@@ -1600,7 +1603,7 @@ func _load() -> void:
 	# справа 2 «Спадок удови»
 	for n3 in ["hub_day","hub_day_case","hub_lamp_off","hub_evening","hub_evening_figure","hub_night","hub_darkness","menu_door","client_woman","client_in_room","subtitle_band"]:
 		if ResourceLoader.exists(ART + n3 + ".png"): tex[n3] = load(ART + n3 + ".png")
-	for n2 in ["case2_desk","watch_wear","watch_chain","paper_receipt_1807","reg_page_h","marks_page_vienna","notebook_spread","mark_diana_macro","mark_maker_macro","tool_tray","hand_caliper","hand_screwdriver","hand_rake","wood_page","plain_book_page","dust_floor","client_vogl","screw_macro","board_face","cl1_p2","cl1_p3","cl1_p4","cl2_p2","cl2_p3","cl2_p4","cl2_door","sec_section","bureau_room","c2_piece","c2_open","c2_stamp","c2_endgrain","c2_recess","box_closed","box_a1","box_a2","box_open","box_under","box_noboard","box_holes","tool_tray_empty","glow_warm","tray_caliper","tray_screwdriver","tray_loupe","tray_rake","scr_head_0","scr_head_1","scr_head_2","scr_head_3","scr_ring_0","scr_ring_1","scr_ring_2","scr_ring_3","label_slip","box_open_hd","box_holes_hd","box_noboard_hd","box_closed_hd","box_under_hd"]:
+	for n2 in ["case2_desk","watch_wear","watch_chain","paper_receipt_1807","reg_page_h","marks_page_vienna","notebook_spread","mark_diana_macro","mark_maker_macro","tool_tray","hand_caliper","hand_screwdriver","hand_rake","wood_page","plain_book_page","dust_floor","client_vogl","screw_macro","board_face","cl1_p2","cl1_p3","cl1_p4","cl2_p2","cl2_p3","cl2_p4","cl2_door","sec_section","bureau_room","c2_piece","c2_open","c2_stamp","c2_endgrain","c2_recess","box_closed","box_a1","box_a2","box_open","box_under","box_noboard","box_holes","tool_tray_empty","glow_warm","tray_caliper","tray_screwdriver","tray_loupe","tray_rake","scr_head_0","scr_head_1","scr_head_2","scr_head_3","scr_ring_0","scr_ring_1","scr_ring_2","scr_ring_3","label_slip","box_open_hd","box_holes_hd","box_noboard_hd","box_closed_hd","box_under_hd","cablock_closed","cablock_open","cablock_drawer"]:
 		if ResourceLoader.exists(ART + n2 + ".png"): tex[n2] = load(ART + n2 + ".png")
 	# опційний арт (додано 24.07): чистий лист клієнтки
 	if ResourceLoader.exists(ART + "letter_client.png"):
@@ -2089,6 +2092,7 @@ const CHAPTERS := [
 	["10 · Darkness",                 "dark"],
 	["11 · The ledger",               "ledger"],
 	["12 · Case 2 — certificate",     "cert2"],
+	["13 · The card-index lock",      "cablock"],
 ]
 
 # ── СТАН → ВИГЛЯД: рівно три входи, і четвертого нема ────────────────────────
@@ -2219,6 +2223,17 @@ func _goto(key: String) -> void:
 			_load_case(2); client_seen = true; _show("C2PIECE")
 		"client2":
 			_start_case2()
+		"cablock":
+			# механізм акту І: з F1 для тестів; вхід із кабінету підключається
+			# кроком 3 сценарію (разом із вмістом теки)
+			cab_rings = [0, 0, 0, 0]; cab_state = "locked"
+			for l in cab_digit_lbls:
+				(l as Label).modulate.a = 1.0
+				(l as Label).text = "0"
+			if cab_plate: cab_plate.texture = tex["cablock_closed"]
+			if screens.has("CABLOCK") and (screens["CABLOCK"] as Control).has_node("cab_body"):
+				((screens["CABLOCK"] as Control).get_node("cab_body") as Button).visible = false
+			_show("CABLOCK")
 		"cert2":
 			# атестат справи 2 «усе знайдено, ще не запечатано» — щоб бачити
 			# питання клієнтки, графи-відповіді та «бо: …» без проходження
@@ -2274,6 +2289,7 @@ func _build_chapters() -> void:
 			["Frau Vogl at the counter", "client2"],
 			["The certificate — filled", "cert2"],
 			["Next morning — the verdict", "morn2"],
+			["The card-index lock (act I)", "cablock"],
 		]],
 	]
 	for g in groups:
@@ -4653,6 +4669,160 @@ func _build_case2() -> void:
 		_play("goblet_set"))
 	to_btn.add_theme_color_override("font_outline_color", Color(0.05,0.04,0.03,0.9))
 	to_btn.add_theme_constant_override("outline_size", 8)
+
+# ── ЗАМОК КАРТОТЕКИ (акт І, SCENARIO Р6) ─────────────────────────────
+# Кільцевий кодовий замок — історична річ XIX ст. (Science Museum co50413,
+# «Combination letter padlock»; конструкція Реньє з 2–5 кільцями). Код 1·0·1·0 =
+# час на зупиненому годиннику кабінету (10:10): Гаас зупинив його САМ як
+# нагадування — під маятником сірник (розкриється в кроці 3 сценарію).
+# Цифри — шрифтом поверх мальованих кілець (правило 1, виняток для тексту);
+# кільце «крутиться» одометром: стара цифра їде вгору, нова заходить знизу.
+var cab_rings := [0, 0, 0, 0]
+var cab_state := "locked"          # locked → open → drawer
+var cab_digit_lbls: Array = []
+var cab_plate: TextureRect = null
+const CAB_CODE := [1, 0, 1, 0]
+const CAB_RING_POS := [Vector2(0.4933, 0.664), Vector2(0.5292, 0.668),
+		Vector2(0.5617, 0.672), Vector2(0.5967, 0.676)]
+
+func _build_cablock() -> void:
+	var s := _screen("CABLOCK")
+	_paper_backdrop(s, 0.10)
+	var t: Texture2D = tex.get("cablock_closed", null)
+	if t == null: return
+	var ih := H * 0.94
+	var iw := ih * float(t.get_width()) / float(t.get_height())
+	if iw > W * 0.72:
+		iw = W * 0.72; ih = iw * float(t.get_height()) / float(t.get_width())
+	var im := TextureRect.new()
+	im.texture = t
+	im.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	im.stretch_mode = TextureRect.STRETCH_SCALE
+	im.size = Vector2(iw, ih); im.position = Vector2((W - iw) * 0.5, (H - ih) * 0.5)
+	im.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	s.add_child(im); cab_plate = im
+	cab_digit_lbls.clear()
+	for i in 4:
+		# кліпер: усередині нього цифра від’їжджає, як барабан одометра
+		var host := Control.new()
+		host.clip_contents = true
+		# вужче за крок кілець (0.0359*iw), інакше сусідні «0» перетинаються
+		host.size = Vector2(iw*0.033, ih*0.088)
+		host.position = im.position + Vector2(iw*CAB_RING_POS[i].x - host.size.x*0.5,
+				ih*CAB_RING_POS[i].y - host.size.y*0.5)
+		host.rotation = deg_to_rad(-4.0)
+		host.pivot_offset = host.size*0.5
+		host.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		s.add_child(host)
+		var l := Label.new()
+		# кістяна цифра з глибокою тінню: гравірування в тіні насічки не читалось
+		var lsd := _ls(fb, int(ih*0.062), Color(0.93, 0.88, 0.72))
+		lsd.shadow_color = Color(0.10, 0.05, 0.0, 0.85)
+		lsd.shadow_offset = Vector2(1.5, 2.0)
+		l.label_settings = lsd
+		l.text = str(cab_rings[i])
+		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		l.size = host.size; l.position = Vector2.ZERO
+		l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		host.add_child(l); cab_digit_lbls.append(l)
+		var b := Button.new(); b.flat = true; b.modulate.a = 0.0
+		b.size = Vector2(iw*0.052, ih*0.20)
+		b.position = im.position + Vector2(iw*CAB_RING_POS[i].x - b.size.x*0.5,
+				ih*CAB_RING_POS[i].y - b.size.y*0.5)
+		b.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+		b.mouse_entered.connect(_set_hint.bind("Turn the ring."))
+		b.pressed.connect(_cab_spin.bind(i))
+		s.add_child(b)
+	# ловець по тілу замка: спрацьовує ПІСЛЯ відкриття (зняти замок → шухляда)
+	var body := Button.new(); body.flat = true; body.modulate.a = 0.0
+	body.name = "cab_body"
+	body.size = Vector2(iw*0.30, ih*0.42)
+	body.position = im.position + Vector2(iw*0.40, ih*0.46)
+	body.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	body.pressed.connect(_cab_body_click)
+	# ловець лежить НАД кільцями — тож до відкриття він вимкнений, інакше
+	# з'їдає кліки по кільцях (спіймано тестом cablock: code_open=false)
+	body.visible = false
+	s.add_child(body)
+	_txtbtn(s, "←  step back", Vector2(W*0.04, H*0.92), func(): _enter_hub())
+
+func _cab_spin(i: int) -> void:
+	if cab_state != "locked" or box_busy: return
+	_play("ui_soft")
+	cab_rings[i] = (cab_rings[i] + 1) % 10
+	var l: Label = cab_digit_lbls[i]
+	var hgt: float = l.size.y
+	box_busy = true
+	var tw := create_tween()
+	tw.tween_property(l, "position:y", -hgt, 0.09)
+	tw.tween_callback(func():
+		l.text = str(cab_rings[i]); l.position.y = hgt)
+	tw.tween_property(l, "position:y", 0.0, 0.09)
+	tw.tween_callback(func():
+		box_busy = false
+		if cab_rings == CAB_CODE: _cab_unlock())
+
+func _cab_unlock() -> void:
+	# щиголь пружини: цифри «звільняються», кадр міняється на відкриту дужку
+	cab_state = "open"
+	_play("goblet_set")
+	box_busy = true
+	var tw := create_tween()
+	for l in cab_digit_lbls:
+		tw.parallel().tween_property(l, "modulate:a", 0.0, 0.22)
+	tw.tween_callback(func():
+		cab_plate.texture = tex["cablock_open"]
+		cab_plate.position.y -= 5.0)
+	tw.tween_property(cab_plate, "position:y", (H - cab_plate.size.y) * 0.5, 0.16).set_trans(Tween.TRANS_BOUNCE).set_ease(Tween.EASE_OUT)
+	tw.tween_callback(func():
+		box_busy = false
+		var sc: Control = screens.get("CABLOCK", null)
+		if sc and sc.has_node("cab_body"): (sc.get_node("cab_body") as Button).visible = true
+		_set_hint("The shackle springs open. Ten and ten — the dead clock keeps the combination."))
+
+func _cab_body_click() -> void:
+	if box_busy: return
+	if cab_state == "open":
+		cab_state = "drawer"
+		_play("page_turn")
+		box_busy = true
+		var tw := create_tween()
+		tw.tween_callback(func(): cab_plate.texture = tex["cablock_drawer"])
+		tw.tween_interval(0.30)
+		tw.tween_callback(func():
+			box_busy = false
+			_set_hint("Under the index cards — an oxblood folder, tied shut. Haas’s hand."))
+
+# тест руками: кільця клікаються, невірний код НЕ відкриває, вірний відкриває
+func _dbg_cablock() -> void:
+	dbg_mode = false
+	var dir := _shotdir(); DirAccess.make_dir_recursive_absolute(dir)
+	await get_tree().process_frame
+	_show("CABLOCK")
+	await get_tree().create_timer(0.2).timeout
+	print("CABLOCK кілець=", cab_digit_lbls.size(), " код=", CAB_CODE.size(), " стан=", cab_state)
+	var ring_pt := func(i: int) -> Vector2:
+		return cab_plate.position + Vector2(cab_plate.size.x*CAB_RING_POS[i].x, cab_plate.size.y*CAB_RING_POS[i].y)
+	# негатив: 1-0-0-0 — має лишитись замкненим
+	await _click_at(ring_pt.call(0))
+	await get_tree().create_timer(0.35).timeout
+	var neg_ok := cab_state == "locked" and cab_rings == [1, 0, 0, 0]
+	print("CABLOCK після негативу: кільця=", cab_rings, " стан=", cab_state)
+	await _shot(dir + "cab_neg.png", 2)
+	# докручуємо третє кільце до 1 → 1-0-1-0
+	await _click_at(ring_pt.call(2))
+	await get_tree().create_timer(1.2).timeout
+	var open_ok := cab_state == "open"
+	print("CABLOCK після коду: кільця=", cab_rings, " стан=", cab_state)
+	await _shot(dir + "cab_open.png", 2)
+	await _click_at(cab_plate.position + cab_plate.size*Vector2(0.55, 0.67))
+	await get_tree().create_timer(0.8).timeout
+	var drawer_ok := cab_state == "drawer"
+	await _shot(dir + "cab_drawer.png", 2)
+	print("CABLOCK_OK neg_locked=", neg_ok, " code_open=", open_ok, " drawer=", drawer_ok)
+	get_tree().quit()
+
 func _build_tool_tray(scr: String) -> void:
 	var host: Control = screens[scr]
 	var t: Texture2D = tex.get("tool_tray_empty", tex["tool_tray"])

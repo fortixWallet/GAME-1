@@ -68,7 +68,7 @@ fi
 export G3_SHOTDIR="/tmp/g3_verify/"
 rm -rf "$G3_SHOTDIR"; mkdir -p "$G3_SHOTDIR"
 FAIL=""
-TESTS="walk a|walk b|walk c|walk e|walk p|walk q|chapters|outcomes|layoutcheck|case2|savetest|furnprobe"
+TESTS="walk a|walk b|walk c|walk e|walk p|walk q|chapters|outcomes|layoutcheck|case2|savetest|furnprobe|cablock"
 if [ "$1" = "--c2" ]; then
   TESTS="case2|furnprobe|layoutcheck"
   echo "ШВИДКИЙ РЕЖИМ: лише справа 2 (повний гейт обов'язковий перед комітом)"
@@ -113,6 +113,8 @@ for t in "$@"; do
                 echo "$OUT" | grep -q "CERT_FILLED all=true" || FAIL="$FAIL cert-fill"
                 echo "$OUT" | grep -q "outcome=out.forgery_named" || FAIL="$FAIL cert-outcome" ;;
     "chapters") echo "$OUT" | grep -q "CHAPTERS_OK all_reachable=true" || FAIL="$FAIL chapters" ;;
+    # замок картотеки: негатив (1-0-0-0 замкнено) + код 1-0-1-0 + шухляда
+    "cablock")  echo "$OUT" | grep -q "CABLOCK_OK neg_locked=true code_open=true drawer=true" || FAIL="$FAIL cablock" ;;
     # чотири наслідки мусять давати чотири РІЗНИХ тексти: дві однакові гілки
     # виглядають як покриття, а насправді одна з них не перевіряється ніколи
     "outcomes") echo "$OUT" | grep -q "OUTCOMES_OK cases=5 unique_ids=4" || FAIL="$FAIL outcomes" ;;

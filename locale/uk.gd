@@ -576,4 +576,9 @@ const T := {
 "She nods at the figure \u2014 and does not look at the box as it is carried out.": "Вона киває на цифру — і не дивиться на скриньку, коли її виносять.",
 "\u00abA dealer, you say.\u00bb Her voice is level. Too level.": "«Кажете, перекупник». Голос у неї рівний. Занадто рівний.",
 "She thanks you. The way one thanks for small change.": "Вона дякує. Так, як дякують за дрібний решток.",
+
+# ─ Замок картотеки (акт І) ─
+"Turn the ring.": "Покрути кільце.",
+"The shackle springs open. Ten and ten — the dead clock keeps the combination.": "Дужка відскакує. Десята десять — мертвий годинник тримає код.",
+"Under the index cards — an oxblood folder, tied shut. Haas’s hand.": "Під картками — оксбладова тека, зав'язана. Рука Гааса.",
 }
