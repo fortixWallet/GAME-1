@@ -202,6 +202,7 @@ func _ready() -> void:
 	_build_case2_papers()
 	_build_case2_plates()
 	_build_cablock()
+	_build_haas_papers()
 	_load_case(1)          # один вхід у стан замість ручного присвоєння CSLOTS
 	# верхня підказка (діегетична — на мальованій стрічці нема, тож тонкий текст)
 	# мальована стрічка під верхнім рядком: текст на строкатому кадрі без підложки
@@ -265,6 +266,8 @@ func _ready() -> void:
 		_dbg_autosolve()
 	if "cablock" in OS.get_cmdline_user_args():
 		_dbg_cablock()
+	if "haas" in OS.get_cmdline_user_args():
+		_dbg_haas()
 	if "walk" in OS.get_cmdline_user_args():
 		_dbg_walk()
 	if "chapters" in OS.get_cmdline_user_args():
@@ -1603,7 +1606,7 @@ func _load() -> void:
 	# справа 2 «Спадок удови»
 	for n3 in ["hub_day","hub_day_case","hub_lamp_off","hub_evening","hub_evening_figure","hub_night","hub_darkness","menu_door","client_woman","client_in_room","subtitle_band"]:
 		if ResourceLoader.exists(ART + n3 + ".png"): tex[n3] = load(ART + n3 + ".png")
-	for n2 in ["case2_desk","watch_wear","watch_chain","paper_receipt_1807","reg_page_h","marks_page_vienna","notebook_spread","mark_diana_macro","mark_maker_macro","tool_tray","hand_caliper","hand_screwdriver","hand_rake","wood_page","plain_book_page","dust_floor","client_vogl","screw_macro","board_face","cl1_p2","cl1_p3","cl1_p4","cl2_p2","cl2_p3","cl2_p4","cl2_door","sec_section","bureau_room","c2_piece","c2_open","c2_stamp","c2_endgrain","c2_recess","box_closed","box_a1","box_a2","box_open","box_under","box_noboard","box_holes","tool_tray_empty","glow_warm","tray_caliper","tray_screwdriver","tray_loupe","tray_rake","scr_head_0","scr_head_1","scr_head_2","scr_head_3","scr_ring_0","scr_ring_1","scr_ring_2","scr_ring_3","label_slip","box_open_hd","box_holes_hd","box_noboard_hd","box_closed_hd","box_under_hd","cablock_closed","cablock_open","cablock_drawer"]:
+	for n2 in ["case2_desk","watch_wear","watch_chain","paper_receipt_1807","reg_page_h","marks_page_vienna","notebook_spread","mark_diana_macro","mark_maker_macro","tool_tray","hand_caliper","hand_screwdriver","hand_rake","wood_page","plain_book_page","dust_floor","client_vogl","screw_macro","board_face","cl1_p2","cl1_p3","cl1_p4","cl2_p2","cl2_p3","cl2_p4","cl2_door","sec_section","bureau_room","c2_piece","c2_open","c2_stamp","c2_endgrain","c2_recess","box_closed","box_a1","box_a2","box_open","box_under","box_noboard","box_holes","tool_tray_empty","glow_warm","tray_caliper","tray_screwdriver","tray_loupe","tray_rake","scr_head_0","scr_head_1","scr_head_2","scr_head_3","scr_ring_0","scr_ring_1","scr_ring_2","scr_ring_3","label_slip","box_open_hd","box_holes_hd","box_noboard_hd","box_closed_hd","box_under_hd","cablock_closed","cablock_open","cablock_drawer","hub_day_paper"]:
 		if ResourceLoader.exists(ART + n2 + ".png"): tex[n2] = load(ART + n2 + ".png")
 	# опційний арт (додано 24.07): чистий лист клієнтки
 	if ResourceLoader.exists(ART + "letter_client.png"):
@@ -2093,6 +2096,8 @@ const CHAPTERS := [
 	["11 · The ledger",               "ledger"],
 	["12 · Case 2 — certificate",     "cert2"],
 	["13 · The card-index lock",      "cablock"],
+	["14 · Haas — the unsealed paper", "haas0"],
+	["15 · Haas — morning card",      "card1"],
 ]
 
 # ── СТАН → ВИГЛЯД: рівно три входи, і четвертого нема ────────────────────────
@@ -2223,6 +2228,11 @@ func _goto(key: String) -> void:
 			_load_case(2); client_seen = true; _show("C2PIECE")
 		"client2":
 			_start_case2()
+		"haas0":
+			_show("HAAS0")
+		"card1":
+			card_pending = 1
+			_show_card(1)
 		"cablock":
 			# механізм акту І: з F1 для тестів; вхід із кабінету підключається
 			# кроком 3 сценарію (разом із вмістом теки)
@@ -2279,6 +2289,7 @@ func _build_chapters() -> void:
 	h.mouse_filter = Control.MOUSE_FILTER_IGNORE; sc.add_child(h)
 	var groups := [
 		["CASE 1 · THE SILVER GOBLET", 0.075, [
+			["Haas — the unsealed paper", "haas0"],
 			["Morning — the door", "door"], ["The client at the counter", "client"],
 			["The desk — fresh case", "desk"], ["The goblet in your hands", "hands"],
 			["The papers and the press", "docs"], ["The mark register", "catalog"],
@@ -2338,6 +2349,22 @@ func _build_menu() -> void:
 	_txtbtn(s0, "choose a scene  →", Vector2(W*0.065, H*0.71), func(): _show("CHAPTERS"), 0.028)
 
 # --- КАБІНЕТ ---
+# ── ПАПЕРИ ГААСА (SCENARIO крок 3): хвиля 0 + ранкові картки ──────────────
+# Щоранку між ніччю і дзвінком на столі аркуш його рукою (прийом SH).
+# Один арт-стан хаба (hub_day_paper) обслуговує ВСІ ранки — різниця у вмісті
+# паперового екрана. Тексти карток — SCENARIO §BEATS.
+var haas0_read := false        # хвиля 0: незакритий атестат №1430 (ранок 1)
+var card_pending := 0          # № картки, що лежить на столі (0 — нема)
+var cards_read: Array = []     # прочитані картки (для сейва й майбутніх ранків)
+var card_lbl: Label = null
+const HAAS_CARDS := {
+	1: "Third week running, the same hand sends church plate to be papered. The messengers change; the chalk does not \u2014 a corner mark, like a bracket lying on its side. I have begun a list.",
+}
+
+func _haas_paper_waiting() -> bool:
+	# ранок 1 до дзвінка — незакритий атестат; будь-який ранок із карткою
+	return (not client_seen and not haas0_read and case_id == 1 and not case_done) or card_pending > 0
+
 func _hub_tex() -> Texture2D:
 	if not lamp_on:
 		if tod == "day" and tex.has("hub_lamp_off"): return tex["hub_lamp_off"]
@@ -2347,6 +2374,7 @@ func _hub_tex() -> Texture2D:
 		if tex.has("hub_evening"): return tex["hub_evening"]
 	if tod == "night" and tex.has("hub_night"): return tex["hub_night"]
 	if client_seen and not case_done and tex.has("hub_day_case"): return tex["hub_day_case"]
+	if _haas_paper_waiting() and tex.has("hub_day_paper"): return tex["hub_day_paper"]
 	return tex["hub_day"]
 
 # зона кабінету: частка кадру → екран (кадр вписаний COVERED)
@@ -2401,7 +2429,10 @@ func _enter_hub() -> void:
 	if hub_bg: hub_bg.texture = _hub_tex()
 	_show("HUB")
 	if not client_seen:
-		_hub_say("Someone is waiting at the door.")
+		if _haas_paper_waiting():
+			_hub_say("On his desk \u2014 a paper filled and never sealed. And someone at the door.")
+		else:
+			_hub_say("Someone is waiting at the door.")
 	elif not case_done:
 		_hub_say("The goblet is on your desk.")
 	elif case_id == 1:
@@ -2415,6 +2446,8 @@ func _hub_say(t: String) -> void:
 func _hub_door() -> void:
 	if not client_seen:
 		_play("door_bell"); client_line = 0; _client_show(); _show("CLIENT")
+	elif card_pending > 0:
+		_hub_say("First the leaf on the desk \u2014 it was not there yesterday.")
 	elif case_done and case_id == 1:
 		# ранок наступного дня: друга клієнтка (міст справ 1→2)
 		tod = "day"; lamp_on = true
@@ -2437,7 +2470,11 @@ func _hub_lamp() -> void:
 	else: _hub_say("Darkness. And on the shelf, something takes the little light there is — a black casket you do not remember shelving.")
 
 func _hub_desk() -> void:
-	if not client_seen: _hub_say("Nothing on the desk yet. Someone is waiting at the door.")
+	if card_pending > 0:
+		_show_card(card_pending)
+	elif not client_seen and not haas0_read:
+		_play("page_turn"); _show("HAAS0")
+	elif not client_seen: _hub_say("Only his blotter, and the shadow where the paper lay.")
 	elif not case_done: _show("C2PIECE" if case_id == 2 else "DESK")
 	else: _show("LEDGER")
 
@@ -2681,6 +2718,7 @@ func _save_game() -> void:
 		"seals_set": seals_set,
 		"tod": tod, "lamp_on": lamp_on,
 		"case_done": case_done, "client_seen": client_seen, "client_line": client_line,
+		"haas0_read": haas0_read, "card_pending": card_pending, "cards_read": cards_read,
 	}
 	var f := FileAccess.open(_save_path(), FileAccess.WRITE)
 	if f: f.store_string(JSON.stringify(d)); f.close()
@@ -2697,6 +2735,9 @@ func _load_game() -> bool:
 		print("SAVE: невідома версія ", d.get("version"), " — починаємо заново")
 		return false
 	_load_case(int(d.get("case_id", 1)))
+	haas0_read = bool(d.get("haas0_read", false))
+	card_pending = int(d.get("card_pending", 0))
+	cards_read = d.get("cards_read", [])
 	for k in d.get("facts", []): facts[String(k)] = true
 	var zs: Dictionary = d.get("zone_states", {})
 	for k2 in zs: zone_states[StringName(k2)] = StringName(zs[k2])
@@ -4795,6 +4836,45 @@ func _cab_body_click() -> void:
 			_set_hint("Under the index cards — an oxblood folder, tied shut. Haas’s hand."))
 
 # тест руками: кільця клікаються, невірний код НЕ відкриває, вірний відкриває
+# шлях гравця через папери Гааса: хвиля 0 → справа → ранок 2 → картка → дзвінок
+func _dbg_haas() -> void:
+	dbg_mode = false
+	var dir := _shotdir(); DirAccess.make_dir_recursive_absolute(dir)
+	await get_tree().process_frame
+	_load_case(1)
+	_enter_hub()
+	await get_tree().create_timer(0.3).timeout
+	var wave0_bg: bool = hub_bg != null and hub_bg.texture == tex.get("hub_day_paper", null)
+	print("HAAS хаб=", _shown(), " аркуш_на_столі=", wave0_bg)
+	# стіл → незакритий атестат
+	var desk := _hub_rect(0.33, 0.68, 0.45, 0.32)
+	await _click_at(desk.position + desk.size*0.5)
+	await get_tree().create_timer(0.3).timeout
+	var wave0_open := _shown() == "HAAS0"
+	await _shot(dir + "haas0.png", 2)
+	await _click_at(Vector2(W*0.10, H*0.935))
+	await get_tree().create_timer(0.3).timeout
+	var wave0_done: bool = haas0_read and _shown() == "HUB" and hub_bg.texture == tex.get("hub_day", null)
+	# ранок 2: картка лежить, двері чекають
+	client_seen = true; case_done = true; sealed = true
+	_second_morning()
+	await get_tree().create_timer(0.3).timeout
+	var card_waiting: bool = card_pending == 1 and hub_bg.texture == tex.get("hub_day_paper", null)
+	await _click_at(_hub_rect(0.00, 0.00, 0.16, 1.00).position + _hub_rect(0.00, 0.00, 0.16, 1.00).size*0.5)
+	await get_tree().create_timer(0.3).timeout
+	var door_gated := _shown() == "HUB" and card_pending == 1
+	await _click_at(desk.position + desk.size*0.5)
+	await get_tree().create_timer(0.3).timeout
+	var card_open := _shown() == "CARD"
+	await _shot(dir + "haas_card.png", 2)
+	await _click_at(Vector2(W*0.10, H*0.935))
+	await get_tree().create_timer(0.3).timeout
+	var bell_after := card_pending == 0 and cards_read == [1] and _shown() == "HUB"
+	print("HAAS_OK wave0_bg=", wave0_bg, " wave0_open=", wave0_open, " wave0_done=", wave0_done,
+		" card_waiting=", card_waiting, " door_gated=", door_gated,
+		" card_open=", card_open, " bell_after=", bell_after)
+	get_tree().quit()
+
 func _dbg_cablock() -> void:
 	dbg_mode = false
 	var dir := _shotdir(); DirAccess.make_dir_recursive_absolute(dir)
@@ -5252,6 +5332,95 @@ func _show_ledger() -> void:
 	_play("page_turn")
 
 # ── НІЧ: монтажний стик між днями (правило 14 — не різати навпростець) ────────
+func _build_haas_papers() -> void:
+	# ХВИЛЯ 0: незакритий атестат №1430 — бланк той самий, рука його
+	var s := _screen("HAAS0")
+	_paper_backdrop(s, 0.16)
+	var at: Texture2D = tex["atestat_flat_blank"]
+	var chh: float = H*0.88
+	var cwd: float = chh*float(at.get_width())/float(at.get_height())
+	var root := Control.new(); root.size = Vector2(cwd, chh)
+	root.position = Vector2((W-cwd)*0.5, (H-chh)*0.5); s.add_child(root)
+	var paper := TextureRect.new(); paper.texture = at
+	paper.expand_mode = TextureRect.EXPAND_IGNORE_SIZE; paper.stretch_mode = TextureRect.STRETCH_SCALE
+	paper.set_anchors_preset(Control.PRESET_FULL_RECT); paper.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(paper)
+	var pw := root.size.x; var ph := root.size.y
+	_ctext(root, _t("CERTIFICATE"), fb, int(ph*0.042), Color(0.15,0.10,0.07), Vector2(pw*0.5, ph*0.145))
+	_ctext(root, _t("b u r e a u   o f   a t t r i b u t i o n"), fr, int(ph*0.017), Color(0.36,0.27,0.17), Vector2(pw*0.5, ph*0.192))
+	var rows := [
+		["The piece \u2014", "a mixed lot of church plate, fourteen pieces"],
+		["The marks \u2014", "the marks are honest \u2014 every one"],
+		["Value \u2014", ""],
+	]
+	for i in rows.size():
+		var yy := 0.30 + 0.13*float(i)
+		var pre := Label.new(); pre.label_settings = _ls(fr, int(ph*0.020), Color(0.38,0.30,0.20))
+		pre.text = _t(String(rows[i][0])); pre.position = Vector2(pw*0.17, ph*yy)
+		pre.mouse_filter = Control.MOUSE_FILTER_IGNORE; root.add_child(pre)
+		var ln := ColorRect.new(); ln.color = Color(0.36,0.27,0.17,0.55)
+		ln.size = Vector2(pw*0.66, 1.5); ln.position = Vector2(pw*0.17, ph*(yy+0.052))
+		ln.mouse_filter = Control.MOUSE_FILTER_IGNORE; root.add_child(ln)
+		if String(rows[i][1]) != "":
+			var val := Label.new(); val.label_settings = _ls(fh, int(ph*0.026), Color(0.22,0.16,0.10))
+			# нижче за назву графи (0.020*1.4), інакше рукопис лізе на друк
+			val.text = _t(String(rows[i][1])); val.position = Vector2(pw*0.20, ph*(yy+0.030))
+			# перенос у межах паперу: довге значення вилазило за край аркуша
+			val.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			val.size = Vector2(pw*0.62, ph*0.10)
+			val.mouse_filter = Control.MOUSE_FILTER_IGNORE; root.add_child(val)
+	# олівцем поперек, його рука — ГОЛОВНЕ на цьому папері
+	var pen := Label.new(); pen.label_settings = _ls(fh, int(ph*0.034), Color(0.32,0.30,0.28))
+	pen.text = _t("The marks are true. The road is not.\nNo wax from me. \u2014 A.H.")
+	pen.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	pen.size = Vector2(pw*0.8, ph*0.2); pen.position = Vector2(pw*0.1, ph*0.70)
+	pen.rotation = deg_to_rad(-5.0); pen.pivot_offset = pen.size*0.5
+	pen.mouse_filter = Control.MOUSE_FILTER_IGNORE; root.add_child(pen)
+	var num := Label.new(); num.label_settings = _ls(fr, int(ph*0.018), Color(0.42,0.33,0.22))
+	num.text = "No 1430"; num.position = Vector2(pw*0.72, ph*0.232)
+	num.mouse_filter = Control.MOUSE_FILTER_IGNORE; root.add_child(num)
+	_txtbtn(s, "\u2190  put it back in the drawer", Vector2(W*0.04, H*0.92), func(): _haas0_done())
+	# РАНКОВА КАРТКА: аркуш його рукою (текст ставить _show_card)
+	var s2 := _screen("CARD")
+	_paper_backdrop(s2, 0.16)
+	var lt: Texture2D = tex.get("letter_client", at)
+	var ch2: float = H*0.88
+	var cw2: float = ch2*float(lt.get_width())/float(lt.get_height())
+	var r2 := Control.new(); r2.size = Vector2(cw2, ch2)
+	r2.position = Vector2((W-cw2)*0.5, (H-ch2)*0.5); s2.add_child(r2)
+	var pp := TextureRect.new(); pp.texture = lt
+	pp.expand_mode = TextureRect.EXPAND_IGNORE_SIZE; pp.stretch_mode = TextureRect.STRETCH_SCALE
+	pp.set_anchors_preset(Control.PRESET_FULL_RECT); pp.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	r2.add_child(pp)
+	card_lbl = Label.new(); card_lbl.label_settings = _ls(fh, int(ch2*0.034), Color(0.22,0.16,0.10))
+	card_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	card_lbl.size = Vector2(cw2*0.72, ch2*0.6); card_lbl.position = Vector2(cw2*0.14, ch2*0.16)
+	card_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE; r2.add_child(card_lbl)
+	var sig := Label.new(); sig.label_settings = _ls(fh, int(ch2*0.036), Color(0.25,0.19,0.12))
+	sig.text = _t("\u2014 A.H."); sig.position = Vector2(cw2*0.62, ch2*0.78)
+	sig.rotation = deg_to_rad(-3.0)
+	sig.mouse_filter = Control.MOUSE_FILTER_IGNORE; r2.add_child(sig)
+	_txtbtn(s2, "\u2190  lay it back on the desk", Vector2(W*0.04, H*0.92), func(): _card_done())
+
+func _show_card(n: int) -> void:
+	if card_lbl: card_lbl.text = _t(String(HAAS_CARDS.get(n, "")))
+	_play("page_turn"); _show("CARD")
+
+func _haas0_done() -> void:
+	haas0_read = true
+	_save_game()
+	_enter_hub()
+	_hub_say("Someone is waiting at the door.")
+
+func _card_done() -> void:
+	if card_pending > 0 and not cards_read.has(card_pending): cards_read.append(card_pending)
+	card_pending = 0
+	_save_game()
+	_enter_hub()
+	# дзвінок — ПІСЛЯ аркуша: ранок дочекався, справа кличе
+	_play("door_bell")
+	_hub_say("The bell. Someone at the door \u2014 with a burden carried in both arms.")
+
 func _night_bridge() -> void:
 	var s: Control
 	if screens.has("NIGHT"):
@@ -5280,9 +5449,10 @@ func _night_bridge() -> void:
 # ранок другого дня: дзвінок кличе до дверей — далі веде сам гравець
 func _second_morning() -> void:
 	tod = "day"; lamp_on = true
+	# SH-прийом: між ніччю і дзвінком — аркуш Гааса; дзвінок чекає прочитання
+	card_pending = 1
 	_enter_hub()
-	_play("door_bell")
-	_hub_say("The bell. Someone at the door — with a burden carried in both arms.")
+	_hub_say("On the desk \u2014 a leaf that was not there yesterday.")
 
 func _ctext(parent: Control, txt: String, font: FontFile, sz: int, col: Color, center: Vector2) -> void:
 	var l := Label.new(); l.label_settings = _ls(font, sz, col); l.text = txt

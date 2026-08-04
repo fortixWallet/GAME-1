@@ -68,7 +68,7 @@ fi
 export G3_SHOTDIR="/tmp/g3_verify/"
 rm -rf "$G3_SHOTDIR"; mkdir -p "$G3_SHOTDIR"
 FAIL=""
-TESTS="walk a|walk b|walk c|walk e|walk p|walk q|chapters|outcomes|layoutcheck|case2|savetest|furnprobe|cablock"
+TESTS="walk a|walk b|walk c|walk e|walk p|walk q|chapters|outcomes|layoutcheck|case2|savetest|furnprobe|cablock|haas"
 if [ "$1" = "--c2" ]; then
   TESTS="case2|furnprobe|layoutcheck"
   echo "ШВИДКИЙ РЕЖИМ: лише справа 2 (повний гейт обов'язковий перед комітом)"
@@ -115,6 +115,9 @@ for t in "$@"; do
     "chapters") echo "$OUT" | grep -q "CHAPTERS_OK all_reachable=true" || FAIL="$FAIL chapters" ;;
     # замок картотеки: негатив (1-0-0-0 замкнено) + код 1-0-1-0 + шухляда
     "cablock")  echo "$OUT" | grep -q "CABLOCK_OK neg_locked=true code_open=true drawer=true" || FAIL="$FAIL cablock" ;;
+    # папери Гааса: хвиля 0 на столі й читається; ранок 2 — двері чекають картку,
+    # після картки — дзвінок (SH-петля «між ніччю і дзвінком»)
+    "haas")     echo "$OUT" | grep -q "HAAS_OK wave0_bg=true wave0_open=true wave0_done=true card_waiting=true door_gated=true card_open=true bell_after=true" || FAIL="$FAIL haas" ;;
     # чотири наслідки мусять давати чотири РІЗНИХ тексти: дві однакові гілки
     # виглядають як покриття, а насправді одна з них не перевіряється ніколи
     "outcomes") echo "$OUT" | grep -q "OUTCOMES_OK cases=5 unique_ids=4" || FAIL="$FAIL outcomes" ;;

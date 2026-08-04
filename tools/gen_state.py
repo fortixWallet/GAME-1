@@ -38,11 +38,16 @@ def main():
     from PIL import Image
     client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
     ref = Image.open(ref_p).convert("RGB")
+    # пропорція генерації = пропорція референса: жорстке 4:3 на кадрі 16:9
+    # перекадровує сцену (hub_day: збіг 0.018, dy=+317 — зловлено 04.08)
+    ar = ref.size[0] / ref.size[1]
+    aspect = min([("4:3", 4/3), ("3:4", 3/4), ("16:9", 16/9), ("9:16", 9/16),
+                  ("1:1", 1.0), ("21:9", 21/9)], key=lambda t: abs(t[1] - ar))[0]
     best, best_img = -1.0, None
     for att in range(1, tries+1):
         r = client.models.generate_content(model="gemini-3-pro-image", contents=[prompt, ref],
             config=types.GenerateContentConfig(response_modalities=["IMAGE"],
-                image_config=types.ImageConfig(aspect_ratio="4:3")))
+                image_config=types.ImageConfig(aspect_ratio=aspect)))
         img = None
         for part in r.candidates[0].content.parts:
             if getattr(part, "inline_data", None) and part.inline_data.data:

@@ -581,4 +581,20 @@ const T := {
 "Turn the ring.": "Покрути кільце.",
 "The shackle springs open. Ten and ten — the dead clock keeps the combination.": "Дужка відскакує. Десята десять — мертвий годинник тримає код.",
 "Under the index cards — an oxblood folder, tied shut. Haas’s hand.": "Під картками — оксбладова тека, зав'язана. Рука Гааса.",
+
+# ─ Папери Гааса: хвиля 0 + ранкові картки (крок 3) ─
+"On his desk \u2014 a paper filled and never sealed. And someone at the door.": "На його столі — папір, заповнений і так і не запечатаний. І хтось під дверима.",
+"Only his blotter, and the shadow where the paper lay.": "Тільки його сукно — і слід, де лежав папір.",
+"On the desk \u2014 a leaf that was not there yesterday.": "На столі — аркуш, якого вчора не було.",
+"First the leaf on the desk \u2014 it was not there yesterday.": "Спершу аркуш на столі — його вчора не було.",
+"Third week running, the same hand sends church plate to be papered. The messengers change; the chalk does not \u2014 a corner mark, like a bracket lying on its side. I have begun a list.": "Третій тиждень поспіль та сама рука шле церковне срібло на папери. Посильні міняються; крейда — ні: знак у кутку, як дужка, що лягла набік. Я почав список.",
+"The piece \u2014": "Ця річ —",
+"Value \u2014": "Ціна —",
+"a mixed lot of church plate, fourteen pieces": "строкатий лот церковного срібла, чотирнадцять предметів",
+"the marks are honest \u2014 every one": "клейма чесні — всі до одного",
+"The marks are true. The road is not.\nNo wax from me. \u2014 A.H.": "Клейма справжні. Дорога — ні.\nВоску від мене не буде. — А.Г.",
+"\u2190  put it back in the drawer": "←  прибрати в шухляду",
+"\u2190  lay it back on the desk": "←  покласти назад на стіл",
+"The marks \u2014": "Клейма —",
+"\u2014 A.H.": "— А.Г.",
 }
