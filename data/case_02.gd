@@ -164,7 +164,7 @@ const RULES := [
 	{"zone": &"z.doc.ref_screws", "tool": &"*", "requires": [&"f.screw_points"],
 	 "req_say": "Pages of screws, old and new. Without a screw in mind they are only pages.",
 	 "facts": [&"f.ref_screw_points"],
-	 "say": "Hand-made screws: blunt end, filed thread of uneven pitch, slot off centre. Pointed screws that cut their own way: patented 1846, made in quantity in Birmingham from 1854."},
+	 "say": "Hand-made screws: blunt end, filed thread of uneven pitch, slot off centre. Pointed screws that cut their own way: patented 1846; within a few years no ironmonger was without them."},
 
 	# --- дослідження предмета: одна точка, різні інструменти, різні відповіді ---
 	{"zone": &"z.box.slope", "tool": &"tool.eye",
@@ -298,8 +298,8 @@ const FACTS := {
 		"text": "Four screws hold the board in the lid. The rest of the box is dowelled and square-nailed."},
 	&"f.screw_points":         {"cite": "the drawn screws end in sharp points, machine thread", "tag": &"body", "weight": 3,
 		"text": "Out of the wood, the screws show themselves: sharp gimlet points, thread even head to tip, machine-cut — seen only once they were drawn."},
-	&"f.ref_screw_points":     {"cite": "the screw book puts that screw after 1854", "tag": &"books", "weight": 3,
-		"text": "Reference: blunt, hand-filed screws before 1846; pointed self-starting screws patented 1846, in quantity from 1854."},
+	&"f.ref_screw_points":     {"cite": "the screw book puts that screw after 1846", "tag": &"books", "weight": 3,
+		"text": "Reference: blunt hand-filed screws before 1846; the pointed self-cutting screw is patented 1846 \u2014 a screw like this means AFTER that year."},
 	&"f.slot_burr":            {"cite": "three heads turned, the wax broken around them", "tag": &"body", "weight": 3,
 		"text": "Three slots bright and torn at one edge; the wax around those heads cracked in a ring. The fourth head stands proud."},
 	&"f.board_lifted":         {"cite": "the recess behind the board", "tag": &"body", "weight": 2,
@@ -319,12 +319,15 @@ const FACTS := {
 }
 
 # ── АТЕСТАТ: 6 граф (case_02.md §6, канонічна таблиця) ───────────────────────
+# питання клієнтки — стоїть зверху атестата; атестат = ВІДПОВІДЬ на нього
+const QUESTION := "What is this box \u2014 and what is it worth?"
+
 const SLOTS := [
 	{"id": &"s.piece", "pre": "The piece is", "kind": &"CHOICE",
 	 "hint": "( turn the box over, then look in the register )",
 	 "needs": [&"f.stamp_gruber", &"f.reg_gruber_1822_1841"],
 	 "opts": [
-		[&"o.vienna_1820s", "a Viennese walnut writing box of the 1820s, by the stamped workshop"],
+		[&"o.vienna_1820s", "a Viennese walnut writing box of the 1820s, by the stamped workshop", [&"f.stamp_gruber", &"f.reg_gruber_1822_1841"]],
 		[&"o.later_copy", "a later copy in the Viennese manner"],
 		[&"o.marriage", "two pieces married into one"],
 	]},
@@ -333,8 +336,8 @@ const SLOTS := [
 	 "needs": [&"f.board_screwed", &"f.screw_points", &"f.ref_screw_points", &"f.lining_fleck"],
 	 "opts": [
 		[&"o.with_carcass", "with the box, by the workshop that made it"],
-		[&"o.trade_later", "later, in a dealer\'s workshop, as a selling feature"],
-		[&"o.private_later", "later, by a hand working alone, in the house"],
+		[&"o.trade_later", "later, in a dealer\'s workshop, as a selling feature", [&"f.trade_label"]],
+		[&"o.private_later", "later, by a hand working alone, in the house", [&"f.syn_late_screws", &"f.lining_fleck"]],
 	]},
 	{"id": &"s.last_opened", "pre": "The recess was last opened", "kind": &"CHOICE",
 	 "hint": "( dust keeps time better than people do )",
@@ -342,14 +345,14 @@ const SLOTS := [
 	 "opts": [
 		[&"o.never", "not since it was fitted"],
 		[&"o.long_ago", "years ago"],
-		[&"o.within_fortnight", "within the fortnight"],
+		[&"o.within_fortnight", "within the fortnight", [&"f.dust_rectangle", &"f.slot_burr"]],
 	]},
 	{"id": &"s.lock_marks", "pre": "The marks on the lock are", "kind": &"CHOICE",
 	 "hint": "( the loupe on the keyhole plate )",
 	 "needs": [&"f.escutcheon_bright"],
 	 "opts": [
-		[&"o.forced", "the work of someone who had no key"],
-		[&"o.our_locksmith", "the work of this bureau, on the 3rd"],
+		[&"o.forced", "the work of someone who had no key", [&"f.escutcheon_bright"]],
+		[&"o.our_locksmith", "the work of this bureau, on the 3rd", [&"f.daybook_locksmith"]],
 		[&"o.old_wear", "the wear of forty years of use"],
 	]},
 	{"id": &"s.basis", "pre": "On the strength of:", "kind": &"FACTS",
@@ -362,20 +365,25 @@ const SLOTS := [
 # ── НАСЛІДКИ РАНКУ (case_02.md §7): перший збіг виграє ───────────────────────
 const OUTCOMES := [
 	{"id": &"out.void_named",
+	 "react": "She listens without a word. Then: \u00abFind him.\u00bb And for the first time since she came \u2014 she sits down.",
 	 "when": {&"s.void_origin": &"o.private_later", &"s.last_opened": &"o.within_fortnight",
 			  &"s.lock_marks": &"o.our_locksmith"},
 	 "basis_any": [&"f.dust_rectangle", &"f.slot_burr", &"f.window_mourning", &"f.contra.opened", &"f.syn_late_screws"], "basis_weight": 5,
 	 "text": "The certificate went to the notary before noon, and the notary sent for the constable. The sale is stayed; the house is asked, room by room, who was alone with the open box in the days of mourning. Frau Vogl came at one. She did not ask about the money. She asked to keep the paper."},
 	{"id": &"out.locksmith_broken",
+	 "react": "\u00abYour own locksmith?\u00bb She draws the box out from under your hand.",
 	 "when": {&"s.lock_marks": &"o.forced"},
 	 "text": "A constable called at eight and took the piece to the station as evidence of a forced entry. Krenn the locksmith was sent for at nine and kept until two. He has worked for this bureau eleven years. The note says he did not argue. The bureau\'s contract with him is on the desk, unsigned for renewal. Frau Vogl\'s son sailed. She was not on the quay."},
 	{"id": &"out.sold_short",
+	 "react": "She nods at the figure \u2014 and does not look at the box as it is carried out.",
 	 "when": {&"s.void_origin": &"o.with_carcass"},
 	 "text": "Sold at your figure: sixty gulden, walnut, sound, no faults recorded. A fortnight later the Wollzeile catalogue lists it: \'Biedermeier writing box, Vienna, c. 1825, with a concealed recess behind the board in the lid — 260 gulden.\' Frau Vogl\'s rent was paid to the end of the month."},
 	{"id": &"out.trade_fitting",
+	 "react": "\u00abA dealer, you say.\u00bb Her voice is level. Too level.",
 	 "when": {&"s.void_origin": &"o.trade_later"},
 	 "basis_any": [&"f.trade_label"],
 	 "text": "Halbert\'s shop answered the enquiry by return: they repaired the piece in 1867, a hinge and two feet, and they fit no compartments — \'we sell furniture, not conjuring.\' The letter is filed. The question it answers is not the one the certificate settled."},
 	{"id": &"out.default", "when": {},
+	 "react": "She thanks you. The way one thanks for small change.",
 	 "text": "The piece sold, the money was paid out, and the ledger line closed. A month on, the nephew entered the estate unopposed; nothing in writing stood against him. Nothing came back."},
 ]

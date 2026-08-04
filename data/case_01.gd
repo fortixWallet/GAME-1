@@ -277,6 +277,9 @@ const FACTS := {
 # ── АТЕСТАТ: 6 граф (case_01.md §6). CHOICE тримає id; NUMBER без валідації
 # відповіді (межі — формат поля, не підказка); FACTS — вибір 2..4 зібраних фактів.
 # Істину рушій НЕ знає — її знають лише OUTCOMES.
+# питання клієнтки — стоїть зверху атестата; атестат = ВІДПОВІДЬ на нього
+const QUESTION := "Is it real \u2014 and what will it fetch?"
+
 const SLOTS := [
 	{"id": &"s.origin", "pre": "Wrought at", "kind": &"CHOICE",
 	 "needs": [&"f.mark_maker", &"f.reg_hoffmann"],

@@ -2088,6 +2088,7 @@ const CHAPTERS := [
 	["9 · Evening — the room",        "evening"],
 	["10 · Darkness",                 "dark"],
 	["11 · The ledger",               "ledger"],
+	["12 · Case 2 — certificate",     "cert2"],
 ]
 
 # ── СТАН → ВИГЛЯД: рівно три входи, і четвертого нема ────────────────────────
@@ -2218,6 +2219,20 @@ func _goto(key: String) -> void:
 			_load_case(2); client_seen = true; _show("C2PIECE")
 		"client2":
 			_start_case2()
+		"cert2":
+			# атестат справи 2 «усе знайдено, ще не запечатано» — щоб бачити
+			# питання клієнтки, графи-відповіді та «бо: …» без проходження
+			_load_case(2)
+			client_seen = true
+			for f in ["f.board_screwed","f.slot_burr","f.board_lifted","f.screw_points",
+					  "f.ref_screw_points","f.dust_rectangle","f.lining_fleck","f.stamp_gruber",
+					  "f.reg_gruber_1822_1841","f.escutcheon_bright","f.daybook_locksmith",
+					  "f.trade_label","f.contra.opened","f.window_mourning","f.syn_late_screws"]:
+				add_fact(f)
+			cvals[0] = &"o.vienna_1820s"; cvals[1] = &"o.private_later"
+			cvals[2] = &"o.within_fortnight"; cvals[3] = &"o.our_locksmith"
+			cvals[4] = [&"f.dust_rectangle", &"f.slot_burr"]
+			_show("CERT")
 		"morn2":
 			# кінцівка справи 2 зі станом «усе знайдено, вирок правильний»
 			_load_case(2)
@@ -2257,6 +2272,7 @@ func _build_chapters() -> void:
 		]],
 		["CASE 2 · THE WRITING BOX", 0.565, [
 			["Frau Vogl at the counter", "client2"],
+			["The certificate — filled", "cert2"],
 			["Next morning — the verdict", "morn2"],
 		]],
 	]
@@ -3271,7 +3287,9 @@ func _build_cert() -> void:
 	var pw := root.size.x; var ph := root.size.y
 	_ctext(root, _t("CERTIFICATE"), fb, int(ph*0.042), Color(0.15,0.10,0.07), Vector2(pw*0.5, ph*0.145))
 	_ctext(root, _t("b u r e a u   o f   a t t r i b u t i o n"), fr, int(ph*0.017), Color(0.36,0.27,0.17), Vector2(pw*0.5, ph*0.192))
-	_ctext(root, _t("This bureau attributes the piece as follows —"), fr, int(ph*0.016), Color(0.42,0.33,0.22), Vector2(pw*0.5, ph*0.232))
+	# питання клієнта малює _refresh_cert (вузол "qhdr"): екран живе довше за
+	# одну справу, і статична шапка показувала питання ПОПЕРЕДНЬОЇ справи
+	# (спіймано оком на ch_cert2.png — на скриньці стояло питання про чашу)
 	opt_layer = Control.new(); opt_layer.set_anchors_preset(Control.PRESET_FULL_RECT); root.add_child(opt_layer)
 	root.set_meta("medallion", Vector2(pw*0.492, ph*0.895))
 	# ПРАВА ПАНЕЛЬ вибору (на екрані, не на папері)
@@ -3414,8 +3432,26 @@ func _refresh_cert() -> void:
 	for c in cert_panel.get_children(): c.queue_free()
 	var pw := cert_layer.size.x; var ph := cert_layer.size.y
 	var n := CSLOTS.size()
+	# шапка-питання ЩОРАЗУ наново: екран переживає зміну справи, і статичний
+	# напис показував питання попередньої (ch_cert2.png, 04.08)
+	if cert_layer.has_node("qhdr"): cert_layer.get_node("qhdr").free()
+	var qh := Control.new(); qh.name = "qhdr"; qh.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	cert_layer.add_child(qh)
+	var qtx := ""
+	if CASE_DATA.has(case_id):
+		var qv = (CASE_DATA[case_id] as Object).get("QUESTION")
+		if qv is String: qtx = String(qv)
+	if qtx != "":
+		# АТЕСТАТ = ВІДПОВІДЬ (Віктор 04.08): її питання стоїть над графами,
+		# і графи читаються реченнями відповіді на нього
+		_ctext(qh, "\u00ab" + _t(qtx) + "\u00bb", fh, int(ph*0.020), Color(0.35,0.24,0.16), Vector2(pw*0.5, ph*0.218))
+		_ctext(qh, _t("\u2014 and the bureau answers:"), fr, int(ph*0.015), Color(0.42,0.33,0.22), Vector2(pw*0.5, ph*0.248))
+	else:
+		_ctext(qh, _t("This bureau attributes the piece as follows \u2014"), fr, int(ph*0.016), Color(0.42,0.33,0.22), Vector2(pw*0.5, ph*0.232))
 	# рядки рівномірно між шапкою і медальйоном; 6 граф уміщаються з кроком 0.088
-	var y0 := 0.235; var step := 0.088 if n >= 6 else 0.118
+	# коли зверху стоїть питання клієнта — графи починаються нижче
+	var y0 := 0.272 if qtx != "" else 0.235
+	var step := 0.088 if n >= 6 else 0.118
 	for i in n:
 		var sl: Dictionary = CSLOTS[i]
 		var yyi := y0 + step*float(i)
@@ -3430,6 +3466,32 @@ func _refresh_cert() -> void:
 		val.position = Vector2(pw*0.195, ph*(yyi+0.016))
 		val.size = Vector2(pw*0.62, ph*0.05); val.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		val.text = _slot_display(i); val.mouse_filter = Control.MOUSE_FILTER_IGNORE; opt_layer.add_child(val)
+		# «на підставі чого» ВИДНО під кожним рядком (Віктор 04.08): опція несе
+		# свої факти-підстави, і їхні cite друкуються сірим під відповіддю
+		if String(sl["kind"]) == "CHOICE" and _slot_filled(i):
+			var why_f: Array = []
+			for o3 in sl.get("opts", []):
+				var oa: Array = o3
+				if StringName(oa[0]) == StringName(cvals[i]) and oa.size() > 2:
+					why_f = oa[2]
+			if not why_f.is_empty():
+				var ftb := _case_facts_table()
+				var cites2: Array = []
+				for fw in why_f:
+					if facts.has(String(fw)):
+						cites2.append("\u00ab" + _t(String((ftb.get(fw, {}) as Dictionary).get("cite", ""))) + "\u00bb")
+				if not cites2.is_empty():
+					var why_l := Label.new()
+					why_l.label_settings = _ls(fr, int(ph*0.0125), Color(0.47,0.40,0.32))
+					why_l.text = _t("for: ") + ", ".join(cites2)
+					why_l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+					why_l.size = Vector2(pw*0.62, ph*0.034)
+					# довге значення переносить рукопис на другий рядок ЧЕРЕЗ лінійку —
+					# тоді «бо:» опускається ще на рядок (наліз у графі 1, ch_cert2)
+					var wy := 0.058 + (0.020 if val.text.length() > 42 else 0.0)
+					why_l.position = Vector2(pw*0.195, ph*(yyi+wy))
+					why_l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+					opt_layer.add_child(why_l)
 		if sealed: continue
 		if gate_open:
 			if active_slot == i:
@@ -3604,6 +3666,16 @@ func _panel_facts(i: int, sl: Dictionary) -> void:
 	note.position = Vector2(0, H*0.56); cert_panel.add_child(note)
 
 # наслідок вироку — ПОДІЯ наступного ранку. Матчер по OUTCOMES даних: перший збіг.
+# те саме зіставлення наслідку, але повертає довільне поле (для "react")
+func _outcome_field(key: String) -> String:
+	var _tx := _outcome_text()   # проганяє матчер і ставить last_outcome_id
+	var outs: Array = (CASE_DATA[case_id] as Object).get("OUTCOMES") if CASE_DATA.has(case_id) else []
+	for o in outs:
+		if String((o as Dictionary).get("id", "")) == last_outcome_id:
+			var v := String((o as Dictionary).get(key, ""))
+			return _t(v) if v != "" else ""
+	return ""
+
 func _outcome_text() -> String:
 	var outs: Array = (CASE_DATA[case_id] as Object).get("OUTCOMES") if CASE_DATA.has(case_id) else []
 	var ft := _case_facts_table()
@@ -3662,7 +3734,13 @@ func _do_verdict() -> void:
 	_set_hint("")
 	await _verdict_anim()
 	_case_closed()
-	var t := create_tween(); t.tween_interval(1.7); t.tween_callback(_show_morning)
+	# ВІДПОВІДЬ ЧУЄ КЛІЄНТ (Віктор 04.08): вона стоїть поруч — реакція одразу,
+	# ранок потім. Текст реакції живе в наслідку (data, "react").
+	var rc := _outcome_field("react")
+	var wait_s := 1.7
+	if rc != "":
+		_set_hint(rc); wait_s = 3.6
+	var t := create_tween(); t.tween_interval(wait_s); t.tween_callback(_show_morning)
 
 # ---------- НАСТУПНИЙ РАНОК (наслідок) ----------
 func _show_morning() -> void:
@@ -4347,7 +4425,7 @@ func _build_case2_papers() -> void:
 	_ptext(bs, "a hole must first be bored.", 0.16, 0.29, 0.021)
 	_ptext(bs, "Patented 1846: the pointed screw", 0.16, 0.40, 0.021)
 	_ptext(bs, "that cuts its own way; made in quantity", 0.16, 0.445, 0.021)
-	_ptext(bs, "at Birmingham from 1854.", 0.16, 0.49, 0.021)
+	_ptext(bs, "in every ironmonger\u2019s soon after.", 0.16, 0.49, 0.021)
 	_ptext(bs, "Old blunt stock lived on for decades:", 0.16, 0.60, 0.019, Color(0.38,0.30,0.22))
 	_ptext(bs, "a pointed screw says \u00abnot before\u00bb \u2014 never \u00abthen\u00bb.", 0.16, 0.64, 0.019, Color(0.38,0.30,0.22))
 	_paper_catcher("BOOK_SCREWS", bs["s"], bs["pg"])
