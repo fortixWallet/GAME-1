@@ -31,6 +31,8 @@ ART = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 
 GROUPS = [
     ("box_closed", ["box_a1", "box_a2", "box_open", "box_noboard", "box_under"]),
     ("cablock_closed", ["cablock_open", "cablock_drawer"]),
+    ("lbox_closed", ["lbox_key", "lbox_mid", "lbox_open"]),
+    ("hub_day", ["hub_day_paper", "hub_day_casket"]),
 ]
 MIN_MATCH = 0.30
 MAX_SHIFT = 2

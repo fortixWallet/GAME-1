@@ -80,7 +80,7 @@ fi
 export G3_SHOTDIR="/tmp/g3_verify/"
 rm -rf "$G3_SHOTDIR"; mkdir -p "$G3_SHOTDIR"
 FAIL=""
-TESTS="walk a|walk b|walk c|walk e|walk p|walk q|chapters|outcomes|layoutcheck|case2|savetest|furnprobe|cablock|haas|sealrit"
+TESTS="walk a|walk b|walk c|walk e|walk p|walk q|chapters|outcomes|layoutcheck|case2|savetest|furnprobe|cablock|haas|sealrit|intro"
 if [ "$1" = "--c2" ]; then
   TESTS="case2|furnprobe|layoutcheck"
   echo "ШВИДКИЙ РЕЖИМ: лише справа 2 (повний гейт обов'язковий перед комітом)"
@@ -132,6 +132,9 @@ for t in "$@"; do
     "haas")     echo "$OUT" | grep -q "HAAS_OK wave0_bg=true wave0_open=true wave0_done=true card_waiting=true door_gated=true card_open=true bell_after=true" || FAIL="$FAIL haas" ;;
     # ритуал печатки: короткий клік НЕ печатає · утримання наливає · прес печатає
     "sealrit")  echo "$OUT" | grep -q "SEALRIT_OK quickclick_no_seal=true poured=true stamped=true" || FAIL="$FAIL sealrit" ;;
+    # вступ v3: лист читається · скринька в хабі · двері замкнені вступом ·
+    # ключ→засувка→кришка→конверт→заповіт · після — дзвінок і аркуш хвилі 0
+    "intro")    echo "$OUT" | grep -q "INTRO_OK letter1=true casket_bg=true door_gated=true screen_lbox=true key=true latch=true lid=true letter2=true done_bell_paper=true" || FAIL="$FAIL intro" ;;
     # чотири наслідки мусять давати чотири РІЗНИХ тексти: дві однакові гілки
     # виглядають як покриття, а насправді одна з них не перевіряється ніколи
     "outcomes") echo "$OUT" | grep -q "OUTCOMES_OK cases=5 unique_ids=4" || FAIL="$FAIL outcomes" ;;

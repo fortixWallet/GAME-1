@@ -203,6 +203,7 @@ func _ready() -> void:
 	_build_case2_plates()
 	_build_cablock()
 	_build_haas_papers()
+	_build_intro()
 	_load_case(1)          # один вхід у стан замість ручного присвоєння CSLOTS
 	# верхня підказка (діегетична — на мальованій стрічці нема, тож тонкий текст)
 	# мальована стрічка під верхнім рядком: текст на строкатому кадрі без підложки
@@ -268,6 +269,8 @@ func _ready() -> void:
 		_dbg_cablock()
 	if "haas" in OS.get_cmdline_user_args():
 		_dbg_haas()
+	if "intro" in OS.get_cmdline_user_args():
+		_dbg_intro()
 	if "sealrit" in OS.get_cmdline_user_args():
 		_dbg_sealrit()
 	if "walk" in OS.get_cmdline_user_args():
@@ -1609,7 +1612,7 @@ func _load() -> void:
 	# справа 2 «Спадок удови»
 	for n3 in ["hub_day","hub_day_case","hub_lamp_off","hub_evening","hub_evening_figure","hub_night","hub_darkness","menu_door","client_woman","client_in_room","subtitle_band"]:
 		if ResourceLoader.exists(ART + n3 + ".png"): tex[n3] = load(ART + n3 + ".png")
-	for n2 in ["case2_desk","watch_wear","watch_chain","paper_receipt_1807","reg_page_h","marks_page_vienna","notebook_spread","mark_diana_macro","mark_maker_macro","tool_tray","hand_caliper","hand_screwdriver","hand_rake","wood_page","plain_book_page","dust_floor","client_vogl","screw_macro","board_face","cl1_p2","cl1_p3","cl1_p4","cl2_p2","cl2_p3","cl2_p4","cl2_door","sec_section","bureau_room","c2_piece","c2_open","c2_stamp","c2_endgrain","c2_recess","box_closed","box_a1","box_a2","box_open","box_under","box_noboard","box_holes","tool_tray_empty","glow_warm","tray_caliper","tray_screwdriver","tray_loupe","tray_rake","scr_head_0","scr_head_1","scr_head_2","scr_head_3","scr_ring_0","scr_ring_1","scr_ring_2","scr_ring_3","label_slip","box_open_hd","box_holes_hd","box_noboard_hd","box_closed_hd","box_under_hd","cablock_closed","cablock_open","cablock_drawer","hub_day_paper","goblet_domes_macro","goblet_church_macro"]:
+	for n2 in ["case2_desk","watch_wear","watch_chain","paper_receipt_1807","reg_page_h","marks_page_vienna","notebook_spread","mark_diana_macro","mark_maker_macro","tool_tray","hand_caliper","hand_screwdriver","hand_rake","wood_page","plain_book_page","dust_floor","client_vogl","screw_macro","board_face","cl1_p2","cl1_p3","cl1_p4","cl2_p2","cl2_p3","cl2_p4","cl2_door","sec_section","bureau_room","c2_piece","c2_open","c2_stamp","c2_endgrain","c2_recess","box_closed","box_a1","box_a2","box_open","box_under","box_noboard","box_holes","tool_tray_empty","glow_warm","tray_caliper","tray_screwdriver","tray_loupe","tray_rake","scr_head_0","scr_head_1","scr_head_2","scr_head_3","scr_ring_0","scr_ring_1","scr_ring_2","scr_ring_3","label_slip","box_open_hd","box_holes_hd","box_noboard_hd","box_closed_hd","box_under_hd","cablock_closed","cablock_open","cablock_drawer","hub_day_paper","goblet_domes_macro","goblet_church_macro","lbox_closed","lbox_key","lbox_mid","lbox_open","hub_day_casket","wax_bar"]:
 		if ResourceLoader.exists(ART + n2 + ".png"): tex[n2] = load(ART + n2 + ".png")
 	# опційний арт (додано 24.07): чистий лист клієнтки
 	if ResourceLoader.exists(ART + "letter_client.png"):
@@ -2101,6 +2104,7 @@ const CHAPTERS := [
 	["13 · The card-index lock",      "cablock"],
 	["14 · Haas — the unsealed paper", "haas0"],
 	["15 · Haas — morning card",      "card1"],
+	["16 · The letter (intro)",       "intro"],
 ]
 
 # ── СТАН → ВИГЛЯД: рівно три входи, і четвертого нема ────────────────────────
@@ -2233,6 +2237,13 @@ func _goto(key: String) -> void:
 			_load_case(2); client_seen = true; _show("C2PIECE")
 		"client2":
 			_start_case2()
+		"intro":
+			intro_done = false
+			lbox_stage = "locked"
+			if lbox_plate: lbox_plate.texture = tex["lbox_closed"]
+			if screens.has("LBOX") and (screens["LBOX"] as Control).has_node("lbox_env"):
+				((screens["LBOX"] as Control).get_node("lbox_env") as Button).visible = false
+			_show("LETTER1")
 		"haas0":
 			_show("HAAS0")
 		"card1":
@@ -2294,6 +2305,7 @@ func _build_chapters() -> void:
 	h.mouse_filter = Control.MOUSE_FILTER_IGNORE; sc.add_child(h)
 	var groups := [
 		["CASE 1 · THE SILVER GOBLET", 0.075, [
+			["The letter (intro)", "intro"],
 			["Haas — the unsealed paper", "haas0"],
 			["Morning — the door", "door"], ["The client at the counter", "client"],
 			["The desk — fresh case", "desk"], ["The goblet in your hands", "hands"],
@@ -2318,9 +2330,10 @@ func _build_chapters() -> void:
 		rule.mouse_filter = Control.MOUSE_FILTER_IGNORE; sc.add_child(rule)
 		var i := 0
 		for it in (g[2] as Array):
-			var col := 0 if i < 6 else 1
+			# 7 рядків на колонку: група справи 1 виросла до 13 сцен
+			var col := 0 if i < 7 else 1
 			var bx := gx + float(col)*W*0.235
-			var by := H*0.235 + float(i % 6)*H*0.088
+			var by := H*0.225 + float(i % 7)*H*0.078
 			var num := str(i + 1) + " · " if String(g[0]).begins_with("CASE 1") else "· "
 			_txtbtn(sc, num + String((it as Array)[0]), Vector2(bx, by),
 					Callable(self, "_goto").bind(String((it as Array)[1])), 0.027)
@@ -2344,7 +2357,11 @@ func _build_menu() -> void:
 	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	sub.size = Vector2(W*0.46, H*0.05); sub.position = Vector2(W*0.065, H*0.50); sub.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	s0.add_child(sub)
-	_txtbtn(s0, "unlock the door  →", Vector2(W*0.065, H*0.60), func(): _play("door_bell"); _load_case(1); _enter_hub(), 0.034)
+	_txtbtn(s0, "unlock the door  →", Vector2(W*0.065, H*0.60), func():
+		if intro_done:
+			_play("door_bell"); _load_case(1); _enter_hub()
+		else:
+			_play("page_turn"); _load_case(1); _show("LETTER1"), 0.034)
 	# продовжити з сейва — тільки якщо він є, читається і має поступ
 	if FileAccess.file_exists(_save_path()):
 		_txtbtn(s0, "return to the desk  →", Vector2(W*0.065, H*0.655),
@@ -2358,6 +2375,10 @@ func _build_menu() -> void:
 # Щоранку між ніччю і дзвінком на столі аркуш його рукою (прийом SH).
 # Один арт-стан хаба (hub_day_paper) обслуговує ВСІ ранки — різниця у вмісті
 # паперового екрана. Тексти карток — SCENARIO §BEATS.
+# ── ВСТУП V3 «СПАДКОЄМЕЦЬ» (MASTER §2.1): лист → ребус скриньки → заповіт ──
+var intro_done := false
+var lbox_stage := "locked"     # locked → keyed → ajar → open
+var lbox_plate: TextureRect = null
 var haas0_read := false        # хвиля 0: незакритий атестат №1430 (ранок 1)
 var card_pending := 0          # № картки, що лежить на столі (0 — нема)
 var cards_read: Array = []     # прочитані картки (для сейва й майбутніх ранків)
@@ -2379,6 +2400,7 @@ func _hub_tex() -> Texture2D:
 		if tex.has("hub_evening"): return tex["hub_evening"]
 	if tod == "night" and tex.has("hub_night"): return tex["hub_night"]
 	if client_seen and not case_done and tex.has("hub_day_case"): return tex["hub_day_case"]
+	if not intro_done and not client_seen and tex.has("hub_day_casket"): return tex["hub_day_casket"]
 	if _haas_paper_waiting() and tex.has("hub_day_paper"): return tex["hub_day_paper"]
 	return tex["hub_day"]
 
@@ -2434,7 +2456,9 @@ func _enter_hub() -> void:
 	if hub_bg: hub_bg.texture = _hub_tex()
 	_show("HUB")
 	if not client_seen:
-		if _haas_paper_waiting():
+		if not intro_done:
+			_hub_say("His bureau. On the desk \u2014 his letter-casket, the key still in the lock.")
+		elif _haas_paper_waiting():
 			_hub_say("On his desk \u2014 a paper filled and never sealed. And someone at the door.")
 		else:
 			_hub_say("Someone is waiting at the door.")
@@ -2449,6 +2473,9 @@ func _hub_say(t: String) -> void:
 	if hub_note: hub_note.text = _t(t)
 
 func _hub_door() -> void:
+	if not intro_done and not client_seen:
+		_hub_say("His desk first \u2014 the casket waits, and the bureau is not yet open.")
+		return
 	if not client_seen:
 		_play("door_bell"); client_line = 0; _client_show(); _show("CLIENT")
 	elif card_pending > 0:
@@ -2475,6 +2502,8 @@ func _hub_lamp() -> void:
 	else: _hub_say("Darkness. And on the shelf, something takes the little light there is — a black casket you do not remember shelving.")
 
 func _hub_desk() -> void:
+	if not intro_done and not client_seen:
+		_play("ui_soft"); _lbox_show(); return
 	if card_pending > 0:
 		_show_card(card_pending)
 	elif not client_seen and not haas0_read:
@@ -2725,6 +2754,7 @@ func _save_game() -> void:
 		"tod": tod, "lamp_on": lamp_on,
 		"case_done": case_done, "client_seen": client_seen, "client_line": client_line,
 		"haas0_read": haas0_read, "card_pending": card_pending, "cards_read": cards_read,
+		"intro_done": intro_done,
 	}
 	var f := FileAccess.open(_save_path(), FileAccess.WRITE)
 	if f: f.store_string(JSON.stringify(d)); f.close()
@@ -2741,6 +2771,8 @@ func _load_game() -> bool:
 		print("SAVE: невідома версія ", d.get("version"), " — починаємо заново")
 		return false
 	_load_case(int(d.get("case_id", 1)))
+	# старі сейви (до вступу v3): гра вже йшла — вступ вважається пройденим
+	intro_done = bool(d.get("intro_done", bool(d.get("client_seen", false)) or bool(d.get("case_done", false))))
 	haas0_read = bool(d.get("haas0_read", false))
 	card_pending = int(d.get("card_pending", 0))
 	cards_read = d.get("cards_read", [])
@@ -4771,25 +4803,34 @@ func _build_cablock() -> void:
 		var host := Control.new()
 		host.clip_contents = true
 		# вужче за крок кілець (0.0359*iw), інакше сусідні «0» перетинаються
-		host.size = Vector2(iw*0.033, ih*0.088)
+		host.size = Vector2(iw*0.033, ih*0.150)
 		host.position = im.position + Vector2(iw*CAB_RING_POS[i].x - host.size.x*0.5,
 				ih*CAB_RING_POS[i].y - host.size.y*0.5)
 		host.rotation = deg_to_rad(-4.0)
 		host.pivot_offset = host.size*0.5
 		host.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		s.add_child(host)
-		var l := Label.new()
-		# кістяна цифра з глибокою тінню: гравірування в тіні насічки не читалось
-		var lsd := _ls(fb, int(ih*0.062), Color(0.93, 0.88, 0.72))
-		lsd.shadow_color = Color(0.10, 0.05, 0.0, 0.85)
-		lsd.shadow_offset = Vector2(1.5, 2.0)
-		l.label_settings = lsd
-		l.text = str(cab_rings[i])
-		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		l.size = host.size; l.position = Vector2.ZERO
-		l.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		host.add_child(l); cab_digit_lbls.append(l)
+		# БАРАБАН (Віктор 04.08: «шифру на механізмах немає»): на кільці видно
+		# РЯД цифр — сусідні визирають зі скосів, тьмяніші й стиснуті
+		for k in [-1, 0, 1]:
+			var lk := Label.new()
+			var big: bool = k == 0
+			var lsd := _ls(fb, int(ih*(0.058 if big else 0.040)),
+				Color(0.93, 0.88, 0.72) if big else Color(0.55, 0.48, 0.34))
+			lsd.shadow_color = Color(0.10, 0.05, 0.0, 0.85)
+			lsd.shadow_offset = Vector2(1.2, 1.6)
+			lk.label_settings = lsd
+			lk.text = str(posmod(cab_rings[i] + k, 10))
+			lk.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			lk.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+			lk.size = host.size
+			lk.position = Vector2(0, host.size.y * 0.62 * float(k))
+			lk.scale = Vector2(1.0, 1.0 if big else 0.62)
+			lk.pivot_offset = host.size * 0.5
+			lk.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			host.add_child(lk)
+			if big: cab_digit_lbls.append(lk)
+			else: lk.set_meta("ring", i); lk.set_meta("off", k)
 		var b := Button.new(); b.flat = true; b.modulate.a = 0.0
 		b.size = Vector2(iw*0.052, ih*0.20)
 		b.position = im.position + Vector2(iw*CAB_RING_POS[i].x - b.size.x*0.5,
@@ -4815,14 +4856,20 @@ func _cab_spin(i: int) -> void:
 	if cab_state != "locked" or box_busy: return
 	_play("ui_soft")
 	cab_rings[i] = (cab_rings[i] + 1) % 10
-	var l: Label = cab_digit_lbls[i]
-	var hgt: float = l.size.y
+	var host: Control = cab_digit_lbls[i].get_parent()
+	var step: float = host.size.y * 0.62
 	box_busy = true
 	var tw := create_tween()
-	tw.tween_property(l, "position:y", -hgt, 0.09)
+	for ch in host.get_children():
+		tw.parallel().tween_property(ch, "position:y", (ch as Control).position.y - step, 0.11)
 	tw.tween_callback(func():
-		l.text = str(cab_rings[i]); l.position.y = hgt)
-	tw.tween_property(l, "position:y", 0.0, 0.09)
+		# після зсуву вгору виставити всі три цифри наново зі свіжого стану
+		var idx := 0
+		for ch in host.get_children():
+			var lk := ch as Label
+			var k: int = [-1, 0, 1][idx]; idx += 1
+			lk.text = str(posmod(cab_rings[i] + k, 10))
+			lk.position = Vector2(0, host.size.y * 0.62 * float(k)))
 	tw.tween_callback(func():
 		box_busy = false
 		if cab_rings == CAB_CODE: _cab_unlock())
@@ -4892,6 +4939,48 @@ func _dbg_sealrit() -> void:
 	var pressed_ok := sealed and seal_stage == "done"
 	await _shot(_shotdir() + "seal_done.png", 2)
 	print("SEALRIT_OK quickclick_no_seal=", neg_ok, " poured=", poured, " stamped=", pressed_ok)
+	get_tree().quit()
+
+# вступ v3: лист → скринька (ключ→засувка→кришка→конверт) → заповіт → дзвінок
+func _dbg_intro() -> void:
+	dbg_mode = false
+	await get_tree().process_frame
+	_goto("intro")
+	await get_tree().create_timer(0.3).timeout
+	var l1 := _shown() == "LETTER1"
+	await _shot(_shotdir() + "in_letter1.png", 2)
+	await _click_at(Vector2(W*0.72, H*0.935))     # → to Wollzeile 17
+	await get_tree().create_timer(0.4).timeout
+	var hub_casket: bool = _shown() == "HUB" and hub_bg.texture == tex.get("hub_day_casket", null)
+	# двері замкнені вступом
+	var dr := _hub_rect(0.00, 0.00, 0.16, 1.00)
+	await _click_at(dr.position + dr.size*0.5)
+	await get_tree().create_timer(0.3).timeout
+	var door_gated := _shown() == "HUB"
+	# стіл → скринька
+	var dk := _hub_rect(0.33, 0.68, 0.45, 0.32)
+	await _click_at(dk.position + dk.size*0.5)
+	await get_tree().create_timer(0.3).timeout
+	var box_open_scr := _shown() == "LBOX"
+	print("INTRO лист=", l1, " скринька_в_хабі=", hub_casket, " двері_замкнені=", door_gated, " екран=", _shown())
+	# ключ → засувка → кришка → конверт (координати часток плити)
+	var ip: Vector2 = lbox_plate.position; var isz: Vector2 = lbox_plate.size
+	await _click_at(ip + isz*Vector2(0.52, 0.60)); await get_tree().create_timer(0.6).timeout
+	var st1 := lbox_stage == "keyed"
+	await _click_at(ip + isz*Vector2(0.64, 0.56)); await get_tree().create_timer(0.6).timeout
+	var st2 := lbox_stage == "ajar"
+	await _click_at(ip + isz*Vector2(0.50, 0.37)); await get_tree().create_timer(0.6).timeout
+	var st3 := lbox_stage == "open"
+	await _shot(_shotdir() + "in_lbox_open.png", 2)
+	await _click_at(ip + isz*Vector2(0.49, 0.47)); await get_tree().create_timer(0.4).timeout
+	var l2 := _shown() == "LETTER2"
+	await _shot(_shotdir() + "in_letter2.png", 2)
+	await _click_at(Vector2(W*0.66, H*0.935))     # fold it into your coat
+	await get_tree().create_timer(0.5).timeout
+	var done_ok: bool = intro_done and _shown() == "HUB" and hub_bg.texture == tex.get("hub_day_paper", null)
+	print("INTRO_OK letter1=", l1, " casket_bg=", hub_casket, " door_gated=", door_gated,
+		" screen_lbox=", box_open_scr, " key=", st1, " latch=", st2, " lid=", st3,
+		" letter2=", l2, " done_bell_paper=", done_ok)
 	get_tree().quit()
 
 func _dbg_haas() -> void:
@@ -5389,6 +5478,121 @@ func _show_ledger() -> void:
 	_play("page_turn")
 
 # ── НІЧ: монтажний стик між днями (правило 14 — не різати навпростець) ────────
+# ── ВСТУП: лист нотаріуса · скринька-ребус · заповіт дядька ──────────────────
+func _build_intro() -> void:
+	# ЛИСТ 1 — нотаріальний
+	var s := _screen("LETTER1")
+	_paper_backdrop(s, 0.16)
+	var lt: Texture2D = tex.get("letter_client", tex["atestat_flat_blank"])
+	var chh: float = H*0.88
+	var cwd: float = chh*float(lt.get_width())/float(lt.get_height())
+	var r1 := Control.new(); r1.size = Vector2(cwd, chh)
+	r1.position = Vector2((W-cwd)*0.5, (H-chh)*0.5); s.add_child(r1)
+	var pp := TextureRect.new(); pp.texture = lt
+	pp.expand_mode = TextureRect.EXPAND_IGNORE_SIZE; pp.stretch_mode = TextureRect.STRETCH_SCALE
+	pp.set_anchors_preset(Control.PRESET_FULL_RECT); pp.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	r1.add_child(pp)
+	var head := Label.new(); head.label_settings = _ls(fr, int(chh*0.024), Color(0.30,0.23,0.15))
+	head.text = _t("Vienna, the 12th of April, 1901")
+	head.position = Vector2(cwd*0.16, chh*0.13); head.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	r1.add_child(head)
+	var body := Label.new(); body.label_settings = _ls(fr, int(chh*0.027), Color(0.22,0.17,0.11))
+	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	body.size = Vector2(cwd*0.70, chh*0.56); body.position = Vector2(cwd*0.15, chh*0.20)
+	body.text = _t("It is our duty to inform you that your uncle, Theodor Haas, sworn attributor, of Wollzeile 17, died on the 9th of this month. He leaves no nearer kin: by law and by his own standing instruction, the bureau \u2014 its rooms, its books and its seal \u2014 passes to you, together with its obligations.\n\nThe bureau is expected open tomorrow at eight.\n\nThe key is enclosed.")
+	body.mouse_filter = Control.MOUSE_FILTER_IGNORE; r1.add_child(body)
+	var sig1 := Label.new(); sig1.label_settings = _ls(fr, int(chh*0.022), Color(0.30,0.23,0.15))
+	sig1.text = _t("\u2014 the notary's office at the Stubenring")
+	sig1.position = Vector2(cwd*0.34, chh*0.78); sig1.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	r1.add_child(sig1)
+	_txtbtn(s, "\u2192  to Wollzeile 17", Vector2(W*0.68, H*0.92), func():
+		_play("door_bell"); _enter_hub())
+	# СКРИНЬКА-РЕБУС: три видимі кроки (ключ → засувка → кришка)
+	var s2 := _screen("LBOX")
+	_paper_backdrop(s2, 0.10)
+	var t: Texture2D = tex["lbox_closed"]
+	var ih := H * 0.94
+	var iw := ih * float(t.get_width()) / float(t.get_height())
+	if iw > W * 0.72:
+		iw = W * 0.72; ih = iw * float(t.get_height()) / float(t.get_width())
+	var im := TextureRect.new(); im.texture = t
+	im.expand_mode = TextureRect.EXPAND_IGNORE_SIZE; im.stretch_mode = TextureRect.STRETCH_SCALE
+	im.size = Vector2(iw, ih); im.position = Vector2((W - iw) * 0.5, (H - ih) * 0.5)
+	im.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	s2.add_child(im); lbox_plate = im
+	var mk := func(fx: float, fy: float, fw: float, fh2: float, hint: String, cb: Callable) -> void:
+		var b := Button.new(); b.flat = true; b.modulate.a = 0.0
+		b.position = im.position + Vector2(iw*fx, ih*fy); b.size = Vector2(iw*fw, ih*fh2)
+		b.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+		b.mouse_entered.connect(_set_hint.bind(hint))
+		b.pressed.connect(cb)
+		s2.add_child(b)
+	mk.call(0.46, 0.52, 0.12, 0.16, "The key, still in the lock.", func(): _lbox_step("locked", "keyed", "The key turns \u2014 a small, willing click."))
+	mk.call(0.58, 0.51, 0.12, 0.10, "A brass slide latch.", func(): _lbox_step("keyed", "ajar", "The latch slides; the lid breathes open a crack."))
+	mk.call(0.24, 0.24, 0.52, 0.26, "The lid.", func(): _lbox_step("ajar", "open", "Old papers \u2014 and one sealed envelope, waiting."))
+	# конверт живе ТІЛЬКИ у відкритому стані: інакше він (остання дитина,
+	# верхній у пікінгу) з'їдає кліки по кришці (грабля №1, зловлено тестом intro)
+	var env_btn := Button.new(); env_btn.flat = true; env_btn.modulate.a = 0.0
+	env_btn.name = "lbox_env"; env_btn.visible = false
+	env_btn.position = im.position + Vector2(iw*0.34, ih*0.36); env_btn.size = Vector2(iw*0.30, ih*0.22)
+	env_btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	env_btn.mouse_entered.connect(_set_hint.bind("A sealed envelope."))
+	env_btn.pressed.connect(func():
+		if lbox_stage == "open": _play("page_turn"); _show("LETTER2"))
+	s2.add_child(env_btn)
+	_txtbtn(s2, "\u2190  step back", Vector2(W*0.04, H*0.92), func(): _enter_hub())
+	# ЛИСТ 2 — заповіт дядька, його рукою
+	var s3 := _screen("LETTER2")
+	_paper_backdrop(s3, 0.16)
+	var r3 := Control.new(); r3.size = Vector2(cwd, chh)
+	r3.position = Vector2((W-cwd)*0.5, (H-chh)*0.5); s3.add_child(r3)
+	var pp3 := TextureRect.new(); pp3.texture = lt
+	pp3.expand_mode = TextureRect.EXPAND_IGNORE_SIZE; pp3.stretch_mode = TextureRect.STRETCH_SCALE
+	pp3.set_anchors_preset(Control.PRESET_FULL_RECT); pp3.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	r3.add_child(pp3)
+	var will := Label.new(); will.label_settings = _ls(fh, int(chh*0.031), Color(0.20,0.15,0.10))
+	will.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	will.size = Vector2(cwd*0.72, chh*0.66); will.position = Vector2(cwd*0.14, chh*0.14)
+	will.text = _t("If you are reading this, I am gone. They killed me. I was threatened, and I did not step aside.\n\nWithin these walls are my caches \u2014 money, letters, proof. Look for them.\n\nWatch the clients. Somewhere among them is the one who did it.\n\nDo not go to the police empty-handed. They need proof, not words.\n\nKeep the bureau. The seal weighs more than any oath.")
+	will.mouse_filter = Control.MOUSE_FILTER_IGNORE; r3.add_child(will)
+	var sig3 := Label.new(); sig3.label_settings = _ls(fh, int(chh*0.036), Color(0.25,0.19,0.12))
+	sig3.text = _t("\u2014 T.H."); sig3.position = Vector2(cwd*0.62, chh*0.80)
+	sig3.rotation = deg_to_rad(-3.0); sig3.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	r3.add_child(sig3)
+	_txtbtn(s3, "fold it into your coat  \u2192", Vector2(W*0.62, H*0.92), func(): _intro_finish())
+
+func _lbox_show() -> void:
+	if lbox_plate:
+		lbox_plate.texture = tex["lbox_" + ("closed" if lbox_stage == "locked" else ("key" if lbox_stage == "keyed" else ("mid" if lbox_stage == "ajar" else "open")))]
+	_show("LBOX")
+
+func _lbox_step(from_stage: String, to_stage: String, hint: String) -> void:
+	if lbox_stage != from_stage or box_busy: return
+	box_busy = true
+	_play("ui_soft")
+	lbox_stage = to_stage
+	var nm := "lbox_" + ("key" if to_stage == "keyed" else ("mid" if to_stage == "ajar" else "open"))
+	var tw := create_tween()
+	tw.tween_interval(0.12)
+	tw.tween_callback(func():
+		lbox_plate.texture = tex[nm]
+		if to_stage == "open":
+			_play("goblet_set")
+			var sc: Control = screens.get("LBOX", null)
+			if sc and sc.has_node("lbox_env"): (sc.get_node("lbox_env") as Button).visible = true)
+	tw.tween_interval(0.25)
+	tw.tween_callback(func():
+		box_busy = false
+		_set_hint(hint))
+
+func _intro_finish() -> void:
+	# заповіт прочитано: бюро відкривається, і світ починає рухатись
+	intro_done = true
+	_save_game()
+	_enter_hub()
+	_play("door_bell")
+	_hub_say("The bell. Someone is waiting at the door.")
+
 func _build_haas_papers() -> void:
 	# ХВИЛЯ 0: незакритий атестат №1430 — бланк той самий, рука його
 	var s := _screen("HAAS0")
@@ -5539,10 +5743,10 @@ func _seal_hold_start() -> void:
 		seal_puddle.position = med - seal_puddle.size*0.5
 		seal_puddle.scale = Vector2(0.2, 0.2); seal_puddle.modulate = Color(1,1,1,0)
 		cert_layer.add_child(seal_puddle)
-		seal_wax = TextureRect.new(); seal_wax.texture = tex["wax_stick"]
+		seal_wax = TextureRect.new(); seal_wax.texture = tex["wax_bar"]
 		seal_wax.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		seal_wax.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		var wxt: Texture2D = tex["wax_stick"]
+		var wxt: Texture2D = tex["wax_bar"]
 		var ww: float = cert_layer.size.x*0.10
 		seal_wax.size = Vector2(ww, ww*float(wxt.get_height())/float(wxt.get_width()))
 		seal_wax.pivot_offset = Vector2(seal_wax.size.x*0.5, seal_wax.size.y*0.9)

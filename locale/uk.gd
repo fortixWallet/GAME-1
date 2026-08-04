@@ -603,4 +603,23 @@ const T := {
 "Hold \u2014 the wax is pouring.": "Тримай — віск ллється.",
 "Now the stamp \u2014 press it true. Once set, it cannot be lifted.": "Тепер штамп — притисни рівно. Поставлену не знімеш.",
 "The attribution is written.\nHold the wax to the medallion; when it has pooled, press the stamp \u2014 once set, it cannot be lifted.": "Атрибуцію написано.\nТримай віск біля медальйона; коли наллється — притисни штамп. Поставлену печатку не знімеш.",
+
+# ─ Вступ v3 «Спадкоємець» ─
+"Vienna, the 12th of April, 1901": "Відень, 12 квітня 1901 року",
+"It is our duty to inform you that your uncle, Theodor Haas, sworn attributor, of Wollzeile 17, died on the 9th of this month. He leaves no nearer kin: by law and by his own standing instruction, the bureau \u2014 its rooms, its books and its seal \u2014 passes to you, together with its obligations.\n\nThe bureau is expected open tomorrow at eight.\n\nThe key is enclosed.": "Обов'язок велить повідомити: Ваш дядько Теодор Гаас, присяжний атрибутор, Вольцайле 17, помер 9-го числа цього місяця. Ближчої рідні він не лишив: за законом і за його власним розпорядженням бюро — приміщення, книги і печатка — переходить Вам, разом з обов'язками.\n\nБюро має відчинитися завтра о восьмій.\n\nКлюч додано.",
+"\u2014 the notary's office at the Stubenring": "— нотаріальна контора на Штубенрінгу",
+"\u2192  to Wollzeile 17": "→  на Вольцайле, 17",
+"His bureau. On the desk \u2014 his letter-casket, the key still in the lock.": "Його бюро. На столі — його скринька для листів, ключ так і стоїть у замку.",
+"His desk first \u2014 the casket waits, and the bureau is not yet open.": "Спершу його стіл — скринька чекає, а бюро ще не відчинене.",
+"The key, still in the lock.": "Ключ, так і лишений у замку.",
+"A brass slide latch.": "Латунна засувка.",
+"The lid.": "Кришка.",
+"A sealed envelope.": "Запечатаний конверт.",
+"The key turns \u2014 a small, willing click.": "Ключ повертається — тихий, слухняний щиголь.",
+"The latch slides; the lid breathes open a crack.": "Засувка від'їжджає; кришка дихає — прочинилась на щілину.",
+"Old papers \u2014 and one sealed envelope, waiting.": "Старі папери — і один запечатаний конверт. Чекає.",
+"If you are reading this, I am gone. They killed me. I was threatened, and I did not step aside.\n\nWithin these walls are my caches \u2014 money, letters, proof. Look for them.\n\nWatch the clients. Somewhere among them is the one who did it.\n\nDo not go to the police empty-handed. They need proof, not words.\n\nKeep the bureau. The seal weighs more than any oath.": "Якщо ти це читаєш — мене вже нема. Мене вбили. Мені погрожували, і я не відступив.\n\nУ цих стінах — мої схованки: гроші, листи, докази. Шукай їх.\n\nПриглядайся до клієнтів. Десь між ними — той, хто це зробив.\n\nНе йди в поліцію з порожніми руками. Їм потрібні докази, не слова.\n\nВеди бюро. Печатка важить більше за будь-яку клятву.",
+"\u2014 T.H.": "— Т.Г.",
+"fold it into your coat  \u2192": "сховати за пазуху  →",
+"The bell. Someone is waiting at the door.": "Дзвінок. Хтось чекає під дверима.",
 }
