@@ -1,136 +1,116 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""ГРАВЮРНИЙ КОНВЕРТЕР — детермінований, без ШІ (правило: фінальний піксель наш).
-Робить із рендера/фото штрихову гравюру XIX ст.: штрихи йдуть ПО ФОРМІ предмета
-(за напрямком градієнта), щільність — за яскравістю, тіні добираються
-перехресним штрихуванням, світлові плями лишаються чистим папером.
-
-Вжиток: python3 tools/engrave.py <вхід.png> <вихід.png> [--paper art/atestat_flat_blank.png]
-Правило 17: друкує, скільки шарів і скільки пікселів покрито штрихом.
+"""ГРАВЮРНИЙ КОНВЕРТЕР v2 — детермінований, без ШІ.
+Закони різцевої гравюри XIX ст., реалізовані буквально:
+  · штрихи йдуть ПО ФОРМІ (напрямок із згладженого поля градієнта);
+  · товщина лінії плавно росте з темрявою (swelling line) — ознака різця;
+  · лінії ЗГЛАДЖЕНІ (anti-alias), а не бінарні — інакше рвань і «фотофільтр»;
+  · ДЕТАЛЬ зберігається: локальний контраст піднімається unsharp-маскою ДО
+    штрихування; тон рахується у двох масштабах (великий — напрямок, дрібний — тон);
+  · фон відсікається маскою предмета, інакше рівне тло береться шумом;
+  · контур — тонка чиста лінія на сильних краях, без потовщення.
+Вжиток: python3 tools/engrave.py <вхід> <вихід> [--period 7] [--paper …png] [--dark 1.0] [--detail 1.6]
+Правило 17: друкує розмір, частку предмета в кадрі і покриття штрихом.
 """
 import sys, pathlib
 import numpy as np
 from PIL import Image, ImageFilter, ImageOps
 
 
-def sobel(gray):
-    k = np.array([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]], dtype=np.float32)
-    from scipy.ndimage import convolve
-    gx = convolve(gray, k)
-    gy = convolve(gray, k.T)
-    return gx, gy
+def blur(a, r):
+    return np.asarray(Image.fromarray(np.clip(a * 255, 0, 255).astype(np.uint8))
+                      .filter(ImageFilter.GaussianBlur(r)), dtype=np.float32) / 255.0
 
 
-def sobel_np(gray):
-    """Sobel без scipy — згортка зсувами."""
-    g = gray
-    up = np.roll(g, -1, axis=0); dn = np.roll(g, 1, axis=0)
-    lf = np.roll(g, -1, axis=1); rt = np.roll(g, 1, axis=1)
-    upl = np.roll(up, -1, axis=1); upr = np.roll(up, 1, axis=1)
-    dnl = np.roll(dn, -1, axis=1); dnr = np.roll(dn, 1, axis=1)
+def sobel_np(g):
+    up = np.roll(g, -1, 0); dn = np.roll(g, 1, 0)
+    lf = np.roll(g, -1, 1); rt = np.roll(g, 1, 1)
+    upl = np.roll(up, -1, 1); upr = np.roll(up, 1, 1)
+    dnl = np.roll(dn, -1, 1); dnr = np.roll(dn, 1, 1)
     gx = (upr + 2 * rt + dnr) - (upl + 2 * lf + dnl)
     gy = (dnl + 2 * dn + dnr) - (upl + 2 * up + upr)
     return gx, gy
 
 
-def hatch_layer(shape, angle_rad, period, phase=0.0, thickness=0.42):
-    """Прямі штрихи під кутом: 1 там, де штрих, 0 де папір."""
-    h, w = shape
-    yy, xx = np.mgrid[0:h, 0:w].astype(np.float32)
-    proj = xx * np.cos(angle_rad) + yy * np.sin(angle_rad)
-    t = np.mod(proj / period + phase, 1.0)
-    return (t < thickness).astype(np.float32)
+def smoothstep(e0, e1, x):
+    t = np.clip((x - e0) / max(abs(e1 - e0), 1e-6), 0.0, 1.0) if np.isscalar(e0) else \
+        np.clip((x - e0) / np.maximum(np.abs(e1 - e0), 1e-6), 0.0, 1.0)
+    return t * t * (3.0 - 2.0 * t)
 
 
-def flow_hatch(shape, ang_field, period, thickness=0.42):
-    """Штрихи, що ЙДУТЬ ПО ФОРМІ: фаза рахується вздовж поля напрямків.
-    Наближення: проєкція координат на локальну нормаль форми."""
-    h, w = shape
-    yy, xx = np.mgrid[0:h, 0:w].astype(np.float32)
-    proj = xx * np.cos(ang_field) + yy * np.sin(ang_field)
-    t = np.mod(proj / period, 1.0)
-    return (t < thickness).astype(np.float32)
+def aa_lines(phase, half_width, feather=0.055):
+    """Згладжена система паралельних ліній: phase — координата поперек ліній
+    у частках періоду; half_width — половина товщини (0..0.5), може бути полем."""
+    d = np.abs(np.mod(phase + 0.5, 1.0) - 0.5)
+    return 1.0 - np.clip((d - half_width) / feather, 0.0, 1.0) ** 1.0
 
 
-def engrave(src_path, out_path, paper_path=None, base_period=6.0, levels=4):
-    im = Image.open(src_path).convert("RGB")
+def engrave(src, out, paper_path=None, period=7.0, dark_gain=1.0, detail=1.6):
+    im = Image.open(src).convert("RGB")
     W, H = im.size
-    g = np.asarray(ImageOps.autocontrast(im.convert("L"), cutoff=1), dtype=np.float32) / 255.0
+    g0 = np.asarray(ImageOps.autocontrast(im.convert("L"), cutoff=1), dtype=np.float32) / 255.0
 
-    # м'яка версія для тону, різка для контурів
-    tone = np.asarray(Image.fromarray((g * 255).astype(np.uint8)).filter(
-        ImageFilter.GaussianBlur(2.2)), dtype=np.float32) / 255.0
-    gx, gy = sobel_np(np.asarray(Image.fromarray((g * 255).astype(np.uint8)).filter(
-        ImageFilter.GaussianBlur(3.0)), dtype=np.float32) / 255.0)
+    # 1. ДЕТАЛЬ: локальний контраст (unsharp) — інакше гільош і клейма гинуть
+    g = np.clip(g0 + detail * (g0 - blur(g0, 3.0)), 0.0, 1.0)
 
-    # напрямок ШТРИХА = перпендикуляр до градієнта (штрих іде по формі)
+    # 2. ДВА МАСШТАБИ: великий — напрямок штриха, дрібний — тон
+    tone = blur(g, 1.0)
+    form = blur(g0, 7.0)
+    gx, gy = sobel_np(form)
     ang = np.arctan2(gy, gx) + np.pi / 2.0
-    # згладити поле напрямків, щоб штрих не тремтів
-    ang_s = np.arctan2(
-        np.asarray(Image.fromarray(((np.sin(ang) + 1) * 127).astype(np.uint8)).filter(
-            ImageFilter.GaussianBlur(6)), dtype=np.float32) / 127.0 - 1.0,
-        np.asarray(Image.fromarray(((np.cos(ang) + 1) * 127).astype(np.uint8)).filter(
-            ImageFilter.GaussianBlur(6)), dtype=np.float32) / 127.0 - 1.0)
+    ang = np.arctan2(blur(np.sin(ang) * 0.5 + 0.5, 9) * 2 - 1,
+                     blur(np.cos(ang) * 0.5 + 0.5, 9) * 2 - 1)
 
-    # ЩІЛЬНІСТЬ ШТРИХА = ТОН (головний закон гравюри): товщина лінії росте
-    # з темрявою плавно, а не «є/нема». Світло — чистий папір, тінь — густа сітка.
-    dark = np.clip(1.0 - tone, 0.0, 1.0)
-    ink = np.zeros((H, W), dtype=np.float32)
-    covered = 0
+    # 3. МАСКА ПРЕДМЕТА: фон = рівні ділянки без градієнта
+    ex, ey = sobel_np(blur(g0, 2.0))
+    emag = np.hypot(ex, ey); emag /= (emag.max() + 1e-6)
+    obj = blur((emag > 0.05).astype(np.float32), 14.0)
+    obj = smoothstep(0.06, 0.20, obj)
 
-    def lay(mask_field, t_local):
-        # t_local: локальна товщина 0..0.5 у частках періоду
-        return (np.mod(mask_field, 1.0) < t_local).astype(np.float32)
-
+    dark = np.clip((1.0 - tone) * dark_gain, 0.0, 1.0)
     yy, xx = np.mgrid[0:H, 0:W].astype(np.float32)
-    # ШАР 1 — по формі, товщина від тону
-    f1 = (xx * np.cos(ang_s) + yy * np.sin(ang_s)) / base_period
-    t1 = np.clip((dark - 0.20) * 0.72, 0.0, 0.46)
-    l1 = lay(f1, t1)
-    ink = np.maximum(ink, l1); covered += int(l1.sum())
-    # ШАР 2 — перехресний 45°, вмикається із середніх тонів
-    f2 = (xx * np.cos(np.deg2rad(45)) + yy * np.sin(np.deg2rad(45))) / (base_period * 1.08)
-    t2 = np.clip((dark - 0.42) * 0.85, 0.0, 0.44)
-    l2 = lay(f2, t2)
-    ink = np.maximum(ink, l2); covered += int(l2.sum())
-    # ШАР 3 — перехресний -45°, тільки глибокі тіні
-    f3 = (xx * np.cos(np.deg2rad(-45)) + yy * np.sin(np.deg2rad(-45))) / (base_period * 1.17)
-    t3 = np.clip((dark - 0.66) * 1.1, 0.0, 0.42)
-    l3 = lay(f3, t3)
-    ink = np.maximum(ink, l3); covered += int(l3.sum())
+    ink = np.zeros((H, W), dtype=np.float32)
 
-    # КОНТУР — тонкий і лише на СИЛЬНИХ краях (гравер веде одну лінію, не заливає)
-    mag = np.hypot(gx, gy)
-    mag = mag / (mag.max() + 1e-6)
-    edge = (mag > 0.34).astype(np.float32)
-    ink = np.maximum(ink, edge * 0.9)
+    # ШАР 1 — по формі, товщина росте з темрявою
+    p1 = (xx * np.cos(ang) + yy * np.sin(ang)) / period
+    w1 = 0.10 + 0.32 * smoothstep(0.05, 0.65, dark)
+    ink = np.maximum(ink, aa_lines(p1, w1))
 
-    # СВІТЛОВІ ПЛЯМИ — чистий папір
-    # чистий папір там, де світло: інакше рівний фон береться шумом
-    ink *= (tone < 0.82).astype(np.float32)
+    # ШАР 2 — перехресний 52°, середні й глибокі тони
+    p2 = (xx * np.cos(np.deg2rad(52)) + yy * np.sin(np.deg2rad(52))) / (period * 1.05)
+    ink = np.maximum(ink, aa_lines(p2, 0.34 * smoothstep(0.34, 0.78, dark)))
 
-    # ЧОРНИЛО на папері
-    ink_img = Image.fromarray(((1.0 - ink) * 255).astype(np.uint8)).convert("L")
-    ink_img = ink_img.filter(ImageFilter.GaussianBlur(0.4))
+    # ШАР 3 — перехресний -38°, найглибші тіні
+    p3 = (xx * np.cos(np.deg2rad(-38)) + yy * np.sin(np.deg2rad(-38))) / (period * 1.11)
+    ink = np.maximum(ink, aa_lines(p3, 0.32 * smoothstep(0.58, 0.92, dark)))
+
+    # 4. КОНТУР — тонка чиста лінія на сильних краях
+    cx, cy = sobel_np(blur(g, 1.2))
+    cmag = np.hypot(cx, cy); cmag /= (cmag.max() + 1e-6)
+    ink = np.maximum(ink, smoothstep(0.22, 0.40, cmag) * 0.92)
+
+    # 5. Фон і світлові плями — чистий папір
+    ink *= obj
+    ink *= (1.0 - smoothstep(0.86, 0.96, tone))   # чистий папір лише в яскравому світлі
+
+    # 6. Друк
+    ink_img = Image.fromarray(((1.0 - np.clip(ink, 0, 1)) * 255).astype(np.uint8))
     if paper_path and pathlib.Path(paper_path).exists():
         paper = Image.open(paper_path).convert("RGB").resize((W, H), Image.LANCZOS)
     else:
-        paper = Image.new("RGB", (W, H), (238, 230, 210))
-    ink_rgb = Image.merge("RGB", [ink_img] * 3)
-    # мультиплікативне накладання: чорнило темнить папір
-    out = Image.fromarray(
-        (np.asarray(paper, dtype=np.float32) * (np.asarray(ink_rgb, dtype=np.float32) / 255.0)
-         ).astype(np.uint8))
-    out.save(out_path)
-    print("ENGRAVE %s -> %s  %dx%d  шарів=%d  пікселів під штрихом=%d (%.1f%%)"
-          % (pathlib.Path(src_path).name, pathlib.Path(out_path).name, W, H,
-             levels, covered, 100.0 * covered / (W * H)))
+        paper = Image.new("RGB", (W, H), (240, 233, 214))
+    res = (np.asarray(paper, np.float32) *
+           (np.asarray(ink_img.convert("RGB"), np.float32) / 255.0))
+    res *= np.array([1.0, 0.985, 0.95], np.float32)   # тепле друкарське чорнило
+    Image.fromarray(np.clip(res, 0, 255).astype(np.uint8)).save(out)
+    print("ENGRAVE %s -> %s  %dx%d  предмет=%.1f%% кадру  штрих=%.1f%% предмета"
+          % (pathlib.Path(src).name, pathlib.Path(out).name, W, H,
+             100.0 * obj.mean(), 100.0 * ink.sum() / max(obj.sum(), 1.0)))
 
 
 if __name__ == "__main__":
-    args = [a for a in sys.argv[1:] if not a.startswith("--")]
-    paper = None
-    if "--paper" in sys.argv:
-        paper = sys.argv[sys.argv.index("--paper") + 1]
-    per = float(sys.argv[sys.argv.index("--period") + 1]) if "--period" in sys.argv else 6.0
-    engrave(args[0], args[1], paper, base_period=per)
+    a = [x for x in sys.argv[1:] if not x.startswith("--")]
+    def opt(n, d, cast=float):
+        return cast(sys.argv[sys.argv.index(n) + 1]) if n in sys.argv else d
+    engrave(a[0], a[1], opt("--paper", None, str), opt("--period", 7.0),
+            opt("--dark", 1.0), opt("--detail", 1.6))
