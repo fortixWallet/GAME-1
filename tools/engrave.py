@@ -75,6 +75,7 @@ def engrave(src, out, paper_path=None, period=7.0, dark_gain=1.0, detail=1.6):
     p1 = (xx * np.cos(ang) + yy * np.sin(ang)) / period
     w1 = 0.10 + 0.32 * smoothstep(0.05, 0.65, dark)
     ink = np.maximum(ink, aa_lines(p1, w1))
+    l1_keep = ink.copy()   # тінь лишається на простій сітці шару 1
 
     # ШАР 2 — перехресний 52°, середні й глибокі тони
     p2 = (xx * np.cos(np.deg2rad(52)) + yy * np.sin(np.deg2rad(52))) / (period * 1.05)
@@ -88,6 +89,12 @@ def engrave(src, out, paper_path=None, period=7.0, dark_gain=1.0, detail=1.6):
     cx, cy = sobel_np(blur(g, 1.2))
     cmag = np.hypot(cx, cy); cmag /= (cmag.max() + 1e-6)
     ink = np.maximum(ink, smoothstep(0.22, 0.40, cmag) * 0.92)
+
+    # 4б. ТІНЬ НА СТОЛІ: на РІВНИХ темних зонах гравер кладе просту паралельну
+    # сітку без перехресних шарів — інакше м'який градієнт стає кашею. Не
+    # заміняємо штрих (це давало смуги на корпусі), а РОЗРІДЖУЄМО перехресні шари.
+    flat = 1.0 - smoothstep(0.03, 0.11, blur(np.hypot(*sobel_np(blur(g0, 4.0))), 7.0))
+    ink = np.minimum(ink, np.maximum(l1_keep, 1.0 - flat * 0.85))
 
     # 5. Фон і світлові плями — чистий папір
     ink *= obj
