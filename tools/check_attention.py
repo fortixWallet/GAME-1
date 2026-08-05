@@ -62,13 +62,21 @@ def main():
     hsv = np.asarray(im.convert("HSV"), dtype=np.float64)
     Hh, S = hsv[..., 0] * 360 / 255.0, hsv[..., 1] / 255.0
 
-    # маска робочої зони
-    if "--obj" in sys.argv:
-        x0, y0, x1, y1 = [float(v) for v in sys.argv[sys.argv.index("--obj") + 1].split(",")]
+    # МАСКА ПРЕДМЕТА. --mask дає ТОЧНУ маску (альфа PNG розміру кадру) — це єдиний
+    # чесний спосіб: прямокутник --obj включає підкладку під діагональним предметом
+    # і псує всі метрики (спіймано 05.08: «силует 0», бо пів «предмета» було сукном).
+    x0, y0, x1, y1 = 0.30, 0.30, 0.70, 0.70
+    if "--mask" in sys.argv:
+        mp = sys.argv[sys.argv.index("--mask") + 1]
+        ma = np.asarray(Image.open(mp).convert("RGBA").resize((W, H)))[:, :, 3]
+        obj = ma > 40
+        ys, xs = np.nonzero(obj)
+        x0, y0, x1, y1 = xs.min()/W, ys.min()/H, xs.max()/W, ys.max()/H
     else:
-        x0, y0, x1, y1 = 0.30, 0.30, 0.70, 0.70
-    obj = np.zeros((H, W), bool)
-    obj[int(H*y0):int(H*y1), int(W*x0):int(W*x1)] = True
+        if "--obj" in sys.argv:
+            x0, y0, x1, y1 = [float(v) for v in sys.argv[sys.argv.index("--obj") + 1].split(",")]
+        obj = np.zeros((H, W), bool)
+        obj[int(H*y0):int(H*y1), int(W*x0):int(W*x1)] = True
     bg = ~obj
 
     print("ATTENTION %s  %dx%d  робоча зона=%.0f%% кадру"
@@ -111,12 +119,22 @@ def main():
     print("  3 КРАЇ       предмет %.3f · фон %.3f · відношення %.2f   %s (норма ≤0.40)"
           % (d_obj, d_bg, ratio_e, "OK" if ratio_e <= 0.40 else "УВАГА"))
 
-    # 4 ЛОКАЛЬНИЙ КОНТРАСТ
-    ls = local_std(L, 32)
-    c_obj, c_bg = np.median(ls[obj]), np.median(ls[bg])
-    ratio_c = c_bg / max(c_obj, 1e-6)
-    print("  4 КОНТРАСТ   предмет %.1f · фон %.1f · відношення %.2f   %s (норма ≤0.50)"
-          % (c_obj, c_bg, ratio_c, "OK" if ratio_c <= 0.50 else "УВАГА"))
+    # 4 ТОНАЛЬНИЙ РОЗМАХ (для ПЛОСКОГО стилю замість локального контрасту:
+    # у гуаші всередині заливки контраст нульовий за визначенням, тому міряємо
+    # РОЗМАХ тонів у зоні — скільки різних площин світлоти вона тримає)
+    span_obj = np.percentile(L[obj], 95) - np.percentile(L[obj], 5)
+    span_bg = np.percentile(L[bg], 95) - np.percentile(L[bg], 5)
+    print("  4 РОЗМАХ     предмет %.0f · фон %.0f   %s (предмет має тримати ≥1.2× фону)"
+          % (span_obj, span_bg, "OK" if span_obj >= span_bg * 1.2 else "УВАГА: фон розмаїтіший"))
+
+    # 4б СИЛУЕТ: чи відділяється предмет від підкладки перепадом на межі
+    om = Image.fromarray((obj*255).astype(np.uint8)).filter(ImageFilter.MaxFilter(9))
+    for _ in range(3):
+        om = om.filter(ImageFilter.MaxFilter(9))
+    ring = (np.asarray(om) > 40) & ~obj
+    d_edge = abs(np.median(L[obj]) - np.median(L[ring]))
+    print("  4б СИЛУЕТ    перепад предмет↔підкладка: %.0f L*   %s (норма ≥12)"
+          % (d_edge, "OK" if d_edge >= 12 else "УВАГА: предмет зливається"))
 
     # 5 АКЦЕНТ (сургучевий)
     acc = (((Hh <= 12) | (Hh >= 350)) & (S > 0.5)).mean()
