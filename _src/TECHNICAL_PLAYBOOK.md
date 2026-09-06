@@ -19,7 +19,8 @@
 Плоску фронтальну картинку на перспективне фото не класти НІКОЛИ.
 
 **Робочий прийом (перевірено):**
-1. Узяти базовий кадр столу (`case_desk.png`, 5504×3072).
+1. Узяти базовий кадр сцени з ГРИ (`Bureau/art/`), а не `case_desk.png`
+   (той — покинутий фото-напрям, у `_archive/`).
 2. `gemini-3-pro-image` у режимі edit: «Add X lying FLAT on the green cloth, in the SAME
    top-down perspective as the desk (~35°), soft realistic contact shadow beneath it,
    match the warm lamp lighting, COMPLETE and not cropped. Keep everything else identical.»
@@ -113,7 +114,8 @@ hub_day (майстер)
 Формула правки: «Using the provided image, keep EVERYTHING identical — same room, same camera
 angle, same objects, same lighting and composition. **Change only:** …»
 
-**Стиль-якір для нових кадрів:** передавати `case_desk.png` (зменшений до 1400 px) як
+**Стиль-якір для нових кадрів:** передавати КАДР ІЗ ГРИ (`Bureau/art/_ETALON_client.png`,
+`spoon_close_bg.png`) як
 референс — тоді нова сцена успадковує дерево, латунь і грейд.
 
 ## 1.8. Іменування й кеш імпорту

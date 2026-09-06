@@ -265,7 +265,7 @@ story; one of them is a forgery — and the murderer is still coming to your cou
   tools/check_frames.py + гейт). Пропорція генерації = пропорція референса.
 - Матеріали, не оцінки («charred wood, ash in cracks»). «No text anywhere» скрізь
   (кирилицю псує; написи — шрифтом поверх; короткі латинські тавра — можна).
-- Стиль-якір: art/case_desk.png у кожну генерацію. HD = ×2 LANCZOS для лупи.
+- Стиль-якір: КАДР ІЗ ГРИ (Bureau/art/) у кожну генерацію; case_desk.png — покинутий напрям. HD = ×2 LANCZOS для лупи.
   JPEG-під-.png нормалізувати PIL. Палітра: оксблад + латунь + слонова кістка,
   сургуч — єдиний акцент. Без окультизму, без кота.
 
