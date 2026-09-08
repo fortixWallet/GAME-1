@@ -1,8 +1,10 @@
 # Genuine Article (Game3) — закони. Повні редакції з цінами: `Bureau/docs/LAWS.md`
 
 Гра живе в `/Users/skydrows/Documents/Game/Bureau` (Godot 4, macOS, `godot`
-з кореня). Game3 — лише робочий простір (`.claude`, `CLAUDE.md`, `_src`); стара
-збірка прибрана з дерева 07.09, історія в git. Збірки — `Game/Demo/win|mac`,
+з кореня) — гілка `development/full-game`, модулі `core/ shared/ days/day_NN/`
+(карта тек — `Bureau/docs/README.md`). Стабільне демо — worktree
+`Game/Bureau_demo` (гілка `release/demo`, тег `demo-day1-frozen`), правки туди
+лише вибірково. Game3 — лише робочий простір (`.claude`, `CLAUDE.md`, `_src`). Збірки — `Game/Demo/win|mac`,
 проміжний експорт — схована `Game/.demo_src`. Робоча ціль — 30–50 тис. копій за перший
 рік ($12.99); 100k+ — верхній хвіст, умови якого названі в BUILD §2.
 
