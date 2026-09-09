@@ -38,6 +38,19 @@
           }
         ]
       }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/skydrows/Documents/Game/Game3/.claude/hooks_no_play.sh",
+            "timeout": 10,
+            "statusMessage": "Закон 46: гру ганяє Віктор"
+          }
+        ]
+      }
     ]
   }
 }
